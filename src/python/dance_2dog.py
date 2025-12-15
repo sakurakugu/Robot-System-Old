@@ -5,10 +5,11 @@ sudo vim /opt/export/config/sdk_config.yaml
 
 robot-launch restart 4
 """
-
+# 两条狗跳舞
 from lib.api import CrazyRobotDog, execute_concurrently as ec
 import time
 
+# 狗狗配置
 DOGS_CONFIG = {
     "131": ("192.168.1.110", 10131),
     "47": ("192.168.1.116", 10047),
@@ -16,6 +17,7 @@ DOGS_CONFIG = {
 
 LOCAL_IP = "192.168.1.106"
 
+# 实例化狗1、2
 dog1 = CrazyRobotDog(
     name="47",
     robot_ip=DOGS_CONFIG["47"][0],
@@ -29,11 +31,14 @@ dog2 = CrazyRobotDog(
     local_port=DOGS_CONFIG["131"][1],
 )
 
+# 让狗站起来，如果已经站起来就在写入0
 dog1.stand_up(0)
 dog2.stand_up(0)
 
 time.sleep(0.8)
 
+# execute_concurrently 并发执行的缩写，如上
+# 狗1、2同时执行 nod_up(2)，lambda用于包装函数，传入指针
 ec(lambda: dog1.nod_up(2), lambda: dog2.nod_up(2))
 ec(lambda: dog1.nod_down(2), lambda: dog2.nod_down(2))
 ec(lambda: dog1.max_height(2), lambda: dog2.max_height(2))

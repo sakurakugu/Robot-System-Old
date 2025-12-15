@@ -1,19 +1,22 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone, timedelta
 from typing import Literal
-from datetime import datetime
 import time
 import math
+import sys
+from pathlib import Path
 
+# 根据平台和架构选择对应的静态库的路径
+arch = "x86_64" if sys.maxsize > 2**32 else "aarch64"
+sys.path.insert(0, str(Path(__file__).parent.parent / "so" / arch))
 
 try:
     import mc_sdk_zsl_1_py
-except ImportError:
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "so" / "x86_64"))
-    import mc_sdk_zsl_1_py
+except ImportError as e:
+    raise ImportError(f"无法导入 mc_sdk_zsl_1_py，请检查 {so_dir} 下是否存在 .so 文件") from e
 
 
+# 导出所需的类和函数
 __all__ = [
     "RobotDog",
     "CrazyRobotDog",
@@ -21,6 +24,7 @@ __all__ = [
 ]
 
 
+tz = timezone(timedelta(hours=8))
 def log(flag: str, name: str, action: str, result: str):
     """日志记录
 
@@ -30,8 +34,10 @@ def log(flag: str, name: str, action: str, result: str):
         action (str): 动作名称
         result (str): 结果描述
     """
+    # 记录当前时间，格式为ISO 8601(始终包含+-而不用Z)，并且精确到微秒
+    timestamp = datetime.now(tz).isoformat(timespec='microseconds') 
     print(
-        f"[{flag}] - {name} - {datetime.now().strftime('%H:%M:%S.%f')} - {action} -> {result}"
+        f"[{timestamp}] [{flag}] [{name}] {action} -> {result}"
     )
 
 
@@ -40,10 +46,11 @@ def execute_concurrently(*actions, _interval: float = 0):
     with ThreadPoolExecutor() as executor:
         futures = []
         for action in actions:
-            futures.append(executor.submit(action))
-            time.sleep(_interval)  # 微小延时，避免瞬时大量请求导致网络拥堵
+            futures.append(executor.submit(action)) # 提交动作到线程池
+            time.sleep(_interval)                   # 微小延时，避免瞬时大量请求导致网络拥堵
         for future in futures:
-            future.result()
+            future.result()                         # 等待动作完成
+
 
 
 class RobotDog:
@@ -147,9 +154,9 @@ class RobotDog:
 
     def _safe_action(
         self,
-        action: callable,
-        action_name: str = "",
-        interval: float = 0.2,
+        action: callable,       # 动作函数的引用
+        action_name: str = "",  # 动作名称
+        interval: float = 0.2,  # 重试间隔（秒）
     ):
         """安全执行动作，直到成功为止
 
@@ -159,7 +166,7 @@ class RobotDog:
             action_name (str): 动作名称
         """
         while True:
-            result = action()
+            result = action()  # 执行动作
             if result == 0:
                 log("+", self.name, action_name, result)
                 break

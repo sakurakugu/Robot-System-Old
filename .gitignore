@@ -1,0 +1,38 @@
+# Python 缓存与编译产物
+__pycache__/
+*.py[cod]
+*$py.class
+# 环境与虚拟环境
+.env
+.env.*
+.venv/
+venv/
+ENV/
+env/
+# 构建与打包产物
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+# 测试与覆盖率缓存
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage*
+coverage.xml
+htmlcov/
+# 笔记本与编辑器配置
+.ipynb_checkpoints/
+.vscode/
+.idea/
+# 系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+# 日志与临时文件
+*.log
+*.tmp
+*.bak
+# Python 版本管理
+.python-version

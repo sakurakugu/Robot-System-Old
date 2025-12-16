@@ -6,14 +6,10 @@
 
 1.   打开 VSCode → 安装 Remote - Containers 插件
 
-2.   打开 robot-dog 文件夹 → 点击左下角 >< 图标 → Reopen in Container
+2.   打开 robot-dog 文件夹 → 点击左边插件栏的`远程资源管理器` → 开发容器 -> `->`(在当前窗口的容器中打开) 
 
-3.   容器启动后：
+     >   第一次打开会自动构建镜像，时间较长
 
-     -   Python 示例代码可直接运行：
+     >   或者在 VSCode 打开该文件夹，然后选择右下角弹出的通知： `在容器中打开`
 
-         ```bash
-         python3 src/python/dance_1dog.py
-         ```
-
-         
+     

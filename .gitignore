@@ -1,7 +1,8 @@
-# Python 缓存与编译产物
+# Python 相关
 __pycache__/
 *.py[cod]
 *$py.class
+.python-version
 # 环境与虚拟环境
 .env
 .env.*
@@ -9,6 +10,8 @@ __pycache__/
 venv/
 ENV/
 env/
+# node相关
+node_modules/
 # 构建与打包产物
 dist/
 build/
@@ -26,6 +29,7 @@ htmlcov/
 .ipynb_checkpoints/
 .vscode/
 .idea/
+.trae/
 # 系统文件
 .DS_Store
 Thumbs.db
@@ -34,5 +38,4 @@ Desktop.ini
 *.log
 *.tmp
 *.bak
-# Python 版本管理
-.python-version
+logs/

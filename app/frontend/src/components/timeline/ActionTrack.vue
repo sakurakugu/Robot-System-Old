@@ -1,0 +1,330 @@
+<template>
+  <div class="action-track" @click="handleTrackClick">
+    <!-- 动作块列表 -->
+    <div
+      v-for="block in blocks"
+      :key="block.id"
+      class="action-block"
+      :class="{ 'selected': isSelected(block) }"
+      :style="getBlockStyle(block)"
+      @mousedown="startDragBlock($event, block)"
+      @dblclick="editBlock(block)"
+      @click.stop="selectBlock(block)"
+    >
+      <div class="block-content">
+        <span class="block-name">{{ block.name }}</span>
+        <span class="block-duration">{{ block.duration.toFixed(1) }}s</span>
+      </div>
+      <!-- 左侧调整手柄 -->
+      <div
+        class="resize-handle left"
+        @mousedown.stop="startResize($event, block, 'left')"
+      ></div>
+      <!-- 右侧调整手柄 -->
+      <div
+        class="resize-handle right"
+        @mousedown.stop="startResize($event, block, 'right')"
+      ></div>
+    </div>
+
+    <!-- 空状态提示 -->
+    <div v-if="blocks.length === 0" class="empty-hint">
+      点击轨道空白处添加动作块
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { ActionBlock, TimelineConfig } from '@/types/timeline'
+
+const props = defineProps<{
+  track: any
+  config: TimelineConfig
+}>()
+
+const emit = defineEmits<{
+  'update:blocks': [blocks: ActionBlock[]]
+  'add-block': []
+  'select-block': [blockId: string]
+}>()
+
+const blocks = computed(() => props.track.blocks || [])
+
+// 选中的块
+const selectedBlockId = ref<string | null>(null)
+
+// 判断是否选中
+const isSelected = (block: ActionBlock) => {
+  return selectedBlockId.value === block.id
+}
+
+// 选中块
+const selectBlock = (block: ActionBlock) => {
+  selectedBlockId.value = block.id
+  emit('select-block', block.id)
+}
+
+// 获取动作块样式
+const getBlockStyle = (block: ActionBlock) => {
+  const left = block.startTime * props.config.pixelsPerSecond
+  const width = block.duration * props.config.pixelsPerSecond
+  return {
+    left: `${left}px`,
+    width: `${width}px`,
+    backgroundColor: block.color || '#569cd6'
+  }
+}
+
+// 拖拽动作块
+let draggedBlock: ActionBlock | null = null
+let dragStartX = 0
+let dragStartTime = 0
+
+const startDragBlock = (e: MouseEvent, block: ActionBlock) => {
+  if (props.track.locked) return
+  
+  draggedBlock = block
+  dragStartX = e.clientX
+  dragStartTime = block.startTime
+
+  document.addEventListener('mousemove', onDragBlock)
+  document.addEventListener('mouseup', stopDragBlock)
+  e.preventDefault()
+}
+
+const onDragBlock = (e: MouseEvent) => {
+  if (!draggedBlock) return
+
+  const deltaX = e.clientX - dragStartX
+  const deltaTime = deltaX / props.config.pixelsPerSecond
+
+  let newStartTime = dragStartTime + deltaTime
+
+  // 吸附到网格
+  if (props.config.snapToGrid) {
+    newStartTime = Math.round(newStartTime / props.config.gridSize) * props.config.gridSize
+  }
+
+  // 限制在时间轴范围内
+  newStartTime = Math.max(0, Math.min(props.config.duration - draggedBlock.duration, newStartTime))
+
+  // 检查是否与其他块重叠
+  const hasOverlap = blocks.value.some((b: ActionBlock) => {
+    if (b.id === draggedBlock!.id) return false
+    const blockEnd = newStartTime + draggedBlock!.duration
+    const bEnd = b.startTime + b.duration
+    return !(blockEnd <= b.startTime || newStartTime >= bEnd)
+  })
+
+  if (!hasOverlap) {
+    // 更新动作块位置
+    const updatedBlocks = blocks.value.map((b: ActionBlock) =>
+      b.id === draggedBlock!.id ? { ...b, startTime: newStartTime } : b
+    )
+    emit('update:blocks', updatedBlocks)
+  }
+}
+
+const stopDragBlock = () => {
+  draggedBlock = null
+  document.removeEventListener('mousemove', onDragBlock)
+  document.removeEventListener('mouseup', stopDragBlock)
+}
+
+// 调整动作块大小
+let resizeBlock: ActionBlock | null = null
+let resizeDirection: 'left' | 'right' = 'right'
+let resizeStartX = 0
+let resizeStartTime = 0
+let resizeStartDuration = 0
+
+const startResize = (e: MouseEvent, block: ActionBlock, direction: 'left' | 'right') => {
+  if (props.track.locked) return
+
+  resizeBlock = block
+  resizeDirection = direction
+  resizeStartX = e.clientX
+  resizeStartTime = block.startTime
+  resizeStartDuration = block.duration
+
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResize)
+  e.preventDefault()
+}
+
+const onResize = (e: MouseEvent) => {
+  if (!resizeBlock) return
+
+  const deltaX = e.clientX - resizeStartX
+  const deltaTime = deltaX / props.config.pixelsPerSecond
+
+  let newStartTime = resizeStartTime
+  let newDuration = resizeStartDuration
+
+  if (resizeDirection === 'left') {
+    newStartTime = resizeStartTime + deltaTime
+    newDuration = resizeStartDuration - deltaTime
+  } else {
+    newDuration = resizeStartDuration + deltaTime
+  }
+
+  // 吸附到网格
+  if (props.config.snapToGrid) {
+    if (resizeDirection === 'left') {
+      newStartTime = Math.round(newStartTime / props.config.gridSize) * props.config.gridSize
+      newDuration = resizeStartTime + resizeStartDuration - newStartTime
+    } else {
+      newDuration = Math.round(newDuration / props.config.gridSize) * props.config.gridSize
+    }
+  }
+
+  // 最小持续时间
+  const minDuration = 0.1
+  if (newDuration < minDuration) {
+    if (resizeDirection === 'left') {
+      newStartTime = resizeStartTime + resizeStartDuration - minDuration
+    }
+    newDuration = minDuration
+  }
+
+  // 限制在时间轴范围内
+  if (resizeDirection === 'left') {
+    newStartTime = Math.max(0, newStartTime)
+    newDuration = resizeStartTime + resizeStartDuration - newStartTime
+  } else {
+    newDuration = Math.min(props.config.duration - newStartTime, newDuration)
+  }
+
+  // 更新动作块
+  const updatedBlocks = blocks.value.map((b: ActionBlock) =>
+    b.id === resizeBlock!.id
+      ? { ...b, startTime: newStartTime, duration: newDuration }
+      : b
+  )
+  emit('update:blocks', updatedBlocks)
+}
+
+const stopResize = () => {
+  resizeBlock = null
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
+}
+
+// 编辑动作块
+const editBlock = (block: ActionBlock) => {
+  // TODO: 打开编辑对话框
+  console.log('Edit block:', block)
+}
+
+// 添加动作块
+const addBlock = () => {
+  emit('add-block')
+}
+
+// 处理轨道点击事件
+const handleTrackClick = (e: MouseEvent) => {
+  if (props.track.locked) return
+  
+  // 如果点击的不是动作块，则添加新动作块（仅当没有任何块时）
+  const target = e.target as HTMLElement
+  if ((target.classList.contains('action-track') || target.classList.contains('empty-hint')) && blocks.value.length === 0) {
+    addBlock()
+  }
+  
+  // 清除选中
+  selectedBlockId.value = null
+}
+</script>
+
+<style scoped>
+.action-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.action-block {
+  position: absolute;
+  top: 8px;
+  height: calc(100% - 16px);
+  border-radius: 4px;
+  cursor: move;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.2s;
+}
+
+.action-block:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.action-block.selected {
+  box-shadow: 0 0 0 2px #ff4444;
+  z-index: 15;
+}
+
+.block-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  flex: 1;
+  pointer-events: none;
+}
+
+.block-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-duration {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.action-block:hover .resize-handle {
+  opacity: 1;
+}
+
+.resize-handle.left {
+  left: 0;
+  border-left: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.resize-handle.right {
+  right: 0;
+  border-right: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.empty-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #666;
+  font-size: 12px;
+  pointer-events: none;
+  user-select: none;
+}
+</style>

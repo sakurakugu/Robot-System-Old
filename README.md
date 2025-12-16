@@ -1,138 +1,12 @@
+# 机器狗控制系统
+
 ## 安装运行环境
 
 [安装运行环境](./docs/1.%20安装运行环境.md)
 
 ## 连接机器狗
 
-### 配置网络
-
-#### 1. AP（热点）直连
-
-1. **找到机械狗遥控器并连接上遥控器上写的机器狗自身的 WIFI**
-
-2. **ssh远程登陆机器狗**
-   
-    ```bash
-    ssh firefly@192.168.234.1  # ip是固定的，用户名和密码默认是：firefly
-    ```
-3. **查看本地 IP**
-
-     ```bash
-    ip addr # ip a
-    ```
-
-    ![1762423310618](https://youke1.picui.cn/s1/2025/11/06/690cae043f51d.png)
-
-    > 这是机械狗 WIFI 分配给本地的局域网 IP
-
-4. **修改 SDK 配置文件**
-
-   ```bash
-   sudo vim /opt/export/config/sdk_config.yaml
-   ```
-
-   ![1762423774051](https://youke1.picui.cn/s1/2025/11/06/690cae232ebae.png)
-   
-   ```bash
-   > `target_ip` 修改为本地 IP，端口一般不用改
-   ```
-   
-   
-
-#### 2. WIFI 局域网连接
-
-1. **按照 [AP 直连步骤 1、2](####1. AP（热点）直连)，远程登陆**
-
-2. **机械狗连接 WIFI**
-
-   ```bash
-   # 查看附近网络
-   sudo nmcli device wifi list
-   
-   # 连接WIFI网络
-   sudo nmcli device wifi connect WIFI名称 password WIFI密码 ifname wlan0
-   
-   # 关闭网络清除服务 (防止每次关机后都清除网络)
-   sudo systemctl stop networkmanager-cleanup.service
-   sudo systemctl disable networkmanager-cleanup.service
-   
-   # 开启自动连接
-   sudo nmcli connection modify WIFI名称 connection.autoconnect yes
-   ```
-
-   ![1762437011780](https://youke1.picui.cn/s1/2025/11/06/690cae4408870.png)
-   
-   > 成功连接 WIFI 后，重新远程登录，这里会显示机械狗在局域网中的 IP
-   
-3. **本机连上 WIFI 后，可以使用机械狗局域网 IP 进行 ssh 远程登录**
-
-4. **编辑运控文件，添加变量**
-
-   ```bash
-   sudo vim /opt/app_launch/start_motion_control.sh
-   ```
-   
-    在文件 `/opt/app_launch/start_motion_control.sh` 中，于 `export ROBOT_TYPE=P2` 行之后，新增一行环境变量配置： 
-
-   ```bash
-   export SDK_CLIENT_IP='【机械狗局域网IP地址】'
-   ```
-   
-   完整示例（添加后）：
-   
-   ```bash
-   #!/bin/bash
-   sleep 10
-   echo "start motion control" # 启动运动控制
-   
-   # 共享内存文件路径
-   SHM_FILE="/dev/shm/spline_shm"
-   
-   # 循环检查设备是否存在
-   while true; do
-       if [ -e "$SHM_FILE" ]; then
-           echo "共享内存文件 $SHM_FILE 已存在。"
-           break
-       else
-           echo "共享内存文件 $SHM_FILE 不存在，等待 1 秒后重试..."
-           sleep 1
-       fi
-   done
-   
-   # 共享内存文件存在后执行的命令
-   echo "共享内存文件已准备好，可以执行后续操作。"
-   
-   sudo ifconfig lo multicast
-   sudo route add -net 224.0.0.0 netmask 240.0.0.0 dev lo
-   
-   export LD_LIBRARY_PATH=/opt/export/mc/bin
-   export ROBOT_TYPE=P2
-   export SDK_CLIENT_IP='192.168.1.116'  
-   
-   cd /opt/export/mc/bin && taskset -c 7 ./mc_ctrl r
-   ```
-   
-   > 注意：直连模式要删除或注释 `SDK_CLIENT_IP`，然后重启运控
-
-5. **参照 [AP 直连步骤 4](####1. AP（热点）直连)，修改 SDK 配置文件**
-
-6. **重启运控**
-
-    ```bash
-    robot-launch restart 4
-    ```
-    
-    > 注意：在重启运控之前必须让机械狗先卧倒，否则会急停
-
-
-
-## 运行代码
-
-```bash
-python3 ./src/python/dance_1dog.py 
-```
-
-
+[连接机器狗](./docs/2.%20连接机器狗.md)
 
 ## 其他
 
@@ -143,9 +17,80 @@ python3 ./src/python/dance_1dog.py
 git clone <远程仓库地址> /tmp/so_repo
 
 # 移动需要的 .so 文件到目标目录
-mkdir -p lib/so
-cp /tmp/so_repo/*.so lib/so/
+mkdir -p app/robot-control/lib/so
+cp /tmp/so_repo/*.so app/robot-control/lib/so/
 
 # 可选：删除临时仓库
 rm -rf /tmp/so_repo
 ```
+
+## GUI 部分
+
+### 一键启动
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+### 分别启动
+
+**启动后端**
+```bash
+cd ./app/backend
+npm run dev
+```
+
+**启动前端**（新终端）
+```bash
+cd ./app/frontend
+npm run dev
+```
+
+- **前端界面**: http://localhost:5173
+- **后端API**: http://localhost:3000/api
+- **健康检查**: http://localhost:3000/health
+- **WebSocket**: ws://localhost:3000
+
+### 🛠️ 常用命令
+
+```bash
+# 停止所有服务
+./stop.sh
+
+# 查看后端日志
+tail -f logs/backend.log
+
+# 查看前端日志
+tail -f logs/frontend.log
+
+# 重新初始化数据库
+cd app/backend
+npm run init-db
+
+# 运行示例程序
+cd app/robot-control
+python3 dance_1dog.py
+```
+
+### 数据库重置
+删除主数据库后重新初始化：
+```bash
+rm ~/.local/share/RobotDogControl/main.db
+cd app/backend
+npm run init-db
+```
+
+### 停止服务
+
+```bash
+./stop.sh
+```
+
+## 数据存储位置
+
+- **Linux**: `~/.local/share/RobotDogControl/`
+- **macOS**: `~/Library/Application Support/RobotDogControl/`
+- **Windows**: `%APPDATA%\RobotDogControl\`
+
+工程文件默认保存在：`~/Documents/RobotDogProjects/`

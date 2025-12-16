@@ -1,0 +1,701 @@
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import multer from 'multer';
+import { v7 as uuidv7 } from 'uuid';
+import { getMainDatabase, ProjectDatabase } from '../database';
+import { PATHS, CONFIG } from '../config';
+import { pythonExecutor } from '../services/python-executor';
+import path from 'path';
+import fs from 'fs';
+
+const router = express.Router();
+
+// 项目接口
+interface Project {
+  uuid: string;
+  user_uuid: string;
+  name: string;
+  description?: string;
+  folder_path: string;
+  thumbnail_path?: string;
+  last_opened?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 获取所有项目
+router.get('/projects', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const projects = await db.all<Project>(
+      'SELECT * FROM project_index ORDER BY last_opened DESC, created_at DESC'
+    );
+    res.json({ success: true, data: projects });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取单个项目
+router.get('/projects/:uuid', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+    
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    res.json({ success: true, data: project });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 创建新项目
+router.post('/projects', async (req: Request, res: Response) => {
+  try {
+    const { name, description } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, error: '项目名称是必需的' });
+    }
+
+    const uuid = uuidv7();
+    // 只替换文件系统不允许的特殊字符，保留中文字符
+    const folderName = `${name.replace(/[<>:"\/|?*]/g, '_')}_${uuid.substring(0, 8)}`;
+    const folderPath = path.join(PATHS.projectsDir, folderName);
+
+    // 创建项目文件夹
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+      fs.mkdirSync(path.join(folderPath, 'audio'));
+      fs.mkdirSync(path.join(folderPath, 'exports'));
+      fs.mkdirSync(path.join(folderPath, 'backups'));
+      fs.mkdirSync(path.join(folderPath, '.project_cache'));
+    }
+
+    // 创建项目数据库
+    const projectDb = new ProjectDatabase(path.join(folderPath, 'project.db'));
+    await projectDb.open();
+    await projectDb.initTables();
+
+    // 初始化项目配置 // TODO：这些推荐用json存储吗，还是直接存储字符串
+    await projectDb.run(
+      'INSERT INTO project_config (key, value) VALUES (?, ?)',
+      ['project_uuid', JSON.stringify(uuid)]
+    );
+    await projectDb.run(
+      'INSERT INTO project_config (key, value) VALUES (?, ?)',
+      ['project_version', JSON.stringify('1.0.0')]
+    );
+    await projectDb.run(
+      'INSERT INTO project_config (key, value) VALUES (?, ?)',
+      ['user_uuid', JSON.stringify('00000000-0000-0000-0000-000000000000')]
+    );
+
+    await projectDb.close();
+
+    // 创建项目元数据文件
+    const projectMeta = {
+      uuid,
+      name,
+      description: description || '',
+      version: '1.0.0',
+      app_version: CONFIG.APP_VERSION,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_opened: null,
+      thumbnail: null,
+      settings: {
+        auto_backup: true,
+        backup_interval: 300,
+        max_backups: 10,
+      },
+    };
+
+    fs.writeFileSync(
+      path.join(folderPath, 'project.json'),
+      JSON.stringify(projectMeta, null, 2)
+    );
+
+    // 在主数据库中记录项目
+    const db = await getMainDatabase();
+    await db.run(
+      `INSERT INTO project_index 
+       (uuid, user_uuid, name, description, folder_path, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        uuid,
+        '00000000-0000-0000-0000-000000000000',
+        name,
+        description || '',
+        folderPath,
+        new Date().toISOString(),
+        new Date().toISOString(),
+      ]
+    );
+
+    // 返回新创建的项目
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [uuid]
+    );
+
+    res.json({ success: true, data: project });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 更新项目
+router.put('/projects/:uuid', async (req: Request, res: Response) => {
+  try {
+    const { name, description } = req.body;
+    const db = await getMainDatabase();
+
+    await db.run(
+      `UPDATE project_index 
+       SET name = ?, description = ?, updated_at = ? 
+       WHERE uuid = ?`,
+      [name, description, new Date().toISOString(), req.params.uuid]
+    );
+
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    res.json({ success: true, data: project });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 删除项目
+router.delete('/projects/:uuid', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    // 删除数据库记录
+    await db.run('DELETE FROM project_index WHERE uuid = ?', [req.params.uuid]);
+
+    // 删除项目文件夹（可选：移到回收站）
+    if (fs.existsSync(project.folder_path)) {
+      fs.rmSync(project.folder_path, { recursive: true, force: true });
+    }
+
+    res.json({ success: true, message: '项目删除成功' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 打开项目（更新最后打开时间）
+router.post('/projects/:uuid/open', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    await db.run(
+      'UPDATE project_index SET last_opened = ? WHERE uuid = ?',
+      [new Date().toISOString(), req.params.uuid]
+    );
+
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    res.json({ success: true, data: project });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 机器人相关接口
+router.get('/projects/:projectUuid/robots', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    const robots = await projectDb.all('SELECT * FROM robots');
+    await projectDb.close();
+
+    res.json({ success: true, data: robots });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/projects/:projectUuid/robots', async (req: Request, res: Response) => {
+  try {
+    const { name, robot_ip, local_ip, local_port, group_name } = req.body;
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const robotUuid = uuidv7();
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    
+    await projectDb.run(
+      `INSERT INTO robots 
+       (uuid, name, robot_ip, local_ip, local_port, group_name, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        robotUuid,
+        name,
+        robot_ip,
+        local_ip,
+        local_port,
+        group_name || null,
+        new Date().toISOString(),
+        new Date().toISOString(),
+      ]
+    );
+
+    const robot = await projectDb.get('SELECT * FROM robots WHERE uuid = ?', [robotUuid]);
+    await projectDb.close();
+
+    res.json({ success: true, data: robot });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 更新机器人
+router.put('/projects/:projectUuid/robots/:robotUuid', async (req: Request, res: Response) => {
+  try {
+    const { name, robot_ip, local_ip, local_port, group_name, status } = req.body;
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    
+    await projectDb.run(
+      `UPDATE robots 
+       SET name = ?, robot_ip = ?, local_ip = ?, local_port = ?, group_name = ?, status = ?, updated_at = ?
+       WHERE uuid = ?`,
+      [
+        name,
+        robot_ip,
+        local_ip,
+        local_port,
+        group_name || null,
+        status || 'offline',
+        new Date().toISOString(),
+        req.params.robotUuid,
+      ]
+    );
+
+    const robot = await projectDb.get('SELECT * FROM robots WHERE uuid = ?', [req.params.robotUuid]);
+    await projectDb.close();
+
+    res.json({ success: true, data: robot });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 删除机器人
+router.delete('/projects/:projectUuid/robots/:robotUuid', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    
+    await projectDb.run('DELETE FROM robots WHERE uuid = ?', [req.params.robotUuid]);
+    await projectDb.close();
+
+    res.json({ success: true, message: '机器人删除成功' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 测试机器人连接
+router.post('/projects/:projectUuid/robots/:robotUuid/test-connection', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    
+    const robot = await projectDb.get('SELECT * FROM robots WHERE uuid = ?', [req.params.robotUuid]);
+    await projectDb.close();
+
+    if (!robot) {
+      return res.status(404).json({ success: false, error: 'Robot not found' });
+    }
+
+    // 使用Python执行器测试连接
+    const result = await pythonExecutor.testConnection({
+      name: robot.name,
+      robot_ip: robot.robot_ip,
+      local_ip: robot.local_ip,
+      local_port: robot.local_port,
+    });
+
+    // 更新机器人状态
+    const projectDb2 = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb2.open();
+    await projectDb2.run(
+      'UPDATE robots SET status = ?, updated_at = ? WHERE uuid = ?',
+      [result.success ? 'online' : 'offline', new Date().toISOString(), req.params.robotUuid]
+    );
+    await projectDb2.close();
+
+    res.json({ 
+      success: result.success, 
+      connected: result.success,
+      message: result.message,
+      robot: robot
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      success: false, 
+      connected: false,
+      error: error.message 
+    });
+  }
+});
+
+// 执行动作序列
+router.post('/projects/:projectUuid/execute-actions', async (req: Request, res: Response) => {
+  try {
+    const { robotUuids, actions } = req.body;
+    
+    if (!robotUuids || !Array.isArray(robotUuids) || robotUuids.length === 0) {
+      return res.status(400).json({ success: false, error: '请选择至少一个机器人' });
+    }
+
+    if (!actions || !Array.isArray(actions) || actions.length === 0) {
+      return res.status(400).json({ success: false, error: '动作序列不能为空' });
+    }
+
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 获取机器人信息
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    
+    const robots = [];
+    for (const robotUuid of robotUuids) {
+      const robot = await projectDb.get('SELECT * FROM robots WHERE uuid = ?', [robotUuid]);
+      if (robot) {
+        robots.push({
+          name: robot.name,
+          robot_ip: robot.robot_ip,
+          local_ip: robot.local_ip,
+          local_port: robot.local_port,
+        });
+      }
+    }
+    
+    await projectDb.close();
+
+    if (robots.length === 0) {
+      return res.status(404).json({ success: false, error: '未找到有效的机器人' });
+    }
+
+    // 生成执行ID
+    const executionId = uuidv7();
+
+    // 异步执行动作序列（不阻塞响应）
+    pythonExecutor.executeActions(executionId, {
+      robots,
+      actions,
+      onProgress: (progress, message) => {
+        console.log(`执行进度 [${executionId}]: ${progress}% - ${message}`);
+      },
+      onOutput: (data) => {
+        console.log(`执行输出 [${executionId}]:`, data);
+      },
+      onError: (error) => {
+        console.error(`执行错误 [${executionId}]:`, error);
+      },
+    }).catch(error => {
+      console.error(`执行失败 [${executionId}]:`, error);
+    });
+
+    res.json({ 
+      success: true, 
+      executionId,
+      message: '动作序列已开始执行' 
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 停止执行
+router.post('/projects/:projectUuid/stop-execution/:executionId', async (req: Request, res: Response) => {
+  try {
+    const { executionId } = req.params;
+    const stopped = pythonExecutor.stopExecution(executionId);
+    
+    res.json({ 
+      success: stopped, 
+      message: stopped ? '执行已停止' : '未找到执行任务'
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取正在执行的任务列表
+router.get('/projects/:projectUuid/executions', async (req: Request, res: Response) => {
+  try {
+    const runningExecutions = pythonExecutor.getRunningExecutions();
+    res.json({ success: true, data: runningExecutions });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 保存项目时间轴数据
+router.post('/projects/:uuid/timeline', async (req: Request, res: Response) => {
+  try {
+    const { tracks, config } = req.body;
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 保存时间轴数据到项目文件夹
+    const timelineDataPath = path.join(project.folder_path, 'timeline.json');
+    const timelineData = {
+      tracks: tracks || [],
+      config: config || {},
+      updated_at: new Date().toISOString()
+    };
+
+    fs.writeFileSync(timelineDataPath, JSON.stringify(timelineData, null, 2));
+
+    // 更新项目的 updated_at 时间
+    await db.run(
+      'UPDATE project_index SET updated_at = ? WHERE uuid = ?',
+      [new Date().toISOString(), req.params.uuid]
+    );
+
+    res.json({ success: true, message: '时间轴数据已保存' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 加载项目时间轴数据
+router.get('/projects/:uuid/timeline', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    const timelineDataPath = path.join(project.folder_path, 'timeline.json');
+    
+    // 如果文件不存在，返回默认空数据
+    if (!fs.existsSync(timelineDataPath)) {
+      return res.json({ 
+        success: true, 
+        data: { 
+          tracks: [], 
+          config: {
+            duration: 60,
+            pixelsPerSecond: 100,
+            currentTime: 0,
+            snapToGrid: true,
+            gridSize: 0.5
+          }
+        } 
+      });
+    }
+
+    const timelineData = JSON.parse(fs.readFileSync(timelineDataPath, 'utf-8'));
+    res.json({ success: true, data: timelineData });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 配置multer用于音频上传
+const audioStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    try {
+      const projectUuid = req.params.uuid;
+      const db = await getMainDatabase();
+      const project = await db.get<Project>(
+        'SELECT * FROM project_index WHERE uuid = ?',
+        [projectUuid]
+      );
+
+      if (!project) {
+        return cb(new Error('项目未找到'), '');
+      }
+
+      const audioDir = path.join(project.folder_path, 'audio');
+      if (!fs.existsSync(audioDir)) {
+        fs.mkdirSync(audioDir, { recursive: true });
+      }
+
+      cb(null, audioDir);
+    } catch (error) {
+      cb(error as Error, '');
+    }
+  },
+  filename: (req, file, cb) => {
+    // 保留原始文件名，但添加时间戳避免重名
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    const filename = `${basename}_${timestamp}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const audioUpload = multer({
+  storage: audioStorage,
+  fileFilter: (req, file, cb) => {
+    // 只接受音频文件
+    if (file.mimetype.startsWith('audio/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('只能上传音频文件'));
+    }
+  },
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 限制50MB
+  }
+});
+
+// 上传音频文件
+router.post('/projects/:uuid/upload-audio', audioUpload.single('audio'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '没有上传文件' });
+    }
+
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 返回相对于项目文件夹的路径
+    const relativePath = path.relative(project.folder_path, req.file.path);
+    const audioUrl = `/api/v1/projects/${req.params.uuid}/audio/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      data: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        size: req.file.size,
+        path: relativePath,
+        url: audioUrl
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取项目音频文件
+router.get('/projects/:uuid/audio/:filename', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    const audioPath = path.join(project.folder_path, 'audio', req.params.filename);
+    
+    if (!fs.existsSync(audioPath)) {
+      return res.status(404).json({ success: false, error: '音频文件未找到' });
+    }
+
+    res.sendFile(audioPath);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+export default router;

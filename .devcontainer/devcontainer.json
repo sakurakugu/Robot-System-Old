@@ -13,7 +13,10 @@
                 "ms-python.vscode-pylance",
                 "ms-iot.robotics-developer-environment",
                 "ms-vscode.cpptools",
-                "ms-azuretools.vscode-docker"
+                "ms-azuretools.vscode-docker",       
+                "vue.volar",
+                "ctf0.macros",          // 快捷键代码宏
+                "gruntfuggly.todo-tree" // todo树
             ]
         }
     },

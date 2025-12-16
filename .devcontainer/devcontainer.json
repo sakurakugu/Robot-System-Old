@@ -1,0 +1,31 @@
+{
+    "name": "机器狗开发",
+    "dockerFile": "Dockerfile",
+    "context": "..",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.shell.linux": "/bin/bash"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-iot.robotics-developer-environment",
+                "ms-vscode.cpptools",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+    // 容器启动时挂载的额外参数
+    "runArgs": [
+        "--network=host",       // 使用主机网络，方便ROS2通信
+        "--cap-add=SYS_PTRACE", // 允许调试
+        "--security-opt",       // 允许使用ptrace
+        "seccomp=unconfined"    // 关闭seccomp安全配置
+    ],
+    "remoteUser": "root", // 使用root用户
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached" // 挂载工作区，以便代码同步
+    ]
+}

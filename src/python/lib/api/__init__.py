@@ -8,7 +8,8 @@ from pathlib import Path
 
 # 根据平台和架构选择对应的静态库的路径
 arch = "x86_64" if sys.maxsize > 2**32 else "aarch64"
-sys.path.insert(0, str(Path(__file__).parent.parent / "so" / arch))
+so_dir = Path(__file__).parent.parent / "so" / arch
+sys.path.insert(0, str(so_dir))
 
 try:
     import mc_sdk_zsl_1_py

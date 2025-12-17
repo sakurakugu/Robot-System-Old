@@ -1059,4 +1059,331 @@ router.post('/projects/import', importUpload.single('project'), async (req: Requ
   }
 });
 
+// 封装项目为Python脚本
+router.post('/projects/:uuid/build', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 读取时间轴数据
+    const timelineDataPath = path.join(project.folder_path, 'timeline.json');
+    if (!fs.existsSync(timelineDataPath)) {
+      return res.status(400).json({ success: false, error: '未找到时间轴数据' });
+    }
+
+    const timelineData = JSON.parse(fs.readFileSync(timelineDataPath, 'utf-8'));
+    
+    // 创建build目录
+    const buildDir = path.join(project.folder_path, 'build');
+    if (!fs.existsSync(buildDir)) {
+      fs.mkdirSync(buildDir, { recursive: true });
+    }
+
+    // 复制lib库到build目录
+    const libSourcePath = path.join(process.cwd(), '..', 'robot-control', 'lib');
+    const libTargetPath = path.join(buildDir, 'lib');
+    
+    if (fs.existsSync(libSourcePath)) {
+      // 删除旧的lib目录
+      if (fs.existsSync(libTargetPath)) {
+        fs.rmSync(libTargetPath, { recursive: true, force: true });
+      }
+      // 复制lib目录
+      copyDirectory(libSourcePath, libTargetPath);
+    }
+
+    // 生成Python代码
+    const pythonCode = generatePythonFromTimeline(timelineData, project.name);
+    
+    // 写入Python文件
+    const pythonFilePath = path.join(buildDir, `${sanitizeFilename(project.name)}.py`);
+    fs.writeFileSync(pythonFilePath, pythonCode, 'utf-8');
+
+    res.json({ 
+      success: true, 
+      message: '封装成功',
+      data: {
+        pythonFile: path.basename(pythonFilePath),
+        buildPath: buildDir
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 运行项目的Python脚本
+router.post('/projects/:uuid/run', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    const buildDir = path.join(project.folder_path, 'build');
+    const pythonFilePath = path.join(buildDir, `${sanitizeFilename(project.name)}.py`);
+
+    if (!fs.existsSync(pythonFilePath)) {
+      return res.status(400).json({ success: false, error: '未找到Python文件，请先封装' });
+    }
+
+    // 运行Python脚本
+    const result = await pythonExecutor.execute(pythonFilePath, buildDir);
+
+    res.json({ 
+      success: true, 
+      data: result
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 封装并运行
+router.post('/projects/:uuid/build-and-run', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 读取时间轴数据
+    const timelineDataPath = path.join(project.folder_path, 'timeline.json');
+    if (!fs.existsSync(timelineDataPath)) {
+      return res.status(400).json({ success: false, error: '未找到时间轴数据' });
+    }
+
+    const timelineData = JSON.parse(fs.readFileSync(timelineDataPath, 'utf-8'));
+    
+    // 创建build目录
+    const buildDir = path.join(project.folder_path, 'build');
+    if (!fs.existsSync(buildDir)) {
+      fs.mkdirSync(buildDir, { recursive: true });
+    }
+
+    // 复制lib库到build目录
+    const libSourcePath = path.join(process.cwd(), '..', 'robot-control', 'lib');
+    const libTargetPath = path.join(buildDir, 'lib');
+    
+    if (fs.existsSync(libSourcePath)) {
+      // 删除旧的lib目录
+      if (fs.existsSync(libTargetPath)) {
+        fs.rmSync(libTargetPath, { recursive: true, force: true });
+      }
+      // 复制lib目录
+      copyDirectory(libSourcePath, libTargetPath);
+    }
+
+    // 生成Python代码
+    const pythonCode = generatePythonFromTimeline(timelineData, project.name);
+    
+    // 写入Python文件
+    const pythonFilePath = path.join(buildDir, `${sanitizeFilename(project.name)}.py`);
+    fs.writeFileSync(pythonFilePath, pythonCode, 'utf-8');
+
+    // 运行Python脚本
+    const result = await pythonExecutor.execute(pythonFilePath, buildDir);
+
+    res.json({ 
+      success: true, 
+      message: '封装并运行成功',
+      data: result
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 辅助函数：复制目录
+function copyDirectory(source: string, target: string) {
+  if (!fs.existsSync(target)) {
+    fs.mkdirSync(target, { recursive: true });
+  }
+
+  const files = fs.readdirSync(source);
+  for (const file of files) {
+    const sourcePath = path.join(source, file);
+    const targetPath = path.join(target, file);
+    
+    if (fs.statSync(sourcePath).isDirectory()) {
+      copyDirectory(sourcePath, targetPath);
+    } else {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+  }
+}
+
+// 辅助函数：清理文件名
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_');
+}
+
+// 辅助函数：从时间轴生成Python代码
+function generatePythonFromTimeline(timelineData: any, projectName: string): string {
+  const { tracks, config } = timelineData;
+  
+  console.log('开始生成Python代码...');
+  console.log('时间轴轨道数量:', tracks?.length || 0);
+  
+  // 提取所有机器人配置
+  const robotsMap = new Map<string, any>();
+  const actions: Array<{ time: number; robot: string; action: string; params: any }> = [];
+  
+  // 分析轨道数据
+  tracks.forEach((track: any, index: number) => {
+    console.log(`轨道 ${index}:`, {
+      type: track.type,
+      robotId: track.robotId,
+      blocksCount: track.blocks?.length || 0,
+      keyframesCount: track.keyframes?.length || 0
+    });
+    
+    if (track.type === 'action') {
+      const robotId = track.robotId || 'default_robot';
+      const robotInfo = track.robotInfo || {};
+      
+      if (!robotsMap.has(robotId)) {
+        robotsMap.set(robotId, {
+          name: robotInfo.name || robotId.slice(0, 8),
+          robot_ip: robotInfo.robot_ip || '192.168.1.110',
+          local_ip: robotInfo.local_ip || '192.168.1.105',
+          local_port: robotInfo.local_port || 10000
+        });
+      }
+      
+      // 提取动作块
+      if (track.blocks && Array.isArray(track.blocks)) {
+        console.log(`轨道 ${index} 的动作块:`, track.blocks.length);
+        track.blocks.forEach((block: any, blockIndex: number) => {
+          console.log(`  块 ${blockIndex}:`, {
+            name: block.name,
+            actionType: block.actionType,
+            startTime: block.startTime,
+            duration: block.duration
+          });
+          
+          // 如果有actionType才添加动作
+          if (block.actionType) {
+            actions.push({
+              time: block.startTime || 0,
+              robot: robotId,
+              action: block.actionType,
+              params: block.actionParams || {}
+            });
+          }
+        });
+      }
+    }
+  });
+  
+  console.log('提取的机器人数量:', robotsMap.size);
+  console.log('提取的动作数量:', actions.length);
+  
+  // 按时间排序动作
+  actions.sort((a, b) => a.time - b.time);
+  
+  // 生成Python代码
+  let code = `# ${projectName}\n`;
+  code += `from lib.api import CrazyRobotDog\n`;
+  code += `import time\n\n`;
+  
+  // 创建机器人变量映射
+  const robotVarMap = new Map<string, string>();
+  
+  // 生成机器人配置
+  if (robotsMap.size > 0) {
+    code += `# 机器人配置\n`;
+    code += `DOGS_CONFIG = {\n`;
+    robotsMap.forEach((config, uuid) => {
+      code += `    "${config.name}": ("${config.robot_ip}", ${config.local_port}),\n`;
+    });
+    code += `}\n\n`;
+    
+    // 假设使用第一个机器人的local_ip
+    const firstRobot = Array.from(robotsMap.values())[0];
+    code += `LOCAL_IP = "${firstRobot.local_ip}"\n\n`;
+    
+    // 创建机器人实例
+    code += `# 创建机器人实例\n`;
+    let robotIndex = 1;
+    robotsMap.forEach((config, uuid) => {
+      const varName = `dog${robotIndex}`;
+      robotVarMap.set(uuid, varName);
+      code += `${varName} = CrazyRobotDog(\n`;
+      code += `    name="${config.name}",\n`;
+      code += `    robot_ip=DOGS_CONFIG["${config.name}"][0],\n`;
+      code += `    local_ip=LOCAL_IP,\n`;
+      code += `    local_port=DOGS_CONFIG["${config.name}"][1],\n`;
+      code += `)\n\n`;
+      robotIndex++;
+    });
+  } else {
+    // 如果没有机器人配置，使用默认配置
+    code += `# 默认机器人配置\n`;
+    code += `DOGS_CONFIG = {\n`;
+    code += `    "131": ("192.168.1.110", 10131),\n`;
+    code += `}\n\n`;
+    code += `LOCAL_IP = "192.168.1.105"\n\n`;
+    code += `dog1 = CrazyRobotDog(\n`;
+    code += `    name="131",\n`;
+    code += `    robot_ip=DOGS_CONFIG["131"][0],\n`;
+    code += `    local_ip=LOCAL_IP,\n`;
+    code += `    local_port=DOGS_CONFIG["131"][1],\n`;
+    code += `)\n\n`;
+  }
+  
+  // 生成动作序列
+  code += `# 动作序列\n`;
+  if (actions.length > 0) {
+    let lastTime = 0;
+    actions.forEach((action, index) => {
+      // 添加延迟
+      if (action.time > lastTime) {
+        const delay = action.time - lastTime;
+        code += `time.sleep(${delay.toFixed(2)})\n`;
+      }
+      
+      // 添加动作
+      const robotVar = robotVarMap.get(action.robot) || 'dog1';
+      const duration = action.params.duration !== undefined ? action.params.duration : '';
+      const angle = action.params.angle !== undefined ? action.params.angle : '';
+      const direction = action.params.direction ? `direction='${action.params.direction}'` : '';
+      
+      let params = [];
+      if (duration !== '') params.push(duration);
+      if (angle !== '') params.push(`angle=${angle}`);
+      if (direction !== '') params.push(direction);
+      
+      const paramsStr = params.join(', ');
+      code += `${robotVar}.${action.action}(${paramsStr})\n`;
+      
+      lastTime = action.time;
+    });
+  } else {
+    code += `# 没有动作数据，添加默认动作\n`;
+    code += `dog1.stand_up(0)\n`;
+    code += `time.sleep(1)\n`;
+    code += `dog1.attitude_rest()\n`;
+  }
+  
+  return code;
+}
+
 export default router;

@@ -110,5 +110,21 @@ export const projectApi = {
     return api.get(`/projects/${uuid}/export`, {
       responseType: 'blob'
     })
+  },
+
+  // 封装项目为Python脚本
+  buildProject(uuid: string): Promise<{ success: boolean; message: string; data: any }> {
+    return api.post(`/projects/${uuid}/build`)
+  },
+
+  // 运行项目的Python脚本
+  runProject(uuid: string): Promise<{ success: boolean; data: any }> {
+    return api.post(`/projects/${uuid}/run`)
+  },
+
+  // 封装并运行项目
+  buildAndRunProject(uuid: string): Promise<{ success: boolean; message: string; data: any }> {
+    return api.post(`/projects/${uuid}/build-and-run`)
   }
 }
+

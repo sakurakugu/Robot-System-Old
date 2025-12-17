@@ -11,7 +11,19 @@
             <div class="menu-item">文件</div>
             <div class="menu-item">编辑</div>
             <div class="menu-item">视图</div>
-            <div class="menu-item">运行</div>
+            <el-dropdown trigger="click" @command="handleRunCommand">
+              <div class="menu-item">
+                运行
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="build">封装</el-dropdown-item>
+                  <el-dropdown-item command="run">运行</el-dropdown-item>
+                  <el-dropdown-item command="build-and-run">封装并运行</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <div class="menu-item">帮助</div>
           </div>
         </div>
@@ -242,11 +254,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, markRaw } from 'vue'
+import { ref, computed, watch, markRaw, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown } from '@element-plus/icons-vue'
 import { projectApi } from '@/api/project'
+import { wsClient } from '@/services/websocket'
 
 interface Tab {
   id: string
@@ -425,6 +438,42 @@ watch(
   { immediate: true }
 )
 
+// WebSocket 消息监听器
+const handleExecutionOutput = (data: any) => {
+  if (data.output) {
+    addLog(`[输出] ${data.output}`)
+  }
+}
+
+const handleExecutionError = (data: any) => {
+  if (data.error) {
+    addLog(`[错误] ${data.error}`)
+  }
+}
+
+const handleExecutionComplete = (data: any) => {
+  addLog(`执行完成，退出码: ${data.code}`)
+  if (data.code === 0) {
+    ElMessage.success('执行成功')
+  } else {
+    ElMessage.error('执行失败')
+  }
+}
+
+// 组件挂载时设置WebSocket监听器
+onMounted(() => {
+  wsClient.on('execution_output', handleExecutionOutput)
+  wsClient.on('execution_error', handleExecutionError)
+  wsClient.on('execution_complete', handleExecutionComplete)
+})
+
+// 组件卸载时移除监听器
+onUnmounted(() => {
+  wsClient.off('execution_output', handleExecutionOutput)
+  wsClient.off('execution_error', handleExecutionError)
+  wsClient.off('execution_complete', handleExecutionComplete)
+})
+
 // 选择机器人
 const selectRobot = (uuid: string) => {
   selectedRobot.value = uuid
@@ -473,9 +522,58 @@ const clearLogs = () => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const addLog = (message: string) => {
   const timestamp = new Date().toLocaleTimeString('zh-CN')
-  logs.value.unshift(`[${timestamp}] ${message}`)
+  logs.value.push(`[${timestamp}] ${message}`)
   if (logs.value.length > 100) {
-    logs.value.pop()
+    logs.value.shift()
+  }
+}
+
+// 运行菜单命令处理
+const handleRunCommand = async (command: string) => {
+  const projectUuid = route.params.uuid as string
+  if (!projectUuid) return
+
+  try {
+    if (command === 'build') {
+      // 封装
+      addLog('开始封装项目...')
+      showBottomPanel.value = true
+      const res = await projectApi.buildProject(projectUuid)
+      if (res.success) {
+        ElMessage.success('封装成功')
+        addLog(`封装成功: ${res.data.pythonFile}`)
+        addLog(`输出目录: ${res.data.buildPath}`)
+      } else {
+        ElMessage.error('封装失败')
+        addLog('封装失败')
+      }
+    } else if (command === 'run') {
+      // 运行
+      addLog('开始运行项目...')
+      showBottomPanel.value = true
+      const res = await projectApi.runProject(projectUuid)
+      // 注意：stdout/stderr 已经通过 WebSocket 实时推送，这里不需要再处理
+      // 只需要检查请求是否成功发送
+      if (!res.success) {
+        ElMessage.error('运行失败')
+        addLog('运行失败')
+      }
+    } else if (command === 'build-and-run') {
+      // 封装并运行
+      addLog('开始封装并运行项目...')
+      showBottomPanel.value = true
+      const res = await projectApi.buildAndRunProject(projectUuid)
+      // 注意：stdout/stderr 已经通过 WebSocket 实时推送，这里不需要再处理
+      // 只需要检查请求是否成功发送
+      if (!res.success) {
+        ElMessage.error('封装并运行失败')
+        addLog('封装并运行失败')
+      }
+    }
+  } catch (error: any) {
+    console.error('运行命令失败:', error)
+    ElMessage.error(error.message || '操作失败')
+    addLog(`错误: ${error.message || '操作失败'}`)
   }
 }
 
@@ -678,6 +776,7 @@ const handleFileClick = (data: any) => {
 .menu-items {
   display: flex;
   gap: 5px;
+  align-items: center;
 }
 
 .menu-item {
@@ -687,11 +786,30 @@ const handleFileClick = (data: any) => {
   cursor: pointer;
   border-radius: 3px;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .menu-item:hover {
   background: #505050;
 }
+
+/* 下拉菜单样式 */
+:deep(.el-dropdown) {
+  display: flex;
+  align-items: center;
+}
+
+:deep(.el-dropdown .menu-item) {
+  margin: 0;
+}
+
+:deep(.el-icon--right) {
+  margin-left: 0;
+  font-size: 12px;
+}
+
 
 .project-title {
   font-size: 13px;

@@ -33,26 +33,7 @@ chmod +x start.sh
 ./start.sh
 ```
 
-### 分别启动
-
-**启动后端**
-```bash
-cd ./app/backend
-npm run dev
-```
-
-**启动前端**（新终端）
-```bash
-cd ./app/frontend
-npm run dev
-```
-
-- **前端界面**: http://localhost:5173
-- **后端API**: http://localhost:3000/api
-- **健康检查**: http://localhost:3000/health
-- **WebSocket**: ws://localhost:3000
-
-### 🛠️ 常用命令
+### 常用命令
 
 ```bash
 # 停止所有服务
@@ -79,12 +60,6 @@ python3 dance_1dog.py
 rm ~/.local/share/RobotDogControl/main.db
 cd app/backend
 npm run init-db
-```
-
-### 停止服务
-
-```bash
-./stop.sh
 ```
 
 ## 数据存储位置

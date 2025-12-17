@@ -111,12 +111,9 @@
     <input
       ref="fileInput"
       type="file"
-      accept=".zip"
+      accept=".zip,.hhzip"
       style="display: none"
       @change="handleFileSelect"
-      webkitdirectory
-      directory
-      multiple
     />
 
     <!-- 创建项目对话框 -->
@@ -147,7 +144,6 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { projectApi, type Project } from '../api/project'
-import JSZip from 'jszip'
 
 const router = useRouter()
 const projects = ref<Project[]>([])
@@ -243,91 +239,46 @@ const formatDate = (dateStr: string) => {
 }
 
 const handleImportClick = () => {
-  // 移除 webkitdirectory 属性，改为选择单个 zip 文件或文件夹
+  // 选择 .zip 或 .hhzip 文件
   if (fileInput.value) {
-    // 移除之前可能设置的属性
-    fileInput.value.removeAttribute('webkitdirectory')
-    fileInput.value.removeAttribute('directory')
-    fileInput.value.removeAttribute('multiple')
-    // 设置为选择文件夹
-    fileInput.value.setAttribute('webkitdirectory', '')
-    fileInput.value.setAttribute('directory', '')
     fileInput.value.click()
   }
 }
 
 const handleFileSelect = async (event: Event) => {
   const target = event.target as HTMLInputElement
-  const files = target.files
+  const file = target.files?.[0]
   
-  if (!files || files.length === 0) {
+  if (!file) {
     return
   }
 
-  // 查找 project.json 文件
-  let projectJsonFile: File | null = null
-  const projectFiles: File[] = []
-  
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    if (file.name === 'project.json') {
-      projectJsonFile = file
-    }
-    projectFiles.push(file)
-  }
-
-  if (!projectJsonFile) {
-    ElMessage.error('未找到 project.json 文件，请选择正确的工程文件夹')
+  // 检查文件扩展名
+  const fileName = file.name.toLowerCase()
+  if (!fileName.endsWith('.zip') && !fileName.endsWith('.hhzip')) {
+    ElMessage.error('请选择 .zip 或 .hhzip 格式的工程文件')
     target.value = ''
     return
   }
 
   try {
     importing.value = true
-    ElMessage.info('正在打包工程文件...')
+    ElMessage.info('正在导入工程...')
 
-    // 使用 JSZip 打包文件
-    const zip = new JSZip()
-    
-    // 获取工程根目录路径（project.json 所在目录）
-    const projectJsonPath = projectJsonFile.webkitRelativePath
-    const rootPath = projectJsonPath.substring(0, projectJsonPath.lastIndexOf('/'))
-    
-    for (const file of projectFiles) {
-      const relativePath = file.webkitRelativePath
-      // 移除根文件夹名称，保持项目内部结构
-      const zipPath = relativePath.substring(rootPath.length + 1)
-      if (zipPath) {
-        zip.file(zipPath, file)
-      }
-    }
-
-    // 生成 zip 文件
-    const blob = await zip.generateAsync({
-      type: 'blob',
-      compression: 'DEFLATE',
-      compressionOptions: {
-        level: 6
-      }
-    })
-
-    // 创建 File 对象
-    const zipFile = new File([blob], 'project.zip', { type: 'application/zip' })
-
-    ElMessage.info('正在上传工程文件...')
-    
-    // 上传到服务器
-    const res = await projectApi.importProject(zipFile)
+    // 调用导入API
+    const res = await projectApi.importProject(file)
     
     if (res.success) {
       ElMessage.success('工程导入成功')
       await loadProjects()
       // 自动打开导入的项目
       router.push(`/project/${res.data.uuid}`)
+    } else {
+      ElMessage.error('工程导入失败')
     }
   } catch (error: any) {
     console.error('导入工程失败:', error)
-    ElMessage.error(error.message || '导入工程失败')
+    ElMessage.error(error.response?.data?.error || '工程导入失败')
   } finally {
     importing.value = false
     target.value = ''
@@ -337,6 +288,7 @@ const handleFileSelect = async (event: Event) => {
 onMounted(() => {
   loadProjects()
 })
+
 </script>
 
 <style scoped>

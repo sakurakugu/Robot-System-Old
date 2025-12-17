@@ -480,14 +480,68 @@ const addLog = (message: string) => {
 }
 
 // 导出项目
-const exportProject = () => {
-  ElMessage.info('导出功能开发中...')
+const exportProject = async () => {
+  const projectUuid = route.params.uuid as string
+  if (!projectUuid) return
+  
+  try {
+    ElMessage.info('正在导出工程...')
+    const blob = await projectApi.exportProject(projectUuid)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${currentProjectName.value}.hhzip`
+    document.body.appendChild(a)
+    a.click()
+    
+    // 清理
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 // 保存项目
-const saveProject = () => {
-  // 触发子组件保存
-  ElMessage.info('保存功能开发中...')
+const saveProject = async () => {
+  const projectUuid = route.params.uuid as string
+  if (!projectUuid) return
+  
+  try {
+    // 检查当前是否在项目编辑页面
+    if (route.name !== 'ProjectEditor') {
+      ElMessage.warning('请在项目编辑页面进行保存')
+      return
+    }
+    
+    ElMessage.info('正在保存...')
+    
+    // 通过事件总线通知子组件保存
+    // 由于我们需要直接访问ProjectEditor组件，这里使用window自定义事件
+    const saveEvent = new CustomEvent('save-project', {
+      detail: { projectUuid }
+    })
+    window.dispatchEvent(saveEvent)
+    
+    // 给子组件一点时间处理保存
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // 然后调用后端保存API
+    const res = await projectApi.saveProject(projectUuid)
+    if (res.success) {
+      ElMessage.success('保存成功')
+    } else {
+      ElMessage.error('保存失败')
+    }
+  } catch (error) {
+    console.error('保存失败:', error)
+    ElMessage.error('保存失败')
+  }
 }
 
 // 切换标签

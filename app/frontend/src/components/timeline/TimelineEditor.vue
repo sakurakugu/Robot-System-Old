@@ -133,7 +133,7 @@
               <!-- 动作轨道 -->
               <ActionTrack v-if="track.type === TrackType.ACTION" :track="track" :config="config"
                 @update:blocks="updateTrackBlocks(track.id, $event)" @add-block="addActionBlock(track.id)"
-                @select-block="selectBlock(track.id, $event)" />
+                @select-block="selectBlock(track.id, $event)" @edit-block="editActionBlock(track.id, $event)" />
 
               <!-- 关键帧轨道 -->
               <KeyframeTrack v-if="track.type === TrackType.KEYFRAME" :track="track" :config="config"
@@ -164,6 +164,14 @@
         }" @mousedown="startDragPlayhead"></div>
       </div>
     </div>
+
+    <!-- 动作选择器对话框 -->
+    <ActionSelectorDialog
+      v-model:visible="actionSelectorVisible"
+      :currentAction="editingActionData"
+      :maxDuration="maxDurationLimit"
+      @confirm="handleActionSelected"
+    />
   </div>
 </template>
 
@@ -173,6 +181,7 @@ import { Track, TrackType, TimelineConfig, ActionBlock, Keyframe } from '@/types
 import ActionTrack from './ActionTrack.vue'
 import KeyframeTrack from './KeyframeTrack.vue'
 import AudioTrack from './AudioTrack.vue'
+import ActionSelectorDialog from './ActionSelectorDialog.vue'
 
 // Props
 const props = defineProps<{
@@ -203,6 +212,13 @@ const tracks = ref<Track[]>([])
 
 // 选中的动作块
 const selectedBlocks = ref<Record<string, string>>({})
+
+// 动作选择器
+const actionSelectorVisible = ref(false)
+const editingTrackId = ref<string | null>(null)
+const editingBlockId = ref<string | null>(null)
+const editingActionData = ref<{ actionType: string; actionParams: Record<string, any> } | undefined>(undefined)
+const maxDurationLimit = ref<number | undefined>(undefined)
 
 // 播放控制
 const isPlaying = ref(false)
@@ -587,10 +603,20 @@ const addActionBlock = (trackId: string) => {
   const track = tracks.value.find((t: Track) => t.id === trackId)
   if (track && track.type === TrackType.ACTION) {
     blockIdCounter++
+    
+    // 找到最后一个动作块的结束时间，将新块放在末尾
+    let maxEndTime = 0
+    ;(track.blocks || []).forEach((b: ActionBlock) => {
+      const endTime = b.startTime + b.duration
+      if (endTime > maxEndTime) {
+        maxEndTime = endTime
+      }
+    })
+    
     const newBlock: ActionBlock = {
       id: `block-${blockIdCounter}`,
       name: `动作 ${blockIdCounter}`,
-      startTime: config.value.currentTime,
+      startTime: maxEndTime, // 放在末尾而不是当前时间
       duration: 2,
       color: `hsl(${Math.random() * 360}, 70%, 60%)`
     }
@@ -621,6 +647,74 @@ const deleteSelectedBlock = (trackId: string) => {
     emit('update:tracks', tracks.value)
     saveHistory()
   }
+}
+
+// 编辑动作块
+const editActionBlock = (trackId: string, block: ActionBlock) => {
+  editingTrackId.value = trackId
+  editingBlockId.value = block.id
+  
+  // 计算当前块的最大可用时间（找到下一个块的起始时间）
+  const track = tracks.value.find((t: Track) => t.id === trackId)
+  if (track && track.type === TrackType.ACTION) {
+    const nextBlock = (track.blocks || [])
+      .filter((b: ActionBlock) => b.id !== block.id && b.startTime > block.startTime)
+      .sort((a: ActionBlock, b: ActionBlock) => a.startTime - b.startTime)[0]
+    
+    if (nextBlock) {
+      // 最大时间 = 下一个块的起始时间 - 当前块的起始时间
+      maxDurationLimit.value = nextBlock.startTime - block.startTime
+    } else {
+      // 如果没有下一个块，使用时间轴总时长作为限制
+      maxDurationLimit.value = config.value.duration - block.startTime
+    }
+  }
+  
+  // 如果块已经有动作数据，传递给对话框
+  if (block.actionType) {
+    editingActionData.value = {
+      actionType: block.actionType,
+      actionParams: { ...(block.actionParams || {}) }
+    }
+    // 将当前块的实际 duration 同步到参数中
+    if (editingActionData.value.actionParams.duration !== undefined) {
+      editingActionData.value.actionParams.duration = block.duration
+    }
+  } else {
+    editingActionData.value = undefined
+  }
+  actionSelectorVisible.value = true
+}
+
+// 处理动作选择
+const handleActionSelected = (action: { actionType: string; actionName: string; actionParams: Record<string, any> }) => {
+  if (editingTrackId.value && editingBlockId.value) {
+    const track = tracks.value.find((t: Track) => t.id === editingTrackId.value)
+    if (track && track.type === TrackType.ACTION) {
+      const block = track.blocks?.find((b: ActionBlock) => b.id === editingBlockId.value)
+      if (block) {
+        // 更新动作块的名称和动作数据
+        block.name = action.actionName
+        block.actionType = action.actionType
+        block.actionParams = action.actionParams
+        
+        // 根据动作参数中的 duration 更新块的持续时间
+        // 注意：duration 已经在对话框中受到最大值限制，这里直接使用即可
+        if (action.actionParams.duration !== undefined) {
+          block.duration = action.actionParams.duration
+        }
+        
+        emit('update:tracks', tracks.value)
+        saveHistory()
+      }
+    }
+  }
+  
+  // 重置编辑状态
+  editingTrackId.value = null
+  editingBlockId.value = null
+  editingActionData.value = undefined
+  maxDurationLimit.value = undefined
 }
 
 // 更新关键帧

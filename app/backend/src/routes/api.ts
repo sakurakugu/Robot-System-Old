@@ -787,15 +787,137 @@ const importStorage = multer.diskStorage({
 const importUpload = multer({
   storage: importStorage,
   fileFilter: (req, file, cb) => {
-    // 只接受 zip 文件
-    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed' || path.extname(file.originalname) === '.zip') {
+    // 接受 .zip 和 .hhzip 文件
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed' || ext === '.zip' || ext === '.hhzip') {
       cb(null, true);
     } else {
-      cb(new Error('只能上传 ZIP 压缩文件'));
+      cb(new Error('只能上传 ZIP 或 HHZIP 压缩文件'));
     }
   },
   limits: {
     fileSize: 500 * 1024 * 1024 // 限制500MB
+  }
+});
+
+// 保存工程（保存当前工程的所有数据）
+router.post('/projects/:uuid/save', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 更新项目元数据文件
+    const projectJsonPath = path.join(project.folder_path, 'project.json');
+    const projectMeta = {
+      uuid: project.uuid,
+      name: project.name,
+      description: project.description || '',
+      created_at: project.created_at,
+      updated_at: new Date().toISOString()
+    };
+    
+    fs.writeFileSync(projectJsonPath, JSON.stringify(projectMeta, null, 2));
+
+    // 更新主数据库中的时间戳
+    await db.run(
+      'UPDATE project_index SET updated_at = ? WHERE uuid = ?',
+      [new Date().toISOString(), req.params.uuid]
+    );
+
+    res.json({ success: true, message: '工程保存成功' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 导出工程为 .hhzip 文件
+router.get('/projects/:uuid/export', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 确保 exports 目录存在
+    const exportsDir = path.join(project.folder_path, 'exports');
+    if (!fs.existsSync(exportsDir)) {
+      fs.mkdirSync(exportsDir, { recursive: true });
+    }
+
+    // 生成导出文件名
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+    const exportFileName = `${project.name}_${timestamp}.hhzip`;
+    const exportPath = path.join(exportsDir, exportFileName);
+
+    // 使用 archiver 创建 zip 压缩文件
+    const archiver = require('archiver');
+    const output = fs.createWriteStream(exportPath);
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // 最高压缩级别
+    });
+
+    // 监听完成事件
+    output.on('close', () => {
+      // 发送文件给客户端
+      res.download(exportPath, exportFileName, (err) => {
+        // 下载完成后删除临时文件
+        if (fs.existsSync(exportPath)) {
+          fs.unlinkSync(exportPath);
+        }
+        if (err) {
+          console.error('下载文件时出错:', err);
+        }
+      });
+    });
+
+    archive.on('error', (err: Error) => {
+      throw err;
+    });
+
+    archive.pipe(output);
+
+    // 添加项目文件夹中的所有文件到压缩包
+    // 排除 exports 目录和其他临时文件
+    const addFilesToArchive = (dirPath: string, basePath: string = '') => {
+      const items = fs.readdirSync(dirPath);
+      
+      for (const item of items) {
+        const fullPath = path.join(dirPath, item);
+        const relativePath = basePath ? path.join(basePath, item) : item;
+        
+        // 跳过 exports 目录和隐藏文件
+        if (item === 'exports' || item.startsWith('.')) {
+          continue;
+        }
+        
+        const stat = fs.statSync(fullPath);
+        
+        if (stat.isDirectory()) {
+          addFilesToArchive(fullPath, relativePath);
+        } else {
+          archive.file(fullPath, { name: relativePath });
+        }
+      }
+    };
+
+    addFilesToArchive(project.folder_path);
+
+    // 完成压缩
+    await archive.finalize();
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

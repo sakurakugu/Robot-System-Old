@@ -15,6 +15,8 @@ export interface ActionBlock {
   duration: number // 秒
   color?: string
   data?: any // 动作数据
+  actionType?: string // 动作类型（对应 Python API 中的方法名）
+  actionParams?: Record<string, any> // 动作参数
 }
 
 // 关键帧

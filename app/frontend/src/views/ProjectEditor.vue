@@ -93,15 +93,50 @@ const connectWebSocket = () => {
   }
 }
 
+// 保存时间轴数据
+const saveTimeline = async () => {
+  if (!timelineEditorRef.value) {
+    throw new Error('时间轴编辑器未初始化')
+  }
+  
+  const tracks = timelineEditorRef.value.tracks
+  const config = timelineEditorRef.value.config
+  
+  await projectApi.saveTimeline(projectUuid, tracks, config)
+}
+
 onMounted(() => {
   loadTimeline()
   connectWebSocket()
+  
+  // 监听保存事件
+  const handleSave = async (event: Event) => {
+    const customEvent = event as CustomEvent
+    if (customEvent.detail?.projectUuid === projectUuid) {
+      try {
+        await saveTimeline()
+      } catch (error) {
+        console.error('保存时间轴失败:', error)
+      }
+    }
+  }
+  
+  window.addEventListener('save-project', handleSave)
+  
+  // 在卸载时移除监听器（需要在 onUnmounted 中添加）
+  const originalOnUnmounted = () => {
+    if (ws) {
+      ws.close()
+    }
+    window.removeEventListener('save-project', handleSave)
+  }
+  
+  onUnmounted(originalOnUnmounted)
 })
 
-onUnmounted(() => {
-  if (ws) {
-    ws.close()
-  }
+// 暴露保存方法给父组件
+defineExpose({
+  saveTimeline
 })
 </script>
 

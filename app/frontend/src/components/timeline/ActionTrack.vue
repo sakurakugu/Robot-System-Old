@@ -8,8 +8,9 @@
       :class="{ 'selected': isSelected(block) }"
       :style="getBlockStyle(block)"
       @mousedown="startDragBlock($event, block)"
-      @dblclick="editBlock(block)"
+      @dblclick.stop="editBlock(block)"
       @click.stop="selectBlock(block)"
+      @contextmenu.prevent="editBlock(block)"
     >
       <div class="block-content">
         <span class="block-name">{{ block.name }}</span>
@@ -47,6 +48,7 @@ const emit = defineEmits<{
   'update:blocks': [blocks: ActionBlock[]]
   'add-block': []
   'select-block': [blockId: string]
+  'edit-block': [block: ActionBlock]
 }>()
 
 const blocks = computed(() => props.track.blocks || [])
@@ -80,6 +82,8 @@ const getBlockStyle = (block: ActionBlock) => {
 let draggedBlock: ActionBlock | null = null
 let dragStartX = 0
 let dragStartTime = 0
+let isDragging = false
+let longPressTimer: number | null = null
 
 const startDragBlock = (e: MouseEvent, block: ActionBlock) => {
   if (props.track.locked) return
@@ -87,6 +91,16 @@ const startDragBlock = (e: MouseEvent, block: ActionBlock) => {
   draggedBlock = block
   dragStartX = e.clientX
   dragStartTime = block.startTime
+  isDragging = false
+
+  // 设置长按定时器（800ms）
+  longPressTimer = window.setTimeout(() => {
+    if (!isDragging) {
+      // 长按触发编辑
+      editBlock(block)
+      longPressTimer = null
+    }
+  }, 800)
 
   document.addEventListener('mousemove', onDragBlock)
   document.addEventListener('mouseup', stopDragBlock)
@@ -96,8 +110,21 @@ const startDragBlock = (e: MouseEvent, block: ActionBlock) => {
 const onDragBlock = (e: MouseEvent) => {
   if (!draggedBlock) return
 
-  const deltaX = e.clientX - dragStartX
-  const deltaTime = deltaX / props.config.pixelsPerSecond
+  // 如果鼠标移动超过阈值，取消长按定时器并开始拖拽
+  const moveThreshold = 5 // 像素
+  const deltaX = Math.abs(e.clientX - dragStartX)
+  
+  if (deltaX > moveThreshold && !isDragging) {
+    isDragging = true
+    if (longPressTimer !== null) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  }
+
+  if (!isDragging) return
+
+  const deltaTime = (e.clientX - dragStartX) / props.config.pixelsPerSecond
 
   let newStartTime = dragStartTime + deltaTime
 
@@ -127,7 +154,14 @@ const onDragBlock = (e: MouseEvent) => {
 }
 
 const stopDragBlock = () => {
+  // 清除长按定时器
+  if (longPressTimer !== null) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+  
   draggedBlock = null
+  isDragging = false
   document.removeEventListener('mousemove', onDragBlock)
   document.removeEventListener('mouseup', stopDragBlock)
 }
@@ -196,13 +230,23 @@ const onResize = (e: MouseEvent) => {
     newDuration = Math.min(props.config.duration - newStartTime, newDuration)
   }
 
-  // 更新动作块
-  const updatedBlocks = blocks.value.map((b: ActionBlock) =>
-    b.id === resizeBlock!.id
-      ? { ...b, startTime: newStartTime, duration: newDuration }
-      : b
-  )
-  emit('update:blocks', updatedBlocks)
+  // 检查是否与其他块重叠
+  const hasOverlap = blocks.value.some((b: ActionBlock) => {
+    if (b.id === resizeBlock!.id) return false
+    const blockEnd = newStartTime + newDuration
+    const bEnd = b.startTime + b.duration
+    return !(blockEnd <= b.startTime || newStartTime >= bEnd)
+  })
+
+  // 如果不重叠，才更新动作块
+  if (!hasOverlap) {
+    const updatedBlocks = blocks.value.map((b: ActionBlock) =>
+      b.id === resizeBlock!.id
+        ? { ...b, startTime: newStartTime, duration: newDuration }
+        : b
+    )
+    emit('update:blocks', updatedBlocks)
+  }
 }
 
 const stopResize = () => {
@@ -213,8 +257,7 @@ const stopResize = () => {
 
 // 编辑动作块
 const editBlock = (block: ActionBlock) => {
-  // TODO: 打开编辑对话框
-  console.log('Edit block:', block)
+  emit('edit-block', block)
 }
 
 // 添加动作块

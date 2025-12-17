@@ -98,5 +98,17 @@ export const projectApi = {
   // 获取项目文件列表
   getProjectFiles(uuid: string): Promise<{ success: boolean; data: any[] }> {
     return api.get(`/projects/${uuid}/files`)
+  },
+
+  // 保存工程（保存当前工程的所有数据）
+  saveProject(uuid: string): Promise<{ success: boolean; message: string }> {
+    return api.post(`/projects/${uuid}/save`)
+  },
+
+  // 导出工程为 .hhzip 文件
+  exportProject(uuid: string): Promise<Blob> {
+    return api.get(`/projects/${uuid}/export`, {
+      responseType: 'blob'
+    })
   }
 }

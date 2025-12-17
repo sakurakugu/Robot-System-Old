@@ -16,7 +16,7 @@
               </el-radio-button>
             </el-radio-group>
             <el-button @click="handleImportClick">
-              <el-icon><Upload /></el-icon>
+              <el-icon class="import-btn"><Upload /></el-icon>
               导入工程
             </el-button>
             <el-button type="primary" @click="showCreateDialog = true">
@@ -363,7 +363,15 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  gap: 12px;
+  gap: 4px;
+}
+
+.header-actions .el-radio-group {
+  margin-right: 20px;
+}
+
+.header-actions .import-btn {
+  margin-right: 8px;
 }
 
 .header-content h1 {

@@ -93,5 +93,10 @@ export const projectApi = {
         'Content-Type': 'multipart/form-data'
       }
     })
+  },
+
+  // 获取项目文件列表
+  getProjectFiles(uuid: string): Promise<{ success: boolean; data: any[] }> {
+    return api.get(`/projects/${uuid}/files`)
   }
 }

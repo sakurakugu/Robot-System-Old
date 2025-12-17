@@ -5,57 +5,52 @@
       <div class="toolbar-left">
         <el-button-group>
           <el-button size="small" @click="addTrack(TrackType.ACTION)">
-            <el-icon><Plus /></el-icon> 动作轨道
+            <el-icon>
+              <Plus />
+            </el-icon> 动作轨道
           </el-button>
           <el-button size="small" @click="addTrack(TrackType.KEYFRAME)">
-            <el-icon><Plus /></el-icon> 关键帧轨道
+            <el-icon>
+              <Plus />
+            </el-icon> 关键帧轨道
           </el-button>
           <el-button size="small" @click="addTrack(TrackType.AUDIO)">
-            <el-icon><Plus /></el-icon> 音频轨道
+            <el-icon>
+              <Plus />
+            </el-icon> 音频轨道
           </el-button>
         </el-button-group>
-        <span class="separator">|</span>
-        <el-button-group>
-          <el-button 
-            size="small" 
-            :type="isPlaying ? 'primary' : 'default'"
-            @click="togglePlay"
-          >
-            <el-icon v-if="!isPlaying"><VideoPlay /></el-icon>
-            <el-icon v-else><VideoPause /></el-icon>
-            {{ isPlaying ? '暂停' : '播放' }}
-          </el-button>
-          <el-button size="small" @click="stop">
-            <el-icon><Close /></el-icon>
-            停止
-          </el-button>
-        </el-button-group>
-        <span class="time-display">{{ formatTime(config.currentTime) }} / {{ formatTime(config.duration) }}</span>
       </div>
       <div class="toolbar-center">
+        <el-button size="small" :type="isPlaying ? 'primary' : 'default'" @click="togglePlay">
+          <el-icon v-if="!isPlaying">
+            <VideoPlay />
+          </el-icon>
+          <el-icon v-else>
+            <VideoPause />
+          </el-icon>
+          {{ isPlaying ? '暂停' : '播放' }}
+        </el-button>
+        <span class="time-display">
+          <span class="time-editable" @click="editCurrentTime">{{ formatTime(config.currentTime) }}</span>
+          <span> / </span>
+          <span class="time-editable" @click="editDuration">{{ formatTime(config.duration) }}</span>
+        </span>
+      </div>
+      <div class="toolbar-right">
         <el-button-group>
           <el-button size="small" @click="zoomIn">
-            <el-icon><ZoomIn /></el-icon>
+            <el-icon>
+              <ZoomIn />
+            </el-icon>
           </el-button>
           <el-button size="small" @click="zoomOut">
-            <el-icon><ZoomOut /></el-icon>
+            <el-icon>
+              <ZoomOut />
+            </el-icon>
           </el-button>
         </el-button-group>
         <el-checkbox v-model="config.snapToGrid" size="small">吸附网格</el-checkbox>
-      </div>
-      <div class="toolbar-right">
-        <span class="time-duration">
-          时长: 
-          <el-input-number 
-            v-model="config.duration" 
-            :min="10" 
-            :max="600" 
-            :step="10"
-            size="small"
-            style="width: 120px"
-          />
-          秒
-        </span>
         <span class="separator">|</span>
         <span class="zoom-level">缩放: {{ Math.round(config.pixelsPerSecond) }}px/s</span>
       </div>
@@ -68,13 +63,8 @@
         <div class="ruler-track-label">时间</div>
         <div class="ruler-wrapper" ref="rulerWrapper">
           <div class="ruler-content" :style="{ width: timelineWidth + 'px' }">
-            <div
-              v-for="tick in timeTicks"
-              :key="tick.time"
-              class="ruler-tick"
-              :class="{ major: tick.isMajor }"
-              :style="{ left: timeToPixel(tick.time) + 'px' }"
-            >
+            <div v-for="tick in timeTicks" :key="tick.time" class="ruler-tick" :class="{ major: tick.isMajor }"
+              :style="{ left: timeToPixel(tick.time) + 'px' }">
               <div class="tick-line"></div>
               <div class="tick-label" v-if="tick.isMajor">{{ formatTime(tick.time) }}</div>
             </div>
@@ -86,128 +76,92 @@
       <div class="tracks-wrapper" ref="tracksWrapper">
         <!-- 轨道列表 -->
         <div class="timeline-tracks">
-        <div
-          v-for="track in tracks"
-          :key="track.id"
-          class="track-row"
-          :style="{ height: track.height + 'px' }"
-        >
-          <!-- 轨道标签 -->
-          <div class="track-label">
-            <div class="track-controls">
-              <el-button
-                size="small"
-                circle
-                @click="toggleTrackVisibility(track.id)"
-                :type="track.visible ? 'primary' : 'default'"
-              >
-                <el-icon><View v-if="track.visible" /><Hide v-else /></el-icon>
-              </el-button>
-              <el-button
-                size="small"
-                circle
-                @click="toggleTrackLock(track.id)"
-                :type="track.locked ? 'warning' : 'default'"
-              >
-                <el-icon><Lock v-if="track.locked" /><Unlock v-else /></el-icon>
-              </el-button>
+          <div v-for="track in tracks" :key="track.id" class="track-row" :style="{ height: track.height + 'px' }">
+            <!-- 轨道标签 -->
+            <div class="track-label">
+              <div class="track-controls">
+                <el-button size="small" circle @click="toggleTrackVisibility(track.id)"
+                  :type="track.visible ? 'primary' : 'default'">
+                  <el-icon>
+                    <View v-if="track.visible" />
+                    <Hide v-else />
+                  </el-icon>
+                </el-button>
+                <el-button size="small" circle @click="toggleTrackLock(track.id)"
+                  :type="track.locked ? 'warning' : 'default'">
+                  <el-icon>
+                    <Lock v-if="track.locked" />
+                    <Unlock v-else />
+                  </el-icon>
+                </el-button>
+                <!-- 动作轨道的添加/删除按钮 -->
+                <template v-if="track.type === TrackType.ACTION">
+                  <el-button size="small" circle @click="addActionBlock(track.id)" :disabled="track.locked">
+                    <el-icon>
+                      <Plus />
+                    </el-icon>
+                  </el-button>
+                  <el-button size="small" circle @click="deleteSelectedBlock(track.id)"
+                    :disabled="track.locked || !getSelectedBlock(track.id)">
+                    <el-icon>
+                      <Minus />
+                    </el-icon>
+                  </el-button>
+                </template>
+                <el-button size="small" circle @click="deleteTrack(track.id)">
+                  <el-icon>
+                    <Delete />
+                  </el-icon>
+                </el-button>
+              </div>
+              <div class="track-name" @dblclick="editTrackName(track.id)">
+                {{ track.name }}
+              </div>
+              <div class="track-type-badge" :class="track.type">
+                {{ track.type === TrackType.AUDIO ? '音频' : track.type === TrackType.ACTION ? '动作' : '关键帧' }}
+              </div>
             </div>
-            <div class="track-name" @dblclick="editTrackName(track.id)">
-              {{ track.name }}
+
+            <!-- 轨道内容 -->
+            <div class="track-content" :style="{ width: timelineWidth + 'px' }">
+              <!-- 网格线 -->
+              <div class="grid-lines">
+                <div v-for="tick in gridTicks" :key="tick" class="grid-line"
+                  :style="{ left: timeToPixel(tick) + 'px' }"></div>
+              </div>
+
+              <!-- 动作轨道 -->
+              <ActionTrack v-if="track.type === TrackType.ACTION" :track="track" :config="config"
+                @update:blocks="updateTrackBlocks(track.id, $event)" @add-block="addActionBlock(track.id)"
+                @select-block="selectBlock(track.id, $event)" />
+
+              <!-- 关键帧轨道 -->
+              <KeyframeTrack v-if="track.type === TrackType.KEYFRAME" :track="track" :config="config"
+                @update:keyframes="updateTrackKeyframes(track.id, $event)"
+                @add-keyframe="addKeyframe(track.id, $event)" />
+
+              <!-- 音频轨道 -->
+              <AudioTrack v-if="track.type === TrackType.AUDIO" :track="track" :config="config"
+                :isTimelinePlaying="isPlaying" :currentTime="config.currentTime" :projectUuid="props.projectUuid"
+                @update:audio="updateTrackAudio(track.id, $event)" />
             </div>
-            <div class="track-type-badge" :class="track.type">
-              {{ track.type }}
-            </div>
-            <!-- 动作轨道的添加/删除按钮 -->
-            <div v-if="track.type === TrackType.ACTION" class="action-controls">
-              <el-button
-                size="small"
-                circle
-                @click="addActionBlock(track.id)"
-                :disabled="track.locked"
-              >
-                <el-icon><Plus /></el-icon>
-              </el-button>
-              <el-button
-                size="small"
-                circle
-                @click="deleteSelectedBlock(track.id)"
-                :disabled="track.locked || !getSelectedBlock(track.id)"
-              >
-                <el-icon><Minus /></el-icon>
-              </el-button>
-            </div>
-            <el-button
-              size="small"
-              circle
-              @click="deleteTrack(track.id)"
-              class="delete-btn"
-            >
-              <el-icon><Delete /></el-icon>
-            </el-button>
           </div>
 
-          <!-- 轨道内容 -->
-          <div class="track-content" :style="{ width: timelineWidth + 'px' }">
-            <!-- 网格线 -->
-            <div class="grid-lines">
-              <div
-                v-for="tick in gridTicks"
-                :key="tick"
-                class="grid-line"
-                :style="{ left: timeToPixel(tick) + 'px' }"
-              ></div>
-            </div>
-
-            <!-- 动作轨道 -->
-            <ActionTrack
-              v-if="track.type === TrackType.ACTION"
-              :track="track"
-              :config="config"
-              @update:blocks="updateTrackBlocks(track.id, $event)"
-              @add-block="addActionBlock(track.id)"
-              @select-block="selectBlock(track.id, $event)"
-            />
-
-            <!-- 关键帧轨道 -->
-            <KeyframeTrack
-              v-if="track.type === TrackType.KEYFRAME"
-              :track="track"
-              :config="config"
-              @update:keyframes="updateTrackKeyframes(track.id, $event)"
-              @add-keyframe="addKeyframe(track.id, $event)"
-            />
-
-            <!-- 音频轨道 -->
-            <AudioTrack
-              v-if="track.type === TrackType.AUDIO"
-              :track="track"
-              :config="config"
-              :isTimelinePlaying="isPlaying"
-              :currentTime="config.currentTime"
-              :projectUuid="props.projectUuid"
-              @update:audio="updateTrackAudio(track.id, $event)"
-            />
+          <!-- 空状态 -->
+          <div v-if="tracks.length === 0" class="empty-state">
+            <el-icon style="font-size: 48px">
+              <Film />
+            </el-icon>
+            <p>暂无轨道，点击上方按钮添加轨道</p>
           </div>
         </div>
-
-        <!-- 空状态 -->
-        <div v-if="tracks.length === 0" class="empty-state">
-          <el-icon style="font-size: 48px"><Film /></el-icon>
-          <p>暂无轨道，点击上方按钮添加轨道</p>
-        </div>
-      </div>
       </div>
 
       <!-- 播放头层（贯穿整个时间轴） -->
       <div class="playhead-layer" ref="playheadLayer">
-        <div
-          class="playhead"
-          :style="{ 
-            left: (timeToPixel(config.currentTime) - scrollLeft + 200) + 'px'
-          }"
-          @mousedown="startDragPlayhead"
-        ></div>
+        <div class="playhead" :style="{
+          left: (timeToPixel(config.currentTime) - scrollLeft + 200) + 'px'
+        }" @mousedown="startDragPlayhead"></div>
       </div>
     </div>
   </div>
@@ -319,7 +273,134 @@ const pixelToTime = (pixel: number) => {
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+
+// 编辑当前时间
+const editCurrentTime = async () => {
+  const { ElMessageBox } = await import('element-plus')
+  const { h } = await import('vue')
+
+  const currentMins = Math.floor(config.value.currentTime / 60)
+  const currentSecs = Math.floor(config.value.currentTime % 60)
+
+  let minutes = currentMins
+  let seconds = currentSecs
+
+  ElMessageBox({
+    title: '编辑当前时间',
+    message: h('div', { style: 'display: flex; align-items: center; gap: 10px;' }, [
+      h('div', { style: 'display: flex; flex-direction: column; gap: 5px;' }, [
+        h('label', { style: 'font-size: 12px; color: #999;' }, '分钟'),
+        h('input', {
+          type: 'number',
+          min: 0,
+          max: 99,
+          value: currentMins,
+          style: 'width: 80px; padding: 5px 10px; border: 1px solid #dcdfe6; border-radius: 4px;',
+          onInput: (e: Event) => {
+            minutes = parseInt((e.target as HTMLInputElement).value) || 0
+          }
+        })
+      ]),
+      h('span', { style: 'font-size: 20px; margin-top: 20px;' }, ':'),
+      h('div', { style: 'display: flex; flex-direction: column; gap: 5px;' }, [
+        h('label', { style: 'font-size: 12px; color: #999;' }, '秒'),
+        h('input', {
+          type: 'number',
+          min: 0,
+          max: 59,
+          value: currentSecs,
+          style: 'width: 80px; padding: 5px 10px; border: 1px solid #dcdfe6; border-radius: 4px;',
+          onInput: (e: Event) => {
+            seconds = parseInt((e.target as HTMLInputElement).value) || 0
+          }
+        })
+      ])
+    ]),
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    beforeClose: (action, instance, done) => {
+      if (action === 'confirm') {
+        const newTime = minutes * 60 + Math.min(seconds, 59)
+        if (newTime <= config.value.duration) {
+          config.value.currentTime = newTime
+          emit('update:currentTime', config.value.currentTime)
+          done()
+        } else {
+          instance.confirmButtonLoading = false
+          done()
+        }
+      } else {
+        done()
+      }
+    }
+  }).catch(() => {
+    // 用户取消
+  })
+}
+
+// 编辑总时长
+const editDuration = async () => {
+  const { ElMessageBox } = await import('element-plus')
+  const { h } = await import('vue')
+
+  const currentMins = Math.floor(config.value.duration / 60)
+  const currentSecs = Math.floor(config.value.duration % 60)
+
+  let minutes = currentMins
+  let seconds = currentSecs
+
+  ElMessageBox({
+    title: '编辑总时长',
+    message: h('div', { style: 'display: flex; align-items: center; gap: 10px;' }, [
+      h('div', { style: 'display: flex; flex-direction: column; gap: 5px;' }, [
+        h('label', { style: 'font-size: 12px; color: #999;' }, '分钟'),
+        h('input', {
+          type: 'number',
+          min: 0,
+          max: 99,
+          value: currentMins,
+          style: 'width: 80px; padding: 5px 10px; border: 1px solid #dcdfe6; border-radius: 4px;',
+          onInput: (e: Event) => {
+            minutes = parseInt((e.target as HTMLInputElement).value) || 0
+          }
+        })
+      ]),
+      h('span', { style: 'font-size: 20px; margin-top: 20px;' }, ':'),
+      h('div', { style: 'display: flex; flex-direction: column; gap: 5px;' }, [
+        h('label', { style: 'font-size: 12px; color: #999;' }, '秒'),
+        h('input', {
+          type: 'number',
+          min: 0,
+          max: 59,
+          value: currentSecs,
+          style: 'width: 80px; padding: 5px 10px; border: 1px solid #dcdfe6; border-radius: 4px;',
+          onInput: (e: Event) => {
+            seconds = parseInt((e.target as HTMLInputElement).value) || 0
+          }
+        })
+      ])
+    ]),
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    beforeClose: (action, instance, done) => {
+      if (action === 'confirm') {
+        const newDuration = minutes * 60 + Math.min(seconds, 59)
+        if (newDuration >= 10) {
+          config.value.duration = newDuration
+          done()
+        } else {
+          instance.confirmButtonLoading = false
+          done()
+        }
+      } else {
+        done()
+      }
+    }
+  }).catch(() => {
+    // 用户取消
+  })
 }
 
 // 历史管理
@@ -328,11 +409,11 @@ const saveHistory = () => {
   if (historyIndex.value < history.value.length - 1) {
     history.value = history.value.slice(0, historyIndex.value + 1)
   }
-  
+
   // 深拷贝当前轨道状态
   const snapshot = JSON.parse(JSON.stringify(tracks.value))
   history.value.push(snapshot)
-  
+
   // 限制历史记录大小
   if (history.value.length > maxHistorySize) {
     history.value.shift()
@@ -416,19 +497,19 @@ const stopDragPlayhead = () => {
 // 自动滚动以跟随播放头
 const autoScrollToPlayhead = () => {
   if (!tracksWrapper.value) return
-  
+
   const playheadPosition = timeToPixel(config.value.currentTime) // 播放头在时间轴内容中的绝对位置
   const currentScrollLeft = tracksWrapper.value.scrollLeft // 当前滚动位置
   const viewportWidth = tracksWrapper.value.clientWidth // 可视区域宽度
   const margin = 200 // 距离边缘的安全边距，考虑右侧预览面板
-  
+
   // 计算播放头相对于可视区域的位置
   const playheadViewportPosition = playheadPosition - currentScrollLeft
-  
+
   // 如果播放头接近可视区域右边缘，自动向右滚动
   if (playheadViewportPosition > viewportWidth - margin) {
     tracksWrapper.value.scrollLeft = playheadPosition - viewportWidth + margin
-  } 
+  }
   // 如果播放头接近可视区域左边缘，自动向左滚动
   else if (playheadViewportPosition < margin) {
     tracksWrapper.value.scrollLeft = Math.max(0, playheadPosition - margin)
@@ -442,19 +523,19 @@ const addTrack = (type: TrackType) => {
   console.log('Adding track with type:', type)
   console.log('TrackType.AUDIO:', TrackType.AUDIO)
   console.log('TrackType.ACTION:', TrackType.ACTION)
-  
+
   const track: Track = {
     id: `track-${trackIdCounter}`,
     name: `${type === TrackType.AUDIO ? '音频' : type === TrackType.ACTION ? '动作' : '关键帧'}轨道 ${trackIdCounter}`,
     type,
     locked: false,
     visible: true,
-    height: type === TrackType.AUDIO ? 100 : 60,
+    height: type === TrackType.AUDIO ? 100 : 85,
     blocks: type === TrackType.ACTION ? [] : undefined,
     keyframes: type === TrackType.KEYFRAME ? [] : undefined,
     audioUrl: type === TrackType.AUDIO ? undefined : undefined
   }
-  
+
   console.log('Created track:', track)
   tracks.value.push(track)
   emit('update:tracks', tracks.value)
@@ -533,7 +614,7 @@ const getSelectedBlock = (trackId: string) => {
 const deleteSelectedBlock = (trackId: string) => {
   const track = tracks.value.find((t: Track) => t.id === trackId)
   const selectedBlockId = selectedBlocks.value[trackId]
-  
+
   if (track && track.type === TrackType.ACTION && selectedBlockId) {
     track.blocks = (track.blocks || []).filter((b: ActionBlock) => b.id !== selectedBlockId)
     delete selectedBlocks.value[trackId]
@@ -575,7 +656,7 @@ const updateTrackAudio = (trackId: string, audioUrl: string) => {
   console.log('updateTrackAudio called:', { trackId, audioUrl })
   const track = tracks.value.find((t: Track) => t.id === trackId)
   console.log('Found track:', track)
-  
+
   if (track && track.type === TrackType.AUDIO) {
     track.audioUrl = audioUrl
     console.log('Updated track.audioUrl:', track.audioUrl)
@@ -593,17 +674,17 @@ onMounted(() => {
     tracksWrapper.value.addEventListener('scroll', (e: Event) => {
       const currentScrollLeft = (e.target as HTMLElement).scrollLeft
       scrollLeft.value = currentScrollLeft
-      
+
       // 同步标尺滚动
       if (rulerWrapper.value) {
         rulerWrapper.value.scrollLeft = currentScrollLeft
       }
     })
   }
-  
+
   // 添加键盘事件监听
   window.addEventListener('keydown', handleKeyDown)
-  
+
   // 初始化历史记录
   saveHistory()
 })
@@ -674,9 +755,6 @@ const stop = () => {
     cancelAnimationFrame(playbackTimer)
     playbackTimer = null
   }
-
-  config.value.currentTime = 0
-  emit('update:currentTime', config.value.currentTime)
 
   // 停止所有音频轨道
   tracks.value.forEach((track) => {
@@ -757,6 +835,19 @@ defineExpose({
   color: #cccccc;
   font-family: monospace;
   padding: 0 10px;
+  display: flex;
+  align-items: center;
+}
+
+.time-editable {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.time-editable:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .timeline-content {
@@ -888,13 +979,17 @@ defineExpose({
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   flex-shrink: 0;
+  justify-content: flex-start;
+  overflow: hidden;
 }
 
 .track-controls {
   display: flex;
-  gap: 5px;
+  gap: 3px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .track-name {
@@ -904,6 +999,8 @@ defineExpose({
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: text;
+  margin-top: 3px;
+  flex-shrink: 0;
 }
 
 .track-type-badge {
@@ -913,7 +1010,8 @@ defineExpose({
   background: #333;
   display: inline-block;
   align-self: flex-start;
-  text-transform: uppercase;
+  margin-top: 3px;
+  flex-shrink: 0;
 }
 
 .track-type-badge.audio {
@@ -929,16 +1027,6 @@ defineExpose({
 .track-type-badge.keyframe {
   background: #ce9178;
   color: #000;
-}
-
-.action-controls {
-  display: flex;
-  gap: 5px;
-  margin-top: 5px;
-}
-
-.delete-btn {
-  margin-top: auto;
 }
 
 .track-content {

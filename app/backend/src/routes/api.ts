@@ -8,6 +8,7 @@ import { PATHS, CONFIG } from '../config';
 import { pythonExecutor } from '../services/python-executor';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 const router = express.Router();
 
@@ -51,6 +52,74 @@ router.get('/projects/:uuid', async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: project });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取项目文件列表
+router.get('/projects/:uuid/files', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+    
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    // 递归读取文件夹结构
+    const readDirectory = (dirPath: string, relativePath: string = ''): any[] => {
+      const items: any[] = [];
+      
+      try {
+        const files = fs.readdirSync(dirPath);
+        
+        for (const file of files) {
+          // 跳过隐藏文件和特定文件夹
+          if (file.startsWith('.') || file === 'node_modules' || file === 'backups') {
+            continue;
+          }
+          
+          const fullPath = path.join(dirPath, file);
+          const relPath = relativePath ? path.join(relativePath, file) : file;
+          const stat = fs.statSync(fullPath);
+          
+          if (stat.isDirectory()) {
+            items.push({
+              name: file,
+              path: relPath,
+              isDirectory: true,
+              children: readDirectory(fullPath, relPath)
+            });
+          } else {
+            items.push({
+              name: file,
+              path: relPath,
+              isDirectory: false,
+              size: stat.size,
+              modifiedTime: stat.mtime
+            });
+          }
+        }
+      } catch (error) {
+        console.error('读取目录失败:', dirPath, error);
+      }
+      
+      // 排序：文件夹在前，文件在后，同类按名称排序
+      items.sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      return items;
+    };
+
+    const fileTree = readDirectory(project.folder_path);
+    res.json({ success: true, data: fileTree });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -701,7 +770,7 @@ router.get('/projects/:uuid/audio/:filename', async (req: Request, res: Response
 // 配置multer用于工程导入
 const importStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const tempDir = path.join(PATHS.projectsDir, '.temp');
+    const tempDir = path.join(os.tmpdir(), 'robot-dog-imports');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -732,7 +801,7 @@ const importUpload = multer({
 
 // 导入现有工程
 router.post('/projects/import', importUpload.single('project'), async (req: Request, res: Response) => {
-  const tempExtractDir = path.join(PATHS.projectsDir, '.temp', `extract_${Date.now()}`);
+  const tempExtractDir = path.join(os.tmpdir(), 'robot-dog-extracts', `extract_${Date.now()}`);
   
   try {
     if (!req.file) {

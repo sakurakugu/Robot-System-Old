@@ -339,8 +339,8 @@ onUnmounted(() => {
 }
 
 .upload-area {
-  width: 100%;
-  height: 100%;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
   display: flex;
   flex-direction: column;
   align-items: center;

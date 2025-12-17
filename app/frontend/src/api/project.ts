@@ -82,5 +82,16 @@ export const projectApi = {
         'Content-Type': 'multipart/form-data'
       }
     })
+  },
+
+  // 导入现有工程
+  importProject(file: File): Promise<{ success: boolean; data: Project }> {
+    const formData = new FormData()
+    formData.append('project', file)
+    return api.post('/projects/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
   }
 }

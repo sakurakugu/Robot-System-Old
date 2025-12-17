@@ -698,4 +698,174 @@ router.get('/projects/:uuid/audio/:filename', async (req: Request, res: Response
   }
 });
 
+// 配置multer用于工程导入
+const importStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const tempDir = path.join(PATHS.projectsDir, '.temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    cb(null, tempDir);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    const filename = `import_${timestamp}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const importUpload = multer({
+  storage: importStorage,
+  fileFilter: (req, file, cb) => {
+    // 只接受 zip 文件
+    if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed' || path.extname(file.originalname) === '.zip') {
+      cb(null, true);
+    } else {
+      cb(new Error('只能上传 ZIP 压缩文件'));
+    }
+  },
+  limits: {
+    fileSize: 500 * 1024 * 1024 // 限制500MB
+  }
+});
+
+// 导入现有工程
+router.post('/projects/import', importUpload.single('project'), async (req: Request, res: Response) => {
+  const tempExtractDir = path.join(PATHS.projectsDir, '.temp', `extract_${Date.now()}`);
+  
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '没有上传文件' });
+    }
+
+    // 动态导入 extract-zip
+    const extract = (await import('extract-zip')).default;
+    
+    // 解压文件
+    await extract(req.file.path, { dir: tempExtractDir });
+
+    // 查找 project.json 文件
+    let projectJsonPath: string | null = null;
+    let projectRootDir: string = tempExtractDir;
+
+    const findProjectJson = (dir: string): string | null => {
+      const items = fs.readdirSync(dir);
+      
+      // 首先在当前目录查找
+      if (items.includes('project.json')) {
+        return path.join(dir, 'project.json');
+      }
+      
+      // 如果有且仅有一个子目录，递归查找
+      const subdirs = items.filter(item => {
+        const itemPath = path.join(dir, item);
+        return fs.statSync(itemPath).isDirectory() && !item.startsWith('.');
+      });
+      
+      if (subdirs.length === 1) {
+        return findProjectJson(path.join(dir, subdirs[0]));
+      }
+      
+      return null;
+    };
+
+    projectJsonPath = findProjectJson(tempExtractDir);
+
+    if (!projectJsonPath) {
+      // 清理临时文件
+      fs.rmSync(req.file.path, { force: true });
+      fs.rmSync(tempExtractDir, { recursive: true, force: true });
+      return res.status(400).json({ success: false, error: '压缩包中未找到 project.json 文件' });
+    }
+
+    // 确定项目根目录
+    projectRootDir = path.dirname(projectJsonPath);
+
+    // 读取 project.json
+    const projectMeta = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
+    
+    if (!projectMeta.name) {
+      // 清理临时文件
+      fs.rmSync(req.file.path, { force: true });
+      fs.rmSync(tempExtractDir, { recursive: true, force: true });
+      return res.status(400).json({ success: false, error: 'project.json 格式不正确，缺少 name 字段' });
+    }
+
+    // 生成新的 UUID
+    const newUuid = uuidv7();
+    const folderName = `${projectMeta.name.replace(/[<>:"\/|?*]/g, '_')}_${newUuid.substring(0, 8)}`;
+    const targetPath = path.join(PATHS.projectsDir, folderName);
+
+    // 移动项目文件夹到目标位置
+    fs.renameSync(projectRootDir, targetPath);
+
+    // 更新 project.json 中的 UUID 和时间戳
+    projectMeta.uuid = newUuid;
+    projectMeta.imported_at = new Date().toISOString();
+    projectMeta.updated_at = new Date().toISOString();
+    
+    fs.writeFileSync(
+      path.join(targetPath, 'project.json'),
+      JSON.stringify(projectMeta, null, 2)
+    );
+
+    // 检查并更新项目数据库
+    const projectDbPath = path.join(targetPath, 'project.db');
+    if (fs.existsSync(projectDbPath)) {
+      const projectDb = new ProjectDatabase(projectDbPath);
+      await projectDb.open();
+      
+      // 更新项目配置中的 UUID
+      await projectDb.run(
+        'UPDATE project_config SET value = ? WHERE key = ?',
+        [JSON.stringify(newUuid), 'project_uuid']
+      );
+      
+      await projectDb.close();
+    }
+
+    // 在主数据库中记录导入的项目
+    const db = await getMainDatabase();
+    await db.run(
+      `INSERT INTO project_index 
+       (uuid, user_uuid, name, description, folder_path, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newUuid,
+        '00000000-0000-0000-0000-000000000000',
+        projectMeta.name,
+        projectMeta.description || '',
+        targetPath,
+        projectMeta.created_at || new Date().toISOString(),
+        new Date().toISOString(),
+      ]
+    );
+
+    // 清理临时文件
+    fs.rmSync(req.file.path, { force: true });
+    if (fs.existsSync(tempExtractDir)) {
+      fs.rmSync(tempExtractDir, { recursive: true, force: true });
+    }
+
+    // 返回新创建的项目
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [newUuid]
+    );
+
+    res.json({ success: true, data: project });
+  } catch (error: any) {
+    // 清理临时文件
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.rmSync(req.file.path, { force: true });
+    }
+    if (fs.existsSync(tempExtractDir)) {
+      fs.rmSync(tempExtractDir, { recursive: true, force: true });
+    }
+    
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

@@ -113,13 +113,21 @@
             >
               <el-icon><Setting /></el-icon>
             </div>
+            <div 
+              class="activity-icon" 
+              :class="{ active: activeView === 'history' }"
+              @click="toggleView('history')"
+              title="历史记录"
+            >
+              <el-icon><Clock /></el-icon>
+            </div>
           </div>
         </div>
 
         <!-- 左侧面板 -->
         <el-aside v-show="showLeftPanel" width="250px" class="left-panel">
           <div class="panel-header">
-            <h3>{{ activeView === 'explorer' ? '资源管理器' : '机器人列表' }}</h3>
+            <h3>{{ getPanelTitle }}</h3>
             <div class="header-actions" v-if="activeView === 'robots'">
               <el-button size="small" @click="goToRobotManager">
                 <el-icon><Setting /></el-icon>
@@ -136,7 +144,7 @@
           </div>
           
           <!-- 文件浏览器 -->
-          <div v-if="activeView === 'explorer'" class="file-explorer">
+          <div v-show="activeView === 'explorer'" class="file-explorer">
             <el-tree
               :data="fileTree"
               :props="treeProps"
@@ -157,7 +165,7 @@
           </div>
           
           <!-- 机器人列表 -->
-          <div v-if="activeView === 'robots'" class="robot-list">
+          <div v-show="activeView === 'robots'" class="robot-list">
             <div
               v-for="robot in robots"
               :key="robot.uuid"
@@ -169,6 +177,12 @@
               <span class="robot-name">{{ robot.name }}</span>
             </div>
             <el-empty v-if="robots.length === 0" description="暂无机器人" />
+          </div>
+
+          <!-- 历史记录容器 -->
+          <div v-show="activeView === 'history'" id="history-panel-container" class="history-container">
+            <!-- TimelineEditor 将会 Teleport 到这里 -->
+            <el-empty v-if="!hasActiveEditor" description="无活动编辑器" />
           </div>
         </el-aside>
 
@@ -299,7 +313,7 @@
 import { ref, computed, watch, markRaw, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled, Clock } from '@element-plus/icons-vue'
 import { projectApi } from '@/api/project'
 import { wsClient } from '@/services/websocket'
 
@@ -355,13 +369,32 @@ const currentProjectName = ref('项目编辑器')
 const showLeftPanel = ref(true)
 const showBottomPanel = ref(true)
 const showRightPanel = ref(false)
-const activeView = ref<'explorer' | 'robots' | 'preview' | null>('robots')
+const activeView = ref<'explorer' | 'robots' | 'preview' | 'history' | null>('robots')
+
+// 计算当前是否有活动编辑器
+const hasActiveEditor = computed(() => {
+  return tabs.value.length > 0 && activeTab.value
+})
+
+// 计算面板标题
+const getPanelTitle = computed(() => {
+  switch (activeView.value) {
+    case 'explorer':
+      return '资源管理器'
+    case 'robots':
+      return '机器人列表'
+    case 'history':
+      return '历史记录'
+    default:
+      return ''
+  }
+})
 
 // 当前执行ID
 const currentExecutionId = ref<string | null>(null)
 
 // 切换侧栏视图
-const toggleView = (view: 'explorer' | 'robots' | 'preview') => {
+const toggleView = (view: 'explorer' | 'robots' | 'preview' | 'history') => {
   if (view === 'preview') {
     // 预览视图只控制右侧面板
     if (activeView.value === 'preview') {
@@ -1383,6 +1416,13 @@ const handleFileClick = async (data: any) => {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+}
+
+.history-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .file-explorer::-webkit-scrollbar {

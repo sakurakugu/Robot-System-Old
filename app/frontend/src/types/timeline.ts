@@ -50,3 +50,39 @@ export interface TimelineConfig {
   snapToGrid: boolean // 是否吸附到网格
   gridSize: number // 网格大小（秒）
 }
+
+// 历史操作类型
+export enum HistoryActionType {
+  ADD_TRACK = 'add_track',
+  DELETE_TRACK = 'delete_track',
+  UPDATE_TRACK = 'update_track',
+  ADD_BLOCK = 'add_block',
+  DELETE_BLOCK = 'delete_block',
+  UPDATE_BLOCK = 'update_block',
+  MOVE_BLOCK = 'move_block',
+  ADD_KEYFRAME = 'add_keyframe',
+  DELETE_KEYFRAME = 'delete_keyframe',
+  UPDATE_KEYFRAME = 'update_keyframe',
+  UPDATE_AUDIO = 'update_audio'
+}
+
+// 历史记录项
+export interface HistoryRecord {
+  id: string
+  type: HistoryActionType
+  description: string // 操作描述
+  timestamp: number
+  trackId?: string
+  trackName?: string
+  data: {
+    before?: any // 操作前的数据
+    after?: any // 操作后的数据
+  }
+}
+
+// 历史记录管理器状态
+export interface HistoryState {
+  records: HistoryRecord[]
+  currentIndex: number // 当前位置（-1表示没有历史）
+  maxSize: number // 最大历史记录数
+}

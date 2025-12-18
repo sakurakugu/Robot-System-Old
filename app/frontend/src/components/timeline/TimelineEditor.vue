@@ -1,7 +1,23 @@
 <template>
   <div class="timeline-editor">
-    <!-- 工具栏 -->
-    <div class="timeline-toolbar">
+    <!-- 历史记录面板 (Teleport到左侧栏) -->
+    <Teleport to="#history-panel-container" :disabled="!isHistoryPanelMounted">
+      <div class="history-sidebar" v-if="isHistoryPanelMounted">
+        <HistoryPanel
+          :historyRecords="historyRecords"
+          :currentIndex="historyCurrentIndex"
+          @undo="handleUndo"
+          @redo="handleRedo"
+          @jump-to="handleJumpTo"
+          @clear="handleClearHistory"
+        />
+      </div>
+    </Teleport>
+
+    <!-- 右侧主编辑区 -->
+    <div class="timeline-main">
+      <!-- 工具栏 -->
+      <div class="timeline-toolbar">
       <div class="toolbar-left">
         <el-button-group>
           <el-button size="small" @click="addTrack(TrackType.ACTION)">
@@ -234,17 +250,22 @@
         <el-button type="primary" @click="confirmRobotSelection">确定</el-button>
       </template>
     </el-dialog>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Track, TrackType, TimelineConfig, ActionBlock, Keyframe } from '@/types/timeline'
+import { Track, TrackType, TimelineConfig, ActionBlock, Keyframe, HistoryRecord, HistoryActionType } from '@/types/timeline'
 import ActionTrack from './ActionTrack.vue'
 import KeyframeTrack from './KeyframeTrack.vue'
 import AudioTrack from './AudioTrack.vue'
 import ActionSelectorDialog from './ActionSelectorDialog.vue'
+import HistoryPanel from './HistoryPanel.vue'
 import { Warning, Check, CircleClose } from '@element-plus/icons-vue'
+
+// 历史记录面板挂载状态
+const isHistoryPanelMounted = ref(false)
 
 // Props
 const props = defineProps<{
@@ -299,9 +320,9 @@ let playbackStartOffset = 0
 // 滚动位置
 const scrollLeft = ref(0)
 
-// 撤销/重做历史
-const history = ref<Track[][]>([])
-const historyIndex = ref(-1)
+// 新的历史记录系统
+const historyRecords = ref<HistoryRecord[]>([])
+const historyCurrentIndex = ref(-1)
 const maxHistorySize = 50
 
 // 引用
@@ -489,39 +510,179 @@ const editDuration = async () => {
   })
 }
 
-// 历史管理
-const saveHistory = () => {
-  // 移除当前索引之后的所有历史
-  if (historyIndex.value < history.value.length - 1) {
-    history.value = history.value.slice(0, historyIndex.value + 1)
+// 新的历史记录管理
+let historyIdCounter = 0
+const createHistoryRecord = (
+  type: HistoryActionType,
+  description: string,
+  data: { before?: any; after?: any },
+  trackId?: string,
+  trackName?: string
+): HistoryRecord => {
+  historyIdCounter++
+  return {
+    id: `history-${historyIdCounter}`,
+    type,
+    description,
+    timestamp: Date.now(),
+    trackId,
+    trackName,
+    data
+  }
+}
+
+const addHistoryRecord = (record: HistoryRecord) => {
+  // 如果当前不在历史记录的末尾，移除后面的记录
+  if (historyCurrentIndex.value < historyRecords.value.length - 1) {
+    historyRecords.value = historyRecords.value.slice(0, historyCurrentIndex.value + 1)
   }
 
-  // 深拷贝当前轨道状态
-  const snapshot = JSON.parse(JSON.stringify(tracks.value))
-  history.value.push(snapshot)
+  // 添加新记录
+  historyRecords.value.push(record)
 
   // 限制历史记录大小
-  if (history.value.length > maxHistorySize) {
-    history.value.shift()
+  if (historyRecords.value.length > maxHistorySize) {
+    historyRecords.value.shift()
   } else {
-    historyIndex.value++
+    historyCurrentIndex.value++
   }
 }
 
-const undo = () => {
-  if (historyIndex.value > 0) {
-    historyIndex.value--
-    tracks.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]))
-    emit('update:tracks', tracks.value)
+const handleUndo = () => {
+  if (historyCurrentIndex.value < 0) return
+
+  const record = historyRecords.value[historyCurrentIndex.value]
+  applyHistoryReverse(record)
+  historyCurrentIndex.value--
+}
+
+const handleRedo = () => {
+  if (historyCurrentIndex.value >= historyRecords.value.length - 1) return
+
+  historyCurrentIndex.value++
+  const record = historyRecords.value[historyCurrentIndex.value]
+  applyHistoryForward(record)
+}
+
+const handleJumpTo = (index: number) => {
+  // 从当前位置跳转到目标位置
+  while (historyCurrentIndex.value > index) {
+    handleUndo()
+  }
+  while (historyCurrentIndex.value < index) {
+    handleRedo()
   }
 }
 
-const redo = () => {
-  if (historyIndex.value < history.value.length - 1) {
-    historyIndex.value++
-    tracks.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]))
-    emit('update:tracks', tracks.value)
+const handleClearHistory = () => {
+  historyRecords.value = []
+  historyCurrentIndex.value = -1
+}
+
+const applyHistoryReverse = (record: HistoryRecord) => {
+  switch (record.type) {
+    case HistoryActionType.ADD_TRACK:
+      if (record.trackId) {
+        tracks.value = tracks.value.filter((t: Track) => t.id !== record.trackId)
+      }
+      break
+    case HistoryActionType.DELETE_TRACK:
+      if (record.data.before) {
+        tracks.value.push(JSON.parse(JSON.stringify(record.data.before)))
+      }
+      break
+    case HistoryActionType.UPDATE_TRACK:
+      if (record.trackId && record.data.before) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track) {
+          Object.assign(track, JSON.parse(JSON.stringify(record.data.before)))
+        }
+      }
+      break
+    case HistoryActionType.ADD_BLOCK:
+    case HistoryActionType.DELETE_BLOCK:
+    case HistoryActionType.UPDATE_BLOCK:
+    case HistoryActionType.MOVE_BLOCK:
+      if (record.trackId && record.data.before) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track && track.type === TrackType.ACTION) {
+          track.blocks = JSON.parse(JSON.stringify(record.data.before))
+        }
+      }
+      break
+    case HistoryActionType.ADD_KEYFRAME:
+    case HistoryActionType.DELETE_KEYFRAME:
+    case HistoryActionType.UPDATE_KEYFRAME:
+      if (record.trackId && record.data.before) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track && track.type === TrackType.KEYFRAME) {
+          track.keyframes = JSON.parse(JSON.stringify(record.data.before))
+        }
+      }
+      break
+    case HistoryActionType.UPDATE_AUDIO:
+      if (record.trackId && record.data.before !== undefined) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track && track.type === TrackType.AUDIO) {
+          track.audioUrl = record.data.before
+        }
+      }
+      break
   }
+  emit('update:tracks', tracks.value)
+}
+
+const applyHistoryForward = (record: HistoryRecord) => {
+  switch (record.type) {
+    case HistoryActionType.ADD_TRACK:
+      if (record.data.after) {
+        tracks.value.push(JSON.parse(JSON.stringify(record.data.after)))
+      }
+      break
+    case HistoryActionType.DELETE_TRACK:
+      if (record.trackId) {
+        tracks.value = tracks.value.filter((t: Track) => t.id !== record.trackId)
+      }
+      break
+    case HistoryActionType.UPDATE_TRACK:
+      if (record.trackId && record.data.after) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track) {
+          Object.assign(track, JSON.parse(JSON.stringify(record.data.after)))
+        }
+      }
+      break
+    case HistoryActionType.ADD_BLOCK:
+    case HistoryActionType.DELETE_BLOCK:
+    case HistoryActionType.UPDATE_BLOCK:
+    case HistoryActionType.MOVE_BLOCK:
+      if (record.trackId && record.data.after) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track && track.type === TrackType.ACTION) {
+          track.blocks = JSON.parse(JSON.stringify(record.data.after))
+        }
+      }
+      break
+    case HistoryActionType.ADD_KEYFRAME:
+    case HistoryActionType.DELETE_KEYFRAME:
+    case HistoryActionType.UPDATE_KEYFRAME:
+      if (record.trackId && record.data.after) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track && track.type === TrackType.KEYFRAME) {
+          track.keyframes = JSON.parse(JSON.stringify(record.data.after))
+        }
+      }
+      break
+    case HistoryActionType.UPDATE_AUDIO:
+      if (record.trackId && record.data.after !== undefined) {
+        const track = tracks.value.find((t: Track) => t.id === record.trackId)
+        if (track && track.type === TrackType.AUDIO) {
+          track.audioUrl = record.data.after
+        }
+      }
+      break
+  }
+  emit('update:tracks', tracks.value)
 }
 
 // 键盘事件处理
@@ -529,12 +690,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
   // Ctrl+Z 撤销
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
     e.preventDefault()
-    undo()
+    handleUndo()
   }
   // Ctrl+Shift+Z 或 Ctrl+Y 重做
   else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
     e.preventDefault()
-    redo()
+    handleRedo()
   }
   // Delete 删除选中的动作块
   else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -627,14 +788,36 @@ const addTrack = (type: TrackType) => {
   console.log('Created track:', track)
   tracks.value.push(track)
   emit('update:tracks', tracks.value)
-  saveHistory()
+  
+  // 添加历史记录
+  const record = createHistoryRecord(
+    HistoryActionType.ADD_TRACK,
+    `添加${track.name}`,
+    { after: track },
+    track.id,
+    track.name
+  )
+  addHistoryRecord(record)
 }
 
 // 删除轨道
 const deleteTrack = (trackId: string) => {
+  const track = tracks.value.find((t: Track) => t.id === trackId)
+  if (!track) return
+  
+  const trackCopy = JSON.parse(JSON.stringify(track))
   tracks.value = tracks.value.filter((t: Track) => t.id !== trackId)
   emit('update:tracks', tracks.value)
-  saveHistory()
+  
+  // 添加历史记录
+  const record = createHistoryRecord(
+    HistoryActionType.DELETE_TRACK,
+    `删除${track.name}`,
+    { before: trackCopy },
+    trackId,
+    track.name
+  )
+  addHistoryRecord(record)
 }
 
 // 切换轨道可见性
@@ -689,9 +872,22 @@ const confirmRobotSelection = () => {
   if (editingTrackIdForRobot.value) {
     const track = tracks.value.find((t: Track) => t.id === editingTrackIdForRobot.value)
     if (track) {
+      const oldRobotId = track.robotId
       track.robotId = selectedRobotId.value || undefined
       emit('update:tracks', tracks.value)
-      saveHistory()
+      
+      // 添加历史记录
+      const record = createHistoryRecord(
+        HistoryActionType.UPDATE_TRACK,
+        `${track.name} ${track.robotId ? '绑定到' : '解除绑定'} ${getRobotBindingText(track.robotId)}`,
+        { 
+          before: { robotId: oldRobotId }, 
+          after: { robotId: track.robotId } 
+        },
+        track.id,
+        track.name
+      )
+      addHistoryRecord(record)
     }
   }
   robotSelectorVisible.value = false
@@ -702,9 +898,19 @@ const confirmRobotSelection = () => {
 const updateTrackBlocks = (trackId: string, blocks: ActionBlock[]) => {
   const track = tracks.value.find((t: Track) => t.id === trackId)
   if (track && track.type === TrackType.ACTION) {
+    const oldBlocks = JSON.parse(JSON.stringify(track.blocks))
     track.blocks = blocks
     emit('update:tracks', tracks.value)
-    saveHistory()
+    
+    // 添加历史记录
+    const record = createHistoryRecord(
+      HistoryActionType.MOVE_BLOCK,
+      `移动${track.name}中的动作块`,
+      { before: oldBlocks, after: blocks },
+      trackId,
+      track.name
+    )
+    addHistoryRecord(record)
   }
 }
 
@@ -731,9 +937,20 @@ const addActionBlock = (trackId: string) => {
       duration: 2,
       color: `hsl(${Math.random() * 360}, 70%, 60%)`
     }
+    
+    const oldBlocks = JSON.parse(JSON.stringify(track.blocks || []))
     track.blocks = [...(track.blocks || []), newBlock]
     emit('update:tracks', tracks.value)
-    saveHistory()
+    
+    // 添加历史记录
+    const record = createHistoryRecord(
+      HistoryActionType.ADD_BLOCK,
+      `在${track.name}中添加动作块`,
+      { before: oldBlocks, after: track.blocks },
+      trackId,
+      track.name
+    )
+    addHistoryRecord(record)
   }
 }
 
@@ -753,10 +970,20 @@ const deleteSelectedBlock = (trackId: string) => {
   const selectedBlockId = selectedBlocks.value[trackId]
 
   if (track && track.type === TrackType.ACTION && selectedBlockId) {
+    const oldBlocks = JSON.parse(JSON.stringify(track.blocks || []))
     track.blocks = (track.blocks || []).filter((b: ActionBlock) => b.id !== selectedBlockId)
     delete selectedBlocks.value[trackId]
     emit('update:tracks', tracks.value)
-    saveHistory()
+    
+    // 添加历史记录
+    const record = createHistoryRecord(
+      HistoryActionType.DELETE_BLOCK,
+      `从${track.name}中删除动作块`,
+      { before: oldBlocks, after: track.blocks },
+      trackId,
+      track.name
+    )
+    addHistoryRecord(record)
   }
 }
 
@@ -804,6 +1031,8 @@ const handleActionSelected = (action: { actionType: string; actionName: string; 
     if (track && track.type === TrackType.ACTION) {
       const block = track.blocks?.find((b: ActionBlock) => b.id === editingBlockId.value)
       if (block) {
+        const oldBlocks = JSON.parse(JSON.stringify(track.blocks || []))
+        
         // 更新动作块的名称和动作数据
         block.name = action.actionName
         block.actionType = action.actionType
@@ -816,7 +1045,16 @@ const handleActionSelected = (action: { actionType: string; actionName: string; 
         }
         
         emit('update:tracks', tracks.value)
-        saveHistory()
+        
+        // 添加历史记录
+        const record = createHistoryRecord(
+          HistoryActionType.UPDATE_BLOCK,
+          `更新${track.name}中的${action.actionName}`,
+          { before: oldBlocks, after: track.blocks },
+          editingTrackId.value,
+          track.name
+        )
+        addHistoryRecord(record)
       }
     }
   }
@@ -832,9 +1070,19 @@ const handleActionSelected = (action: { actionType: string; actionName: string; 
 const updateTrackKeyframes = (trackId: string, keyframes: Keyframe[]) => {
   const track = tracks.value.find((t: Track) => t.id === trackId)
   if (track && track.type === TrackType.KEYFRAME) {
+    const oldKeyframes = JSON.parse(JSON.stringify(track.keyframes || []))
     track.keyframes = keyframes
     emit('update:tracks', tracks.value)
-    saveHistory()
+    
+    // 添加历史记录
+    const record = createHistoryRecord(
+      HistoryActionType.UPDATE_KEYFRAME,
+      `更新${track.name}中的关键帧`,
+      { before: oldKeyframes, after: keyframes },
+      trackId,
+      track.name
+    )
+    addHistoryRecord(record)
   }
 }
 
@@ -850,9 +1098,20 @@ const addKeyframe = (trackId: string, time: number) => {
       value: 0.5,
       easing: 'linear'
     }
+    
+    const oldKeyframes = JSON.parse(JSON.stringify(track.keyframes || []))
     track.keyframes = [...(track.keyframes || []), newKeyframe]
     emit('update:tracks', tracks.value)
-    saveHistory()
+    
+    // 添加历史记录
+    const record = createHistoryRecord(
+      HistoryActionType.ADD_KEYFRAME,
+      `在${track.name}中添加关键帧`,
+      { before: oldKeyframes, after: track.keyframes },
+      trackId,
+      track.name
+    )
+    addHistoryRecord(record)
   }
 }
 
@@ -863,10 +1122,20 @@ const updateTrackAudio = (trackId: string, audioUrl: string) => {
   console.log('Found track:', track)
 
   if (track && track.type === TrackType.AUDIO) {
+    const oldAudioUrl = track.audioUrl
     track.audioUrl = audioUrl
     console.log('Updated track.audioUrl:', track.audioUrl)
     emit('update:tracks', tracks.value)
-    saveHistory()
+    
+    // 添加历史记录
+    const record = createHistoryRecord(
+      HistoryActionType.UPDATE_AUDIO,
+      `更新${track.name}的音频`,
+      { before: oldAudioUrl, after: audioUrl },
+      trackId,
+      track.name
+    )
+    addHistoryRecord(record)
   } else {
     console.log('Track not found or not audio type')
   }
@@ -874,6 +1143,19 @@ const updateTrackAudio = (trackId: string, audioUrl: string) => {
 
 // 同步滚动
 onMounted(() => {
+  // 检查是否有历史记录容器
+  const checkContainer = setInterval(() => {
+    if (document.getElementById('history-panel-container')) {
+      isHistoryPanelMounted.value = true
+      clearInterval(checkContainer)
+    }
+  }, 100)
+
+  // 5秒后如果还没找到，停止检查
+  setTimeout(() => {
+    clearInterval(checkContainer)
+  }, 5000)
+
   // 同步横向滚动
   if (tracksWrapper.value) {
     tracksWrapper.value.addEventListener('scroll', (e: Event) => {
@@ -889,9 +1171,6 @@ onMounted(() => {
 
   // 添加键盘事件监听
   window.addEventListener('keydown', handleKeyDown)
-
-  // 初始化历史记录
-  saveHistory()
 })
 
 // 播放控制函数
@@ -1009,9 +1288,24 @@ defineExpose({
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
   background: #1e1e1e;
   color: #d4d4d4;
+}
+
+.history-sidebar {
+  width: 100%;
+  height: 100%;
+  border-right: none;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .timeline-toolbar {

@@ -52,7 +52,17 @@ const emit = defineEmits<{
   'edit-block': [block: ActionBlock]
 }>()
 
-const blocks = computed(() => props.track.blocks || [])
+const blocks = computed(() => {
+  if (isDragging.value || isResizing.value) {
+    return localBlocks.value
+  }
+  return props.track.blocks || []
+})
+
+// 本地动作块状态（用于拖拽和调整大小时）
+const localBlocks = ref<ActionBlock[]>([])
+const isDragging = ref(false)
+const isResizing = ref(false)
 
 // 选中的块
 const selectedBlockId = ref<string | null>(null)
@@ -83,7 +93,6 @@ const getBlockStyle = (block: ActionBlock) => {
 let draggedBlock: ActionBlock | null = null
 let dragStartX = 0
 let dragStartTime = 0
-let isDragging = false
 let longPressTimer: number | null = null
 
 const startDragBlock = (e: MouseEvent, block: ActionBlock) => {
@@ -92,11 +101,14 @@ const startDragBlock = (e: MouseEvent, block: ActionBlock) => {
   draggedBlock = block
   dragStartX = e.clientX
   dragStartTime = block.startTime
-  isDragging = false
+  isDragging.value = false
+  
+  // 初始化本地块状态
+  localBlocks.value = JSON.parse(JSON.stringify(props.track.blocks || []))
 
   // 设置长按定时器（800ms）
   longPressTimer = window.setTimeout(() => {
-    if (!isDragging) {
+    if (!isDragging.value) {
       // 长按触发编辑
       editBlock(block)
       longPressTimer = null
@@ -115,15 +127,15 @@ const onDragBlock = (e: MouseEvent) => {
   const moveThreshold = 5 // 像素
   const deltaX = Math.abs(e.clientX - dragStartX)
   
-  if (deltaX > moveThreshold && !isDragging) {
-    isDragging = true
+  if (deltaX > moveThreshold && !isDragging.value) {
+    isDragging.value = true
     if (longPressTimer !== null) {
       clearTimeout(longPressTimer)
       longPressTimer = null
     }
   }
 
-  if (!isDragging) return
+  if (!isDragging.value) return
 
   const deltaTime = (e.clientX - dragStartX) / props.config.pixelsPerSecond
 
@@ -138,7 +150,7 @@ const onDragBlock = (e: MouseEvent) => {
   newStartTime = Math.max(0, Math.min(props.config.duration - draggedBlock.duration, newStartTime))
 
   // 检查是否与其他块重叠
-  const hasOverlap = blocks.value.some((b: ActionBlock) => {
+  const hasOverlap = localBlocks.value.some((b: ActionBlock) => {
     if (b.id === draggedBlock!.id) return false
     const blockEnd = newStartTime + draggedBlock!.duration
     const bEnd = b.startTime + b.duration
@@ -146,11 +158,10 @@ const onDragBlock = (e: MouseEvent) => {
   })
 
   if (!hasOverlap) {
-    // 更新动作块位置
-    const updatedBlocks = blocks.value.map((b: ActionBlock) =>
+    // 仅更新本地状态
+    localBlocks.value = localBlocks.value.map((b: ActionBlock) =>
       b.id === draggedBlock!.id ? { ...b, startTime: newStartTime } : b
     )
-    emit('update:blocks', updatedBlocks)
   }
 }
 
@@ -161,8 +172,13 @@ const stopDragBlock = () => {
     longPressTimer = null
   }
   
+  if (isDragging.value) {
+    // 拖拽结束时才触发更新事件
+    emit('update:blocks', localBlocks.value)
+  }
+  
   draggedBlock = null
-  isDragging = false
+  isDragging.value = false
   document.removeEventListener('mousemove', onDragBlock)
   document.removeEventListener('mouseup', stopDragBlock)
 }
@@ -182,6 +198,10 @@ const startResize = (e: MouseEvent, block: ActionBlock, direction: 'left' | 'rig
   resizeStartX = e.clientX
   resizeStartTime = block.startTime
   resizeStartDuration = block.duration
+  isResizing.value = true
+
+  // 初始化本地块状态
+  localBlocks.value = JSON.parse(JSON.stringify(props.track.blocks || []))
 
   document.addEventListener('mousemove', onResize)
   document.addEventListener('mouseup', stopResize)
@@ -232,7 +252,7 @@ const onResize = (e: MouseEvent) => {
   }
 
   // 检查是否与其他块重叠
-  const hasOverlap = blocks.value.some((b: ActionBlock) => {
+  const hasOverlap = localBlocks.value.some((b: ActionBlock) => {
     if (b.id === resizeBlock!.id) return false
     const blockEnd = newStartTime + newDuration
     const bEnd = b.startTime + b.duration
@@ -241,17 +261,22 @@ const onResize = (e: MouseEvent) => {
 
   // 如果不重叠，才更新动作块
   if (!hasOverlap) {
-    const updatedBlocks = blocks.value.map((b: ActionBlock) =>
+    localBlocks.value = localBlocks.value.map((b: ActionBlock) =>
       b.id === resizeBlock!.id
         ? { ...b, startTime: newStartTime, duration: newDuration }
         : b
     )
-    emit('update:blocks', updatedBlocks)
   }
 }
 
 const stopResize = () => {
+  if (isResizing.value) {
+    // 调整结束时才触发更新事件
+    emit('update:blocks', localBlocks.value)
+  }
+
   resizeBlock = null
+  isResizing.value = false
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
 }

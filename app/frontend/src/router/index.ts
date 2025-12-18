@@ -3,6 +3,8 @@ import ProjectList from '../views/ProjectList.vue'
 import MainLayout from '../views/MainLayout.vue'
 import ProjectEditor from '../views/ProjectEditor.vue'
 import RobotManager from '../views/RobotManager.vue'
+import Help from '../views/Help.vue'
+import About from '../views/About.vue'
 import CodeEditor from '../components/CodeEditor.vue'
 
 const routes = [
@@ -24,6 +26,16 @@ const routes = [
         path: 'robots',
         name: 'RobotManager',
         component: RobotManager
+      },
+      {
+        path: 'help',
+        name: 'Help',
+        component: Help
+      },
+      {
+        path: 'about',
+        name: 'About',
+        component: About
       },
       {
         path: 'file',

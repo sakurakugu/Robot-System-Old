@@ -17,6 +17,7 @@ export interface ActionBlock {
   data?: any // 动作数据
   actionType?: string // 动作类型（对应 Python API 中的方法名）
   actionParams?: Record<string, any> // 动作参数
+  robotId?: string // 绑定的机器狗ID
 }
 
 // 关键帧

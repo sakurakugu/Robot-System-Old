@@ -117,8 +117,16 @@
               <div class="track-name" @dblclick="editTrackName(track.id)">
                 {{ track.name }}
               </div>
-              <div class="track-type-badge" :class="track.type">
-                {{ track.type === TrackType.AUDIO ? '音频' : track.type === TrackType.ACTION ? '动作' : '关键帧' }}
+              <div class="track-badges">
+                <div class="track-type-badge" :class="track.type">
+                  {{ track.type === TrackType.AUDIO ? '音频' : track.type === TrackType.ACTION ? '动作' : '关键帧' }}
+                </div>
+                <!-- 动作轨道的机器狗绑定状态 -->
+                <div v-if="track.type === TrackType.ACTION" class="robot-binding" @click.stop="selectRobotForTrack(track.id)">
+                  <el-icon v-if="!track.robotId" style="color: #ffc107;"><Warning /></el-icon>
+                  <el-icon v-else style="color: #4caf50;"><Check /></el-icon>
+                  <span class="binding-text">{{ getRobotBindingText(track.robotId) }}</span>
+                </div>
               </div>
             </div>
 
@@ -132,6 +140,7 @@
 
               <!-- 动作轨道 -->
               <ActionTrack v-if="track.type === TrackType.ACTION" :track="track" :config="config"
+                :robots="props.robots"
                 @update:blocks="updateTrackBlocks(track.id, $event)" @add-block="addActionBlock(track.id)"
                 @select-block="selectBlock(track.id, $event)" @edit-block="editActionBlock(track.id, $event)" />
 
@@ -172,6 +181,59 @@
       :maxDuration="maxDurationLimit"
       @confirm="handleActionSelected"
     />
+
+    <!-- 机器狗选择对话框 -->
+    <el-dialog
+      v-model="robotSelectorVisible"
+      title="选择机器狗"
+      width="680px"
+      :close-on-click-modal="false"
+      class="robot-selector-dialog"
+    >
+      <div class="robot-selector-header">为此轨道选择一个机器狗：</div>
+      <div class="robot-selector-container">
+        <!-- 取消绑定卡片 -->
+        <div 
+          class="robot-select-card" 
+          :class="{ active: !selectedRobotId }"
+          @click="selectedRobotId = ''"
+        >
+          <div class="card-icon">
+            <el-icon><CircleClose /></el-icon>
+          </div>
+          <div class="card-name">取消绑定</div>
+          <div class="card-desc">解除当前关联</div>
+          <div class="selection-mark" v-if="!selectedRobotId">
+            <el-icon><Check /></el-icon>
+          </div>
+        </div>
+
+        <!-- 机器狗列表 -->
+        <div 
+          v-for="robot in props.robots" 
+          :key="robot.uuid"
+          class="robot-select-card"
+          :class="{ active: selectedRobotId === robot.uuid }"
+          @click="selectedRobotId = robot.uuid"
+        >
+          <div class="card-status-dot" :class="robot.status" :title="robot.status === 'online' ? '在线' : '离线'"></div>
+          <div class="card-icon robot-icon">
+            🐕
+          </div>
+          <div class="card-info">
+            <div class="card-name">{{ robot.name }}</div>
+            <div class="card-ip">{{ robot.robot_ip }}</div>
+          </div>
+          <div class="selection-mark" v-if="selectedRobotId === robot.uuid">
+            <el-icon><Check /></el-icon>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="robotSelectorVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmRobotSelection">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -182,11 +244,14 @@ import ActionTrack from './ActionTrack.vue'
 import KeyframeTrack from './KeyframeTrack.vue'
 import AudioTrack from './AudioTrack.vue'
 import ActionSelectorDialog from './ActionSelectorDialog.vue'
+import { Warning, Check, CircleClose } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps<{
   duration?: number
   projectUuid?: string
+  selectedRobot?: string | null // 当前选中的机器狗ID
+  robots?: any[] // 机器狗列表
 }>()
 
 // Emits
@@ -219,6 +284,11 @@ const editingTrackId = ref<string | null>(null)
 const editingBlockId = ref<string | null>(null)
 const editingActionData = ref<{ actionType: string; actionParams: Record<string, any> } | undefined>(undefined)
 const maxDurationLimit = ref<number | undefined>(undefined)
+
+// 机器狗选择器
+const robotSelectorVisible = ref(false)
+const selectedRobotId = ref<string>('')
+const editingTrackIdForRobot = ref<string | null>(null)
 
 // 播放控制
 const isPlaying = ref(false)
@@ -544,6 +614,8 @@ const addTrack = (type: TrackType) => {
     id: `track-${trackIdCounter}`,
     name: `${type === TrackType.AUDIO ? '音频' : type === TrackType.ACTION ? '动作' : '关键帧'}轨道 ${trackIdCounter}`,
     type,
+    // 如果是动作轨道且有选中的机器狗，自动绑定
+    robotId: type === TrackType.ACTION && props.selectedRobot ? props.selectedRobot : undefined,
     locked: false,
     visible: true,
     height: type === TrackType.AUDIO ? 100 : 85,
@@ -585,6 +657,45 @@ const toggleTrackLock = (trackId: string) => {
 const editTrackName = (trackId: string) => {
   // TODO: 实现轨道名称编辑
   console.log('Edit track name:', trackId)
+}
+
+// 获取机器狗绑定文本
+const getRobotBindingText = (robotId: string | undefined) => {
+  if (!robotId) return '未绑定'
+  if (!props.robots) return '未知机器狗'
+  const robot = props.robots.find((r: any) => r.uuid === robotId)
+  return robot ? robot.name : '未知机器狗'
+}
+
+// 为轨道选择机器狗
+const selectRobotForTrack = async (trackId: string) => {
+  const track = tracks.value.find((t: Track) => t.id === trackId)
+  if (!track || track.type !== TrackType.ACTION) return
+  
+  if (!props.robots || props.robots.length === 0) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.warning('没有可用的机器狗，请先添加机器狗')
+    return
+  }
+  
+  // 设置当前选中的机器狗
+  selectedRobotId.value = track.robotId || ''
+  editingTrackIdForRobot.value = trackId
+  robotSelectorVisible.value = true
+}
+
+// 确认机器狗选择
+const confirmRobotSelection = () => {
+  if (editingTrackIdForRobot.value) {
+    const track = tracks.value.find((t: Track) => t.id === editingTrackIdForRobot.value)
+    if (track) {
+      track.robotId = selectedRobotId.value || undefined
+      emit('update:tracks', tracks.value)
+      saveHistory()
+    }
+  }
+  robotSelectorVisible.value = false
+  editingTrackIdForRobot.value = null
 }
 
 // 更新动作块
@@ -867,10 +978,27 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', stopDragPlayhead)
 })
 
+// 校验时间轴数据
+const validate = () => {
+  const unboundTracks = tracks.value.filter(
+    t => t.type === TrackType.ACTION && !t.robotId
+  )
+  
+  if (unboundTracks.length > 0) {
+    return {
+      valid: false,
+      message: `有 ${unboundTracks.length} 个动作轨道未绑定机器狗，请先绑定`
+    }
+  }
+  
+  return { valid: true }
+}
+
 // 暴露方法
 defineExpose({
   addTrack,
   deleteTrack,
+  validate,
   config,
   tracks
 })
@@ -1097,14 +1225,20 @@ defineExpose({
   flex-shrink: 0;
 }
 
+.track-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
 .track-type-badge {
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 3px;
   background: #333;
   display: inline-block;
-  align-self: flex-start;
-  margin-top: 3px;
   flex-shrink: 0;
 }
 
@@ -1121,6 +1255,31 @@ defineExpose({
 .track-type-badge.keyframe {
   background: #ce9178;
   color: #000;
+}
+
+.robot-binding {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.robot-binding:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.binding-text {
+  font-size: 10px;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .track-content {
@@ -1155,5 +1314,120 @@ defineExpose({
 .empty-state p {
   margin-top: 15px;
   font-size: 14px;
+}
+
+.robot-selector-header {
+  margin-bottom: 15px;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.robot-selector-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 15px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.robot-select-card {
+  border: 1px solid #3c3c3c;
+  background: #252526;
+  border-radius: 8px;
+  padding: 15px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.robot-select-card:hover {
+  border-color: #555;
+  background: #2d2d30;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.robot-select-card.active {
+  border-color: #0e639c;
+  background: rgba(14, 99, 156, 0.2);
+  box-shadow: 0 0 0 1px #0e639c inset;
+}
+
+.card-icon {
+  font-size: 28px;
+  color: #888;
+  margin-bottom: 5px;
+}
+
+.robot-select-card.active .card-icon {
+  color: #fff;
+}
+
+.robot-icon {
+  font-size: 32px;
+}
+
+.card-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.card-status-dot.online {
+  background: #4ec9b0;
+  box-shadow: 0 0 4px #4ec9b0;
+}
+
+.card-status-dot.offline {
+  background: #f48771;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.card-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.card-ip {
+  font-size: 11px;
+  color: #888;
+  font-family: monospace;
+}
+
+.card-desc {
+  font-size: 12px;
+  color: #666;
+}
+
+.selection-mark {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  color: #0e639c;
+  font-size: 16px;
+  background: rgba(30, 30, 30, 0.8);
+  border-radius: 50%;
+  padding: 2px;
 }
 </style>

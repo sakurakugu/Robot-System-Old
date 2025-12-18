@@ -1348,24 +1348,19 @@ function generatePythonFromTimeline(timelineData: any, projectName: string, robo
     });
     
     if (track.type === 'action') {
-      // 如果轨道没有指定robotId，使用第一个机器人（如果有的话）
-      let robotId = track.robotId;
+      // 检查轨道是否绑定了机器狗
+      const robotId = track.robotId;
       
-      if (!robotId && robotsMap.size > 0) {
-        // 使用第一个机器人的UUID
-        robotId = Array.from(robotsMap.keys())[0];
-        console.log(`轨道 ${index} 未指定机器人，使用默认机器人: ${robotId}`);
-      } else if (!robotId) {
-        // 如果完全没有机器人，使用默认配置
-        robotId = 'default_robot';
-        if (!robotsMap.has(robotId)) {
-          robotsMap.set(robotId, {
-            name: 'default_',
-            robot_ip: '192.168.1.110',
-            local_ip: '192.168.1.105',
-            local_port: 10000
-          });
-        }
+      if (!robotId) {
+        // 如果轨道未绑定机器狗，跳过该轨道
+        console.log(`⚠️ 轨道 ${index} 未绑定机器狗，跳过处理`);
+        return;
+      }
+      
+      // 检查robotId是否在机器人列表中
+      if (!robotsMap.has(robotId)) {
+        console.log(`⚠️ 轨道 ${index} 绑定的机器狗 ${robotId} 不存在，跳过处理`);
+        return;
       }
       
       // 提取动作块

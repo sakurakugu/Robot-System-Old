@@ -5,6 +5,8 @@
         ref="timelineEditorRef"
         :duration="totalDuration"
         :projectUuid="projectUuid"
+        :selectedRobot="props.selectedRobot"
+        :robots="props.robots"
         @update:currentTime="updateCurrentTime"
         @update:tracks="updateTracks"
       />
@@ -136,7 +138,8 @@ onMounted(() => {
 
 // 暴露保存方法给父组件
 defineExpose({
-  saveTimeline
+  saveTimeline,
+  validate: () => timelineEditorRef.value?.validate() || { valid: true }
 })
 </script>
 

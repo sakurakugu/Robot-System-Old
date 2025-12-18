@@ -8,9 +8,39 @@
             <el-icon><ArrowLeft /></el-icon>
           </el-button>
           <div class="menu-items">
-            <div class="menu-item">文件</div>
-            <div class="menu-item">编辑</div>
-            <div class="menu-item">视图</div>
+            <el-dropdown trigger="click" @command="handleFileCommand" popper-class="run-dropdown-popper">
+              <div class="menu-item">
+                文件
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="export">导出</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-dropdown trigger="click" @command="handleEditCommand" popper-class="run-dropdown-popper">
+              <div class="menu-item">
+                编辑
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="save">保存</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-dropdown trigger="click" @command="handleViewCommand" popper-class="run-dropdown-popper">
+              <div class="menu-item">
+                视图
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="show-editor">显示编辑页面</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-dropdown trigger="click" @command="handleRunCommand" popper-class="run-dropdown-popper">
               <div class="menu-item">
                 运行
@@ -25,7 +55,18 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <div class="menu-item">帮助</div>
+            <el-dropdown trigger="click" @command="handleHelpCommand" popper-class="run-dropdown-popper">
+              <div class="menu-item">
+                帮助
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="open-help">打开帮助</el-dropdown-item>
+                  <el-dropdown-item command="about">关于</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </div>
         <div class="toolbar-center">
@@ -71,14 +112,6 @@
               title="机器人列表"
             >
               <el-icon><Setting /></el-icon>
-            </div>
-            <div 
-              class="activity-icon" 
-              :class="{ active: activeView === 'preview' }"
-              @click="toggleView('preview')"
-              title="预览"
-            >
-              <el-icon><Monitor /></el-icon>
             </div>
           </div>
         </div>
@@ -167,10 +200,18 @@
           </div>
 
           <el-main class="content-area">
-            <router-view v-slot="{ Component }">
+            <div v-if="tabs.length === 0" class="empty-state">
+              <div class="empty-content">
+                <el-icon class="empty-icon"><Monitor /></el-icon>
+                <p>没有打开的编辑器</p>
+                <p class="sub-text">请从左侧资源管理器打开文件或使用菜单栏打开视图</p>
+              </div>
+            </div>
+            <router-view v-else v-slot="{ Component }">
               <keep-alive>
                 <component 
                   :is="Component" 
+                  ref="routerViewRef"
                   :key="$route.fullPath"
                   :robots="robots"
                   :selectedRobot="selectedRobot"
@@ -258,7 +299,7 @@
 import { ref, computed, watch, markRaw, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled } from '@element-plus/icons-vue'
 import { projectApi } from '@/api/project'
 import { wsClient } from '@/services/websocket'
 
@@ -360,6 +401,9 @@ const newRobot = ref({
   group_name: ''
 })
 
+// 路由视图引用
+const routerViewRef = ref<any>(null)
+
 // 日志
 const logs = ref<string[]>([])
 
@@ -404,7 +448,12 @@ watch(
     console.log('路由变化:', route.name, route.path, projectUuid)
     console.log('当前标签数量:', tabs.value.length)
     
-    if ((route.name === 'ProjectEditor' || route.name === 'RobotManager') && projectUuid) {
+    if ((route.name === 'ProjectEditor' || route.name === 'RobotManager' || route.name === 'Help' || route.name === 'About') && projectUuid) {
+      // 检查 query 参数，如果包含 empty=true，则不自动创建标签
+      if (route.query.empty === 'true') {
+        return
+      }
+
       // 加载项目信息
       await loadProject(projectUuid)
       
@@ -453,6 +502,36 @@ watch(
           // 更新现有标签的名称
           console.log('更新机器人管理标签:', tabId)
           existingTab.label = `${currentProjectName.value} - 机器人管理`
+        }
+      } else if (route.name === 'Help') {
+        const tabId = `help-${projectUuid}`
+        
+        // 如果标签不存在，添加新标签
+        const existingTab = tabs.value.find(tab => tab.id === tabId)
+        if (!existingTab) {
+          console.log('添加帮助标签:', tabId)
+          tabs.value.push({
+            id: tabId,
+            label: '帮助',
+            icon: markRaw(QuestionFilled),
+            route: `/project/${projectUuid}/help`,
+            closable: true
+          })
+        }
+      } else if (route.name === 'About') {
+        const tabId = `about-${projectUuid}`
+        
+        // 如果标签不存在，添加新标签
+        const existingTab = tabs.value.find(tab => tab.id === tabId)
+        if (!existingTab) {
+          console.log('添加关于标签:', tabId)
+          tabs.value.push({
+            id: tabId,
+            label: '关于',
+            icon: markRaw(InfoFilled),
+            route: `/project/${projectUuid}/about`,
+            closable: true
+          })
         }
       }
       
@@ -554,6 +633,50 @@ const addLog = (message: string) => {
   }
 }
 
+// 文件菜单命令处理
+const handleFileCommand = async (command: string) => {
+  if (command === 'export') {
+    await exportProject()
+  } else if (command === 'save') {
+    await saveProject()
+  }
+}
+
+// 编辑菜单命令处理
+const handleEditCommand = (command: string) => {
+  if (command === 'show-editor') {
+    // 这里的逻辑可能需要调整，因为 show-editor 移到了视图菜单
+    // 保持兼容性或根据需求移除
+  } else if (command === 'save') {
+    saveProject()
+  }
+}
+
+const handleViewCommand = (command: string) => {
+  if (command === 'show-editor') {
+    const projectUuid = route.params.uuid as string
+    router.push({
+      name: 'ProjectEditor',
+      params: { uuid: projectUuid }
+    })
+  }
+}
+
+const handleHelpCommand = (command: string) => {
+  const projectUuid = route.params.uuid as string
+  if (command === 'open-help') {
+    router.push({
+      name: 'Help',
+      params: { uuid: projectUuid }
+    })
+  } else if (command === 'about') {
+    router.push({
+      name: 'About',
+      params: { uuid: projectUuid }
+    })
+  }
+}
+
 // 运行菜单命令处理
 const handleRunCommand = async (command: string) => {
   const projectUuid = route.params.uuid as string
@@ -562,6 +685,26 @@ const handleRunCommand = async (command: string) => {
   try {
     if (command === 'build') {
       // 封装
+      // 先校验项目
+      const currentTab = tabs.value.find(t => t.id === activeTab.value)
+      if (currentTab && currentTab.route.includes('/project/')) {
+        // 如果在项目编辑页面，尝试获取编辑器组件实例进行校验
+        // 这里需要一种方式获取到 ProjectEditor 的实例
+        // 由于我们是在 router-view 中渲染组件，可以通过 ref 获取
+        // 但这里我们简单起见，假设如果存在未绑定的机器狗，后端也会校验
+        // 不过用户要求前端校验，我们需要在 router-view 上添加 ref
+      }
+
+      // 获取当前激活的组件实例
+      const component = routerViewRef.value
+      if (component && component.validate) {
+        const validation = component.validate()
+        if (!validation.valid) {
+          ElMessage.warning(validation.message)
+          return
+        }
+      }
+
       addLog('开始封装项目...')
       showBottomPanel.value = true
       const res = await projectApi.buildProject(projectUuid)
@@ -589,6 +732,16 @@ const handleRunCommand = async (command: string) => {
       }
     } else if (command === 'build-and-run') {
       // 封装并运行
+      // 校验
+      const component = routerViewRef.value
+      if (component && component.validate) {
+        const validation = component.validate()
+        if (!validation.valid) {
+          ElMessage.warning(validation.message)
+          return
+        }
+      }
+
       addLog('开始封装并运行项目...')
       showBottomPanel.value = true
       const res = await projectApi.buildAndRunProject(projectUuid)
@@ -731,8 +884,48 @@ const closeTab = (tabId: string) => {
       const nextIndex = index > 0 ? index - 1 : 0
       router.push(tabs.value[nextIndex].route)
     } else {
-      // 没有其他标签，返回项目列表
-      router.push('/')
+      // 没有其他标签，不返回项目列表，而是保持在当前路由但不显示内容（或显示空状态）
+      // 这里我们可以跳转到一个专门的空状态路由，或者仅仅是不做任何跳转（但需要处理路由视图的显示）
+      // 考虑到MainLayout是父路由，子路由控制中间内容区
+      // 我们可以让activeTab为空，并且不进行路由跳转到其他页面，而是跳转到一个空页面或者不做处理
+      // 但由于router-view依赖路由，如果路径还是/project/:uuid，那么默认子路由ProjectEditor会被激活
+      // 除非我们定义一个专门的空子路由，或者我们在MainLayout中控制router-view的显示
+      
+      // 简单的做法：如果不跳转回首页，我们可能需要一个"空"的子路由来显示"没有打开的编辑器"
+      // 或者我们可以简单地不跳转，让用户手动去打开文件或视图
+      // 但当前路由配置下，/project/:uuid 对应 ProjectEditor
+      // 所以如果我们要关闭所有标签但保留在项目内，我们需要一种状态来表示"无编辑器打开"
+      
+      // 方案：当没有标签时，我们可以将路由推到一个特定的 query 参数或者不做任何操作但隐藏 router-view
+      // 但更好的体验可能是显示一个"空状态"组件
+      // 这里我们暂时不做路由跳转，只清空 activeTab
+      activeTab.value = ''
+      
+      // 如果当前路由是某个具体的功能页（如机器人管理），关闭后应该去哪里？
+      // 如果关闭的是最后一个标签，我们可以留在一个空状态
+      // 为了实现这一点，我们需要确保 router-view 不显示内容，或者显示空内容
+      // 由于 vue-router 的机制，如果 URL 匹配，组件就会渲染
+      // 所以我们可以控制 router-view 的显示
+      
+      // 如果是最后一个标签被关闭，且它是 ProjectEditor，那么路由本身就是 /project/:uuid
+      // 这会导致它被重新创建（因为我们有 watcher 监听路由变化自动添加标签）
+      // 这就是为什么之前会"自动打开"或者"关闭整个工程"（因为之前的逻辑是跳转回首页）
+      
+      // 现在的需求是：关闭编辑页面（标签），不关闭整个工程（不跳转回首页）
+      // 我们可以尝试跳转到一个 dummy 路由，或者修改 watcher 逻辑不自动添加标签（如果是由关闭操作触发的）
+      
+      // 这里我们简单地跳转到一个不存在的子路径，或者保持当前路径但通过状态控制显示
+      // 但最简单且符合习惯的是：不做路由跳转（如果已经是当前项目路径），但清空 activeTab
+      // 并且在 watcher 中添加逻辑：如果是因为关闭标签导致的路由变化或状态变化，不要自动重新打开标签
+      
+      // 但问题是：如果路由还是 /project/:uuid，ProjectEditor 组件依然挂载
+      // 我们可以在 MainLayout 中增加一个变量控制是否显示 router-view
+      
+      // 或者，更简单的：
+      // 不要跳转回首页
+      // 如果 tabs 为空，我们可以显示一个 Empty 状态
+      
+      router.push({ path: `/project/${projectUuid}`, query: { empty: 'true' } })
     }
   }
 }
@@ -1303,6 +1496,32 @@ const handleFileClick = async (data: any) => {
   overflow: hidden;
   padding: 0;
   background: #1e1e1e;
+}
+
+/* 空状态样式 */
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1e1e;
+  color: #cccccc;
+}
+
+.empty-content {
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: #3c3c3c;
+  margin-bottom: 20px;
+}
+
+.sub-text {
+  font-size: 13px;
+  color: #666;
+  margin-top: 10px;
 }
 
 /* 底部面板 */

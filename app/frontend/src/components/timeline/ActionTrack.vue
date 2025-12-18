@@ -42,6 +42,7 @@ import { ActionBlock, TimelineConfig } from '@/types/timeline'
 const props = defineProps<{
   track: any
   config: TimelineConfig
+  robots?: any[] // 机器狗列表
 }>()
 
 const emit = defineEmits<{

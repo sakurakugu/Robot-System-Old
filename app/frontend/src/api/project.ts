@@ -100,6 +100,13 @@ export const projectApi = {
     return api.get(`/projects/${uuid}/files`)
   },
 
+  // 读取文件内容
+  getFileContent(uuid: string, filePath: string): Promise<{ success: boolean; data: string }> {
+    return api.get(`/projects/${uuid}/files/content`, {
+      params: { path: filePath }
+    })
+  },
+
   // 保存工程（保存当前工程的所有数据）
   saveProject(uuid: string): Promise<{ success: boolean; message: string }> {
     return api.post(`/projects/${uuid}/save`)
@@ -125,6 +132,16 @@ export const projectApi = {
   // 封装并运行项目
   buildAndRunProject(uuid: string): Promise<{ success: boolean; message: string; data: any }> {
     return api.post(`/projects/${uuid}/build-and-run`)
+  },
+
+  // 停止执行
+  stopExecution(uuid: string, executionId: string): Promise<{ success: boolean; message: string }> {
+    return api.post(`/projects/${uuid}/stop-execution/${executionId}`)
+  },
+
+  // 获取正在执行的任务列表
+  getExecutions(uuid: string): Promise<{ success: boolean; data: string[] }> {
+    return api.get(`/projects/${uuid}/executions`)
   }
 }
 

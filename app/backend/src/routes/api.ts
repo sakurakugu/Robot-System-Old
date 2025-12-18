@@ -12,7 +12,32 @@ import os from 'os';
 
 const router = express.Router();
 
-// 项目接口
+// 获取本地 IP
+router.get('/network/local-ip', (req: Request, res: Response) => {
+  try {
+    const interfaces = os.networkInterfaces();
+    const addresses: string[] = [];
+    
+    Object.keys(interfaces).forEach((ifname) => {
+      interfaces[ifname]?.forEach((iface) => {
+        // 跳过内部（即 127.0.0.1）和非 IPv4 地址
+        if ('IPv4' !== iface.family || iface.internal) {
+          return;
+        }
+        addresses.push(iface.address);
+      });
+    });
+
+    // 默认返回第一个找到的 IP，或者空字符串
+    const localIp = addresses.length > 0 ? addresses[0] : '';
+    
+    res.json({ success: true, data: { ip: localIp, all: addresses } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取项目接口
 interface Project {
   uuid: string;
   user_uuid: string;
@@ -120,6 +145,46 @@ router.get('/projects/:uuid/files', async (req: Request, res: Response) => {
 
     const fileTree = readDirectory(project.folder_path);
     res.json({ success: true, data: fileTree });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 读取文件内容
+router.get('/projects/:uuid/files/content', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+    
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+
+    const filePath = req.query.path as string;
+    if (!filePath) {
+      return res.status(400).json({ success: false, error: '文件路径是必需的' });
+    }
+
+    // 防止目录遍历攻击
+    const fullPath = path.join(project.folder_path, filePath);
+    if (!fullPath.startsWith(project.folder_path)) {
+      return res.status(403).json({ success: false, error: '非法的文件路径' });
+    }
+
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ success: false, error: '文件不存在' });
+    }
+
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) {
+      return res.status(400).json({ success: false, error: '无法读取文件夹内容' });
+    }
+
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    res.json({ success: true, data: content });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1080,6 +1145,12 @@ router.post('/projects/:uuid/build', async (req: Request, res: Response) => {
 
     const timelineData = JSON.parse(fs.readFileSync(timelineDataPath, 'utf-8'));
     
+    // 读取项目的机器人配置
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    const robots = await projectDb.all<any[]>('SELECT * FROM robots');
+    await projectDb.close();
+    
     // 创建build目录
     const buildDir = path.join(project.folder_path, 'build');
     if (!fs.existsSync(buildDir)) {
@@ -1100,7 +1171,7 @@ router.post('/projects/:uuid/build', async (req: Request, res: Response) => {
     }
 
     // 生成Python代码
-    const pythonCode = generatePythonFromTimeline(timelineData, project.name);
+    const pythonCode = generatePythonFromTimeline(timelineData, project.name, robots);
     
     // 写入Python文件
     const pythonFilePath = path.join(buildDir, `${sanitizeFilename(project.name)}.py`);
@@ -1140,11 +1211,13 @@ router.post('/projects/:uuid/run', async (req: Request, res: Response) => {
     }
 
     // 运行Python脚本
-    const result = await pythonExecutor.execute(pythonFilePath, buildDir);
+    const result = pythonExecutor.execute(pythonFilePath, buildDir);
 
     res.json({ 
       success: true, 
-      data: result
+      data: {
+        executionId: result.executionId
+      }
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -1172,6 +1245,12 @@ router.post('/projects/:uuid/build-and-run', async (req: Request, res: Response)
 
     const timelineData = JSON.parse(fs.readFileSync(timelineDataPath, 'utf-8'));
     
+    // 读取项目的机器人配置
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    const robots = await projectDb.all<any[]>('SELECT * FROM robots');
+    await projectDb.close();
+    
     // 创建build目录
     const buildDir = path.join(project.folder_path, 'build');
     if (!fs.existsSync(buildDir)) {
@@ -1192,19 +1271,21 @@ router.post('/projects/:uuid/build-and-run', async (req: Request, res: Response)
     }
 
     // 生成Python代码
-    const pythonCode = generatePythonFromTimeline(timelineData, project.name);
+    const pythonCode = generatePythonFromTimeline(timelineData, project.name, robots);
     
     // 写入Python文件
     const pythonFilePath = path.join(buildDir, `${sanitizeFilename(project.name)}.py`);
     fs.writeFileSync(pythonFilePath, pythonCode, 'utf-8');
 
     // 运行Python脚本
-    const result = await pythonExecutor.execute(pythonFilePath, buildDir);
+    const result = pythonExecutor.execute(pythonFilePath, buildDir);
 
     res.json({ 
       success: true, 
       message: '封装并运行成功',
-      data: result
+      data: {
+        executionId: result.executionId
+      }
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -1236,15 +1317,26 @@ function sanitizeFilename(name: string): string {
 }
 
 // 辅助函数：从时间轴生成Python代码
-function generatePythonFromTimeline(timelineData: any, projectName: string): string {
+function generatePythonFromTimeline(timelineData: any, projectName: string, robots: any[] = []): string {
   const { tracks, config } = timelineData;
   
   console.log('开始生成Python代码...');
   console.log('时间轴轨道数量:', tracks?.length || 0);
+  console.log('项目机器人数量:', robots.length);
   
   // 提取所有机器人配置
   const robotsMap = new Map<string, any>();
   const actions: Array<{ time: number; robot: string; action: string; params: any }> = [];
+  
+  // 使用数据库中的机器人配置作为默认配置
+  robots.forEach(robot => {
+    robotsMap.set(robot.uuid, {
+      name: robot.name,
+      robot_ip: robot.robot_ip,
+      local_ip: robot.local_ip,
+      local_port: robot.local_port
+    });
+  });
   
   // 分析轨道数据
   tracks.forEach((track: any, index: number) => {
@@ -1256,16 +1348,24 @@ function generatePythonFromTimeline(timelineData: any, projectName: string): str
     });
     
     if (track.type === 'action') {
-      const robotId = track.robotId || 'default_robot';
-      const robotInfo = track.robotInfo || {};
+      // 如果轨道没有指定robotId，使用第一个机器人（如果有的话）
+      let robotId = track.robotId;
       
-      if (!robotsMap.has(robotId)) {
-        robotsMap.set(robotId, {
-          name: robotInfo.name || robotId.slice(0, 8),
-          robot_ip: robotInfo.robot_ip || '192.168.1.110',
-          local_ip: robotInfo.local_ip || '192.168.1.105',
-          local_port: robotInfo.local_port || 10000
-        });
+      if (!robotId && robotsMap.size > 0) {
+        // 使用第一个机器人的UUID
+        robotId = Array.from(robotsMap.keys())[0];
+        console.log(`轨道 ${index} 未指定机器人，使用默认机器人: ${robotId}`);
+      } else if (!robotId) {
+        // 如果完全没有机器人，使用默认配置
+        robotId = 'default_robot';
+        if (!robotsMap.has(robotId)) {
+          robotsMap.set(robotId, {
+            name: 'default_',
+            robot_ip: '192.168.1.110',
+            local_ip: '192.168.1.105',
+            local_port: 10000
+          });
+        }
       }
       
       // 提取动作块

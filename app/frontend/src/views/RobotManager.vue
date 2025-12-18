@@ -2,6 +2,25 @@
   <div class="robot-manager">
     <div class="header">
       <h2>机器人管理</h2>
+      <div class="header-center">
+        <div class="local-ip-config">
+          <label>本机IP:</label>
+          <div class="ip-input-group">
+            <input 
+              v-model="unifiedLocalIp" 
+              type="text" 
+              placeholder="自动获取中..." 
+              @change="updateAllRobotsLocalIp"
+            />
+            <button class="btn-icon" @click="fetchLocalIp" title="刷新本机IP">
+              <el-icon><Refresh /></el-icon>
+            </button>
+            <button class="btn-icon" @click="overwriteAllRobotsLocalIp" title="一键覆盖所有机器人的本地IP">
+              <el-icon><Download /></el-icon>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="actions">
         <button class="btn-view" :class="{ active: viewMode === 'card' }" @click="viewMode = 'card'">
           卡片视图
@@ -9,7 +28,7 @@
         <button class="btn-view" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">
           列表视图
         </button>
-        <button class="btn-primary" @click="showAddDialog = true">
+        <button class="btn-primary" @click="openAddDialog">
           + 添加机器人
         </button>
       </div>
@@ -66,7 +85,7 @@
       <!-- 空状态 -->
       <div v-if="robots.length === 0" class="empty-state">
         <p>暂无机器人</p>
-        <button class="btn-primary" @click="showAddDialog = true">添加第一个机器人</button>
+        <button class="btn-primary" @click="openAddDialog">添加第一个机器人</button>
       </div>
     </div>
 
@@ -115,7 +134,7 @@
           </tr>
           <tr v-if="robots.length === 0">
             <td colspan="7" class="empty-cell">
-              暂无机器人，<a @click="showAddDialog = true">添加一个</a>
+              暂无机器人，<a @click="openAddDialog">添加一个</a>
             </td>
           </tr>
         </tbody>
@@ -172,12 +191,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRobots, addRobot, updateRobot, deleteRobot, testRobotConnection, type Robot, type RobotCreateData } from '../api/robot'
+import api from '../api/index'
 import { wsClient } from '../services/websocket'
 
 const route = useRoute()
 const projectUuid = computed(() => route.params.uuid as string)
 
 const robots = ref<Robot[]>([])
+const unifiedLocalIp = ref('')
 const viewMode = ref<'card' | 'list'>('card')
 const showAddDialog = ref(false)
 const editingRobot = ref<Robot | null>(null)
@@ -217,6 +238,63 @@ async function loadRobots() {
   } catch (error) {
     console.error('加载机器人列表失败:', error)
   }
+}
+
+async function fetchLocalIp() {
+  try {
+    const result: any = await api.get('/network/local-ip')
+    if (result.success && result.data.ip) {
+      unifiedLocalIp.value = result.data.ip
+    }
+  } catch (error) {
+    console.error('获取本机IP失败:', error)
+  }
+}
+
+async function updateAllRobotsLocalIp() {
+  if (!unifiedLocalIp.value) return
+  
+  // 批量更新所有机器人的本地IP（这里只是前端更新，如果需要保存到后端需要循环调用API）
+  // 暂时只在添加新机器人时使用该IP作为默认值
+}
+
+async function overwriteAllRobotsLocalIp() {
+  if (!unifiedLocalIp.value) {
+    alert('请先获取或输入本机IP')
+    return
+  }
+
+  if (!confirm(`确定要将所有机器人的本地IP更新为 ${unifiedLocalIp.value} 吗？`)) {
+    return
+  }
+
+  try {
+    const updatePromises = robots.value.map(robot => {
+      const updatedData = {
+        name: robot.name,
+        robot_ip: robot.robot_ip,
+        local_ip: unifiedLocalIp.value,
+        local_port: robot.local_port,
+        group_name: robot.group_name
+      }
+      return updateRobot(projectUuid.value, robot.uuid, updatedData)
+    })
+
+    await Promise.all(updatePromises)
+    await loadRobots()
+    alert('更新成功')
+  } catch (error) {
+    console.error('批量更新IP失败:', error)
+    alert('批量更新失败，请重试')
+  }
+}
+
+// 自动分配端口
+function getNextAvailablePort() {
+  if (robots.value.length === 0) return 10000
+  
+  const ports = robots.value.map(r => r.local_port).sort((a, b) => a - b)
+  return ports[ports.length - 1] + 1
 }
 
 async function testConnection(robot: Robot) {
@@ -300,6 +378,18 @@ function closeDialog() {
   }
 }
 
+// 监听添加对话框打开
+const openAddDialog = () => {
+  showAddDialog.value = true
+  formData.value = {
+    name: '',
+    robot_ip: '',
+    local_ip: unifiedLocalIp.value || '',
+    local_port: getNextAvailablePort(),
+    group_name: ''
+  }
+}
+
 // WebSocket事件监听
 wsClient.on('robot_status_update', (data: any) => {
   const robot = robots.value.find(r => r.uuid === data.robotUuid)
@@ -309,12 +399,70 @@ wsClient.on('robot_status_update', (data: any) => {
 })
 
 onMounted(() => {
-  loadRobots()
-  wsClient.joinProject(projectUuid.value)
-})
+    loadRobots()
+    fetchLocalIp()
+    wsClient.joinProject(projectUuid.value)
+  })
 </script>
 
 <style scoped>
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.local-ip-config {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #252526;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #3c3c3c;
+}
+
+.local-ip-config label {
+  color: #cccccc;
+  font-weight: 500;
+}
+
+.ip-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ip-input-group input {
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  color: #cccccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 140px;
+}
+
+.ip-input-group input:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.btn-icon:hover {
+  background: #37373d;
+}
+
 .robot-manager {
   padding: 20px;
   height: 100%;

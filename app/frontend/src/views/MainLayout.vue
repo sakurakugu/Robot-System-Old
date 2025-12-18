@@ -11,7 +11,7 @@
             <div class="menu-item">文件</div>
             <div class="menu-item">编辑</div>
             <div class="menu-item">视图</div>
-            <el-dropdown trigger="click" @command="handleRunCommand">
+            <el-dropdown trigger="click" @command="handleRunCommand" popper-class="run-dropdown-popper">
               <div class="menu-item">
                 运行
                 <el-icon class="el-icon--right"><arrow-down /></el-icon>
@@ -21,6 +21,7 @@
                   <el-dropdown-item command="build">封装</el-dropdown-item>
                   <el-dropdown-item command="run">运行</el-dropdown-item>
                   <el-dropdown-item command="build-and-run">封装并运行</el-dropdown-item>
+                  <el-dropdown-item command="stop" divided :disabled="!currentExecutionId">停止</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -107,7 +108,6 @@
               :data="fileTree"
               :props="treeProps"
               node-key="path"
-              default-expand-all
               :expand-on-click-node="false"
               @node-click="handleFileClick"
             >
@@ -174,6 +174,7 @@
                   :key="$route.fullPath"
                   :robots="robots"
                   :selectedRobot="selectedRobot"
+                  :initialContent="fileContent"
                   @update:logs="updateLogs"
                 />
               </keep-alive>
@@ -282,6 +283,26 @@ const activeTab = computed(() => {
   
   if (route.name === 'RobotManager') {
     return `robots-${projectUuid}`
+  } else if (route.name === 'FileEditor') {
+    // 这里需要根据查询参数找到对应的标签ID
+    // 我们可以遍历 tabs 找到 route 匹配的 tab
+    const currentTab = tabs.value.find(t => t.route === route.fullPath)
+    if (currentTab) {
+      return currentTab.id
+    }
+    // 如果找不到精确匹配，尝试模糊匹配（因为 query 参数顺序可能不同）
+    const fileName = route.query.name
+    if (fileName) {
+      // 注意：这里假设文件名是唯一的，或者我们需要更复杂的逻辑来匹配路径
+      // 由于我们之前用 file-${path} 作为 ID，但这里只拿到了文件名，所以可能需要改进
+      // 实际上，我们在创建 tab 时保存了 route，所以上面的精确匹配应该能工作
+      // 如果不行，可能需要重新设计 tab ID 的生成方式或者路由参数传递方式
+      
+      // 尝试从 tabs 中找到 label 匹配的
+      const tab = tabs.value.find(t => t.label === fileName)
+      return tab ? tab.id : ''
+    }
+    return ''
   }
   return `editor-${projectUuid}`
 })
@@ -294,6 +315,9 @@ const showLeftPanel = ref(true)
 const showBottomPanel = ref(true)
 const showRightPanel = ref(false)
 const activeView = ref<'explorer' | 'robots' | 'preview' | null>('robots')
+
+// 当前执行ID
+const currentExecutionId = ref<string | null>(null)
 
 // 切换侧栏视图
 const toggleView = (view: 'explorer' | 'robots' | 'preview') => {
@@ -458,6 +482,8 @@ const handleExecutionComplete = (data: any) => {
   } else {
     ElMessage.error('执行失败')
   }
+  // 清除当前执行ID
+  currentExecutionId.value = null
 }
 
 // 组件挂载时设置WebSocket监听器
@@ -552,9 +578,12 @@ const handleRunCommand = async (command: string) => {
       addLog('开始运行项目...')
       showBottomPanel.value = true
       const res = await projectApi.runProject(projectUuid)
-      // 注意：stdout/stderr 已经通过 WebSocket 实时推送，这里不需要再处理
-      // 只需要检查请求是否成功发送
-      if (!res.success) {
+      console.log('运行项目响应:', res)
+      if (res.success && res.data?.executionId) {
+        currentExecutionId.value = res.data.executionId
+        addLog(`执行ID: ${res.data.executionId}`)
+        console.log('设置executionId:', currentExecutionId.value)
+      } else {
         ElMessage.error('运行失败')
         addLog('运行失败')
       }
@@ -563,11 +592,30 @@ const handleRunCommand = async (command: string) => {
       addLog('开始封装并运行项目...')
       showBottomPanel.value = true
       const res = await projectApi.buildAndRunProject(projectUuid)
-      // 注意：stdout/stderr 已经通过 WebSocket 实时推送，这里不需要再处理
-      // 只需要检查请求是否成功发送
-      if (!res.success) {
+      console.log('封装并运行响应:', res)
+      if (res.success && res.data?.executionId) {
+        currentExecutionId.value = res.data.executionId
+        addLog(`执行ID: ${res.data.executionId}`)
+        console.log('设置executionId:', currentExecutionId.value)
+      } else {
         ElMessage.error('封装并运行失败')
         addLog('封装并运行失败')
+      }
+    } else if (command === 'stop') {
+      // 停止执行
+      if (!currentExecutionId.value) {
+        ElMessage.warning('没有正在运行的任务')
+        return
+      }
+      addLog('正在停止执行...')
+      const res = await projectApi.stopExecution(projectUuid, currentExecutionId.value)
+      if (res.success) {
+        ElMessage.success('已停止执行')
+        addLog('执行已停止')
+        currentExecutionId.value = null
+      } else {
+        ElMessage.error('停止失败')
+        addLog(`停止失败: ${res.message || ''}`)
       }
     }
   } catch (error: any) {
@@ -722,11 +770,63 @@ const refreshFileTree = () => {
   }
 }
 
+const fileContent = ref('')
+
 // 处理文件点击
-const handleFileClick = (data: any) => {
+const handleFileClick = async (data: any) => {
   if (!data.isDirectory) {
-    ElMessage.info(`点击了文件: ${data.name}`)
-    // TODO: 打开文件编辑器
+    const projectUuid = route.params.uuid as string
+    
+    // 如果是文本文件，尝试打开
+    // 这里简单通过扩展名判断是否是文本文件
+    const textExtensions = ['.txt', '.json', '.js', '.ts', '.py', '.md', '.html', '.css', '.vue']
+    const isTextFile = textExtensions.some(ext => data.name.endsWith(ext))
+    
+    if (isTextFile) {
+      try {
+        const res = await projectApi.getFileContent(projectUuid, data.path)
+        if (res.success) {
+          fileContent.value = res.data
+          
+          const tabId = `file-${data.path}`
+          
+          // 如果标签不存在，添加新标签
+          const existingTab = tabs.value.find(tab => tab.id === tabId)
+          if (!existingTab) {
+            tabs.value.push({
+              id: tabId,
+              label: data.name,
+              icon: markRaw(Document),
+              route: `/project/${projectUuid}/file?name=${encodeURIComponent(data.name)}`,
+              closable: true
+            })
+          }
+          
+          // 跳转到文件编辑页
+          // 注意：这里我们需要通过 state 传递内容，因为内容可能很大不适合放在 URL 参数中
+          // 但是 vue-router 的 state 在刷新后会丢失，所以理想情况是再次请求
+          // 这里为了简化，我们通过 params 传递（需要在路由配置中支持）或者通过 store/props 传递
+          router.push({
+            name: 'FileEditor',
+            params: { 
+              uuid: projectUuid,
+              content: res.data 
+            },
+            query: {
+              name: data.name
+            }
+          })
+          
+          // 更新激活的标签
+          // activeTab 是计算属性，依赖路由，所以路由跳转后会自动更新
+        }
+      } catch (error) {
+        console.error('读取文件失败:', error)
+        ElMessage.error('读取文件失败')
+      }
+    } else {
+      ElMessage.info(`点击了文件: ${data.name}`)
+    }
   }
 }
 </script>
@@ -808,6 +908,57 @@ const handleFileClick = (data: any) => {
 :deep(.el-icon--right) {
   margin-left: 0;
   font-size: 12px;
+}
+
+/* 运行下拉菜单深色主题 */
+.run-dropdown-popper {
+  background: #252526 !important;
+  border: 1px solid #3c3c3c !important;
+  padding: 4px 0 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.run-dropdown-popper .el-dropdown-menu {
+  background: #252526 !important;
+  border: 1px solid #3c3c3c !important;
+  box-shadow: none !important;
+}
+
+.run-dropdown-popper .el-dropdown-menu__item {
+  color: #cccccc !important;
+  font-size: 13px !important;
+  padding: 8px 20px !important;
+  transition: background 0.2s !important;
+}
+
+.run-dropdown-popper .el-dropdown-menu__item:hover {
+  background: #2a2d2e !important;
+  color: #ffffff !important;
+}
+
+.run-dropdown-popper .el-dropdown-menu__item.is-disabled {
+  color: #666666 !important;
+  cursor: not-allowed !important;
+}
+
+.run-dropdown-popper .el-dropdown-menu__item.is-disabled:hover {
+  background: transparent !important;
+  color: #666666 !important;
+}
+
+/* Popper箭头样式 */
+.run-dropdown-popper .el-popper__arrow::before {
+  background: #252526 !important;
+  border: 1px solid #3c3c3c !important;
+}
+
+/* 覆盖Element Plus的默认白色边框 */
+:global(.run-dropdown-popper) {
+  border-color: #3c3c3c !important;
+}
+
+:global(.run-dropdown-popper .el-dropdown-menu) {
+  border-color: #3c3c3c !important;
 }
 
 

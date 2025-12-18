@@ -271,67 +271,60 @@ except Exception as e:
   /**
    * 执行Python文件
    */
-  async execute(pythonFilePath: string, workingDirectory?: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    return new Promise((resolve, reject) => {
-      const cwd = workingDirectory || path.dirname(pythonFilePath);
-      
-      // 生成执行ID用于WebSocket推送
-      const executionId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      
-      const process = spawn(this.pythonPath, [pythonFilePath], {
-        cwd: cwd,
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      process.stdout.on('data', (data) => {
-        const output = data.toString();
-        stdout += output;
-        
-        // 实时推送输出到WebSocket
-        const lines = output.split('\n');
-        lines.forEach((line: string) => {
-          if (line.trim()) {
-            this.emit('output', { executionId, data: line });
-          }
-        });
-      });
-
-      process.stderr.on('data', (data) => {
-        const error = data.toString();
-        stderr += error;
-        
-        // 实时推送错误到WebSocket
-        const lines = error.split('\n');
-        lines.forEach((line: string) => {
-          if (line.trim()) {
-            this.emit('error', { executionId, error: line });
-          }
-        });
-      });
-
-      process.on('close', (code) => {
-        this.emit('complete', { executionId, code: code || 0 });
-        resolve({
-          stdout,
-          stderr,
-          exitCode: code || 0
-        });
-      });
-
-      process.on('error', (error) => {
-        this.emit('error', { executionId, error: error.message });
-        reject(new Error(`执行失败: ${error.message}`));
-      });
-
-      // 设置超时（60秒）
-      setTimeout(() => {
-        process.kill();
-        this.emit('error', { executionId, error: '执行超时' });
-        reject(new Error('执行超时'));
-      }, 60000);
+  execute(pythonFilePath: string, workingDirectory?: string): { executionId: string } {
+    const cwd = workingDirectory || path.dirname(pythonFilePath);
+    
+    // 生成执行ID用于WebSocket推送
+    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    const process = spawn(this.pythonPath, [pythonFilePath], {
+      cwd: cwd,
     });
+    
+    // 将进程存储到Map中，以便可以停止执行
+    this.processes.set(executionId, process);
+
+    let stdout = '';
+    let stderr = '';
+
+    process.stdout.on('data', (data) => {
+      const output = data.toString();
+      stdout += output;
+      
+      // 实时推送输出到WebSocket
+      const lines = output.split('\n');
+      lines.forEach((line: string) => {
+        if (line.trim()) {
+          this.emit('output', { executionId, data: line });
+        }
+      });
+    });
+
+    process.stderr.on('data', (data) => {
+      const error = data.toString();
+      stderr += error;
+      
+      // 实时推送错误到WebSocket
+      const lines = error.split('\n');
+      lines.forEach((line: string) => {
+        if (line.trim()) {
+          this.emit('error', { executionId, error: line });
+        }
+      });
+    });
+
+    process.on('close', (code) => {
+      this.processes.delete(executionId);
+      this.emit('complete', { executionId, code: code || 0 });
+    });
+
+    process.on('error', (error) => {
+      this.processes.delete(executionId);
+      this.emit('error', { executionId, error: error.message });
+    });
+
+    // 立即返回executionId，不等待进程完成
+    return { executionId };
   }
 
   /**

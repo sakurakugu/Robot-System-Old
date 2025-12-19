@@ -39,3 +39,11 @@ Desktop.ini
 *.tmp
 *.bak
 logs/
+
+# 模型文件
+# 这种二进制文件，到时候单独开一个git仓库放置
+# app/fronted/public/models/
+*.glb
+*.gltf
+*.bin
+

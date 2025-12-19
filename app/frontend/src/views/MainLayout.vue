@@ -271,15 +271,16 @@
         </el-container>
 
         <!-- 右侧预览面板 -->
-        <el-aside v-show="showRightPanel" width="300px" class="right-panel">
+        <el-aside v-show="showRightPanel" width="400px" class="right-panel">
           <div class="panel-header">
             <h3>实时预览</h3>
           </div>
           <div class="preview-content">
-            <div class="preview-placeholder">
-              <el-icon style="font-size: 64px"><Monitor /></el-icon>
-              <p>机器人状态预览</p>
-            </div>
+            <RobotPreview
+              :currentTime="timelineCurrentTime"
+              :isPlaying="timelineIsPlaying"
+              :tracks="timelineTracks"
+            />
           </div>
         </el-aside>
       </el-container>
@@ -324,14 +325,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, markRaw, onMounted, onUnmounted, nextTick, provide } from 'vue'
+import { ref, computed, watch, markRaw, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled, Clock, VideoPlay } from '@element-plus/icons-vue'
-import TimelineEditor from '@/components/timeline/TimelineEditor.vue'
 import ActionList from './ActionList.vue'
+import RobotPreview from '@/components/RobotPreview.vue'
 import { projectApi } from '@/api/project'
 import { wsClient } from '@/services/websocket'
+import type { Track } from '@/types/timeline'
 
 interface Tab {
   id: string
@@ -384,7 +386,7 @@ const currentProjectName = ref('项目编辑器')
 // 侧栏显示状态
 const showLeftPanel = ref(true)
 const showBottomPanel = ref(true)
-const showRightPanel = ref(false)
+const showRightPanel = ref(true) // 默认显示3D预览
 const activeView = ref<'explorer' | 'robots' | 'actions' | 'preview' | 'history' | null>('robots')
 
 // 计算当前是否有活动编辑器
@@ -465,6 +467,25 @@ const treeProps = {
   children: 'children',
   isLeaf: (data: any) => !data.isDirectory
 }
+
+// 时间轴状态（用于3D预览）
+const timelineCurrentTime = ref(0)
+const timelineIsPlaying = ref(false)
+const timelineTracks = ref<Track[]>([])
+
+// 提供全局方法供TimelineEditor更新时间轴状态
+provide('updateTimelineState', (state: { currentTime: number; isPlaying: boolean; tracks: Track[] }) => {
+  timelineCurrentTime.value = state.currentTime
+  timelineIsPlaying.value = state.isPlaying
+  timelineTracks.value = state.tracks
+})
+
+// 自动显示右侧预览面板（当有轨道时）
+watch(() => timelineTracks.value.length, (newLength) => {
+  if (newLength > 0 && !showRightPanel.value) {
+    showRightPanel.value = true
+  }
+})
 
 // 加载项目信息
 const loadProject = async (projectUuid: string) => {
@@ -960,8 +981,8 @@ const closeTab = (tabId: string) => {
       
       // 方案：当没有标签时，我们可以将路由推到一个特定的 query 参数或者不做任何操作但隐藏 router-view
       // 但更好的体验可能是显示一个"空状态"组件
-      // 这里我们暂时不做路由跳转，只清空 activeTab
-      activeTab.value = ''
+      // 这里我们通过添加空查询参数来防止自动创建标签
+      router.push({ path: route.path, query: { empty: 'true' } })
       
       // 如果当前路由是某个具体的功能页（如机器人管理），关闭后应该去哪里？
       // 如果关闭的是最后一个标签，我们可以留在一个空状态
@@ -1662,9 +1683,12 @@ const handleFileClick = async (data: any) => {
 
 /* 预览面板 */
 .preview-content {
-  padding: 20px;
+  padding: 0;
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .preview-placeholder {

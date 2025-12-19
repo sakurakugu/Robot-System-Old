@@ -255,7 +255,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, inject } from 'vue'
 import { Track, TrackType, TimelineConfig, ActionBlock, Keyframe, HistoryRecord, HistoryActionType } from '@/types/timeline'
 import ActionTrack from './ActionTrack.vue'
 import KeyframeTrack from './KeyframeTrack.vue'
@@ -1172,6 +1172,20 @@ onMounted(() => {
   // 添加键盘事件监听
   window.addEventListener('keydown', handleKeyDown)
 })
+
+// Inject更新时间轴状态的函数
+const updateTimelineState = inject<((state: { currentTime: number; isPlaying: boolean; tracks: Track[] }) => void) | undefined>('updateTimelineState', undefined)
+
+// 监听状态变化并同步到父组件（用于3D预览）
+watch([() => config.value.currentTime, () => isPlaying.value, () => tracks.value], () => {
+  if (updateTimelineState) {
+    updateTimelineState({
+      currentTime: config.value.currentTime,
+      isPlaying: isPlaying.value,
+      tracks: tracks.value
+    })
+  }
+}, { deep: true })
 
 // 播放控制函数
 const togglePlay = () => {

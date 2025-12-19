@@ -46,4 +46,6 @@ logs/
 *.glb
 *.gltf
 *.bin
+*.blend
+*.blend1
 

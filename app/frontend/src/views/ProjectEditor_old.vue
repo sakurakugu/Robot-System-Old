@@ -122,52 +122,56 @@ const saveTimeline = async () => {
   return res
 }
 
-// 监听保存事件
-const handleSave = async (event: Event) => {
-  const customEvent = event as CustomEvent
-  if (customEvent.detail?.projectUuid === projectUuid) {
-    try {
-      console.log('开始保存时间轴数据...')
-      const res = await saveTimeline()
-      console.log('时间轴保存结果:', res)
-    } catch (error) {
-      console.error('保存时间轴失败:', error)
-    }
-  }
-}
-
-// 监听"保存为自定义动作"
-const handleSaveAsAction = async (event: Event) => {
-  const customEvent = event as CustomEvent
-  if (customEvent.detail?.projectUuid === projectUuid) {
-    const name: string = customEvent.detail?.name
-    if (!name) return
-    try {
-      if (!timelineEditorRef.value) throw new Error('时间轴编辑器未初始化')
-      const data = timelineEditorRef.value.getTimelineData()
-      await projectApi.saveCustomAction(projectUuid, { name, description: '', tracks: data.tracks, config: data.config })
-    } catch (error) {
-      console.error('保存为自定义动作失败:', error)
-    }
-  }
-}
-
 onMounted(async () => {
   // 延迟加载，确保 TimelineEditor 组件已完全挂载
   await nextTick()
   loadTimeline()
   connectWebSocket()
   
-  window.addEventListener('save-project', handleSave)
-  window.addEventListener('save-as-action', handleSaveAsAction)
-})
-
-onUnmounted(() => {
-  if (ws) {
-    ws.close()
+  // 监听保存事件
+  const handleSave = async (event: Event) => {
+    const customEvent = event as CustomEvent
+    if (customEvent.detail?.projectUuid === projectUuid) {
+      try {
+        console.log('开始保存时间轴数据...')
+        const res = await saveTimeline()
+        console.log('时间轴保存结果:', res)
+      } catch (error) {
+        console.error('保存时间轴失败:', error)
+      }
+    }
   }
-  window.removeEventListener('save-project', handleSave)
-  window.removeEventListener('save-as-action', handleSaveAsAction)
+  
+  window.addEventListener('save-project', handleSave)
+  
+  // 监听“保存为自定义动作”
+  const handleSaveAsAction = async (event: Event) => {
+    const customEvent = event as CustomEvent
+    if (customEvent.detail?.projectUuid === projectUuid) {
+      const name: string = customEvent.detail?.name
+      if (!name) return
+      try {
+        if (!timelineEditorRef.value) throw new Error('时间轴编辑器未初始化')
+        const data = timelineEditorRef.value.getTimelineData()
+        await projectApi.saveCustomAction(projectUuid, { name, description: '', tracks: data.tracks, config: data.config })
+      } catch (error) {
+        console.error('保存为自定义动作失败:', error)
+      }
+    }
+  }
+  
+  window.addEventListener('save-as-action', handleSaveAsAction)
+  
+  // 在卸载时移除监听器（需要在 onUnmounted 中添加）
+  const originalOnUnmounted = () => {
+    if (ws) {
+      ws.close()
+    }
+    window.removeEventListener('save-project', handleSave)
+    window.removeEventListener('save-as-action', handleSaveAsAction)
+  }
+  
+  onUnmounted(originalOnUnmounted)
 })
 
 // 暴露保存方法给父组件

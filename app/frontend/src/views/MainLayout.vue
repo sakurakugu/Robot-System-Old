@@ -903,17 +903,19 @@ const saveProject = async () => {
     
     ElMessage.info('正在保存...')
     
-    // 通过事件总线通知子组件保存
-    // 由于我们需要直接访问ProjectEditor组件，这里使用window自定义事件
-    const saveEvent = new CustomEvent('save-project', {
-      detail: { projectUuid }
-    })
-    window.dispatchEvent(saveEvent)
+    // 直接调用子组件的保存方法
+    if (routerViewRef.value && routerViewRef.value.saveTimeline) {
+      try {
+        const timelineRes = await routerViewRef.value.saveTimeline()
+        console.log('时间轴保存结果:', timelineRes)
+      } catch (error) {
+        console.error('保存时间轴失败:', error)
+        ElMessage.error('保存时间轴数据失败')
+        return
+      }
+    }
     
-    // 给子组件一点时间处理保存
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // 然后调用后端保存API
+    // 然后调用后端保存API（保存项目元数据）
     const res = await projectApi.saveProject(projectUuid)
     if (res.success) {
       ElMessage.success('保存成功')

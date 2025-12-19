@@ -650,6 +650,12 @@ router.get('/projects/:projectUuid/executions', async (req: Request, res: Respon
 router.post('/projects/:uuid/timeline', async (req: Request, res: Response) => {
   try {
     const { tracks, config } = req.body;
+    console.log('保存时间轴数据:', {
+      uuid: req.params.uuid,
+      tracksCount: Array.isArray(tracks) ? tracks.length : 'not array',
+      config: config
+    });
+    
     const db = await getMainDatabase();
     const project = await db.get<Project>(
       'SELECT * FROM project_index WHERE uuid = ?',
@@ -669,6 +675,7 @@ router.post('/projects/:uuid/timeline', async (req: Request, res: Response) => {
     };
 
     fs.writeFileSync(timelineDataPath, JSON.stringify(timelineData, null, 2));
+    console.log('时间轴数据已保存到:', timelineDataPath);
 
     // 更新项目的 updated_at 时间
     await db.run(
@@ -678,6 +685,7 @@ router.post('/projects/:uuid/timeline', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: '时间轴数据已保存' });
   } catch (error: any) {
+    console.error('保存时间轴数据失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -699,6 +707,7 @@ router.get('/projects/:uuid/timeline', async (req: Request, res: Response) => {
     
     // 如果文件不存在，返回默认空数据
     if (!fs.existsSync(timelineDataPath)) {
+      console.log('时间轴文件不存在，返回默认数据:', timelineDataPath);
       return res.json({ 
         success: true, 
         data: { 
@@ -715,8 +724,13 @@ router.get('/projects/:uuid/timeline', async (req: Request, res: Response) => {
     }
 
     const timelineData = JSON.parse(fs.readFileSync(timelineDataPath, 'utf-8'));
+    console.log('加载时间轴数据:', {
+      tracksCount: Array.isArray(timelineData.tracks) ? timelineData.tracks.length : 'not array',
+      config: timelineData.config
+    });
     res.json({ success: true, data: timelineData });
   } catch (error: any) {
+    console.error('加载时间轴数据失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

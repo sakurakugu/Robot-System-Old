@@ -917,7 +917,10 @@ const updateTrackBlocks = (trackId: string, blocks: ActionBlock[]) => {
 // 添加动作块
 let blockIdCounter = 0
 const addActionBlock = (trackId: string) => {
+  console.log('addActionBlock 被调用, trackId:', trackId)
   const track = tracks.value.find((t: Track) => t.id === trackId)
+  console.log('找到的 track:', track)
+  
   if (track && track.type === TrackType.ACTION) {
     blockIdCounter++
     
@@ -938,8 +941,11 @@ const addActionBlock = (trackId: string) => {
       color: `hsl(${Math.random() * 360}, 70%, 60%)`
     }
     
+    console.log('创建新块:', newBlock)
+    
     const oldBlocks = JSON.parse(JSON.stringify(track.blocks || []))
     track.blocks = [...(track.blocks || []), newBlock]
+    console.log('更新后的 blocks:', track.blocks)
     emit('update:tracks', tracks.value)
     
     // 添加历史记录
@@ -951,6 +957,8 @@ const addActionBlock = (trackId: string) => {
       track.name
     )
     addHistoryRecord(record)
+  } else {
+    console.warn('未找到轨道或轨道类型不是 ACTION:', trackId, track?.type)
   }
 }
 
@@ -1287,13 +1295,86 @@ const validate = () => {
   return { valid: true }
 }
 
+// 加载时间轴数据的方法
+const loadTimelineData = (data: { tracks?: Track[]; config?: Partial<TimelineConfig> }) => {
+  console.log('TimelineEditor.loadTimelineData 被调用:', data)
+  
+  if (data.tracks && Array.isArray(data.tracks)) {
+    console.log('设置 tracks:', data.tracks.length, '个轨道')
+    // 深度克隆数据，确保响应式
+    const clonedTracks = JSON.parse(JSON.stringify(data.tracks))
+    console.log('克隆后的tracks:', clonedTracks)
+    
+    // 打印每个轨道的详细信息
+    clonedTracks.forEach((track: Track, index: number) => {
+      console.log(`轨道 ${index}:`, {
+        id: track.id,
+        name: track.name,
+        type: track.type,
+        blocksCount: track.blocks?.length || 0,
+        keyframesCount: track.keyframes?.length || 0,
+        audioUrl: track.audioUrl
+      })
+    })
+    
+    tracks.value = clonedTracks
+    
+    // 更新 trackIdCounter 和 blockIdCounter，避免 ID 冲突
+    let maxTrackId = 0
+    let maxBlockId = 0
+    clonedTracks.forEach((track: Track) => {
+      // 提取轨道 ID 中的数字
+      const trackMatch = track.id.match(/track-(\d+)/)
+      if (trackMatch) {
+        const trackNum = parseInt(trackMatch[1])
+        if (trackNum > maxTrackId) maxTrackId = trackNum
+      }
+      
+      // 提取动作块 ID 中的数字
+      if (track.blocks) {
+        track.blocks.forEach((block: any) => {
+          const blockMatch = block.id.match(/block-(\d+)/)
+          if (blockMatch) {
+            const blockNum = parseInt(blockMatch[1])
+            if (blockNum > maxBlockId) maxBlockId = blockNum
+          }
+        })
+      }
+    })
+    
+    trackIdCounter = maxTrackId
+    blockIdCounter = maxBlockId
+    console.log('更新计数器 - trackIdCounter:', trackIdCounter, 'blockIdCounter:', blockIdCounter)
+    
+    // 清空历史记录
+    historyRecords.value = []
+    historyCurrentIndex.value = -1
+  }
+  
+  if (data.config) {
+    console.log('合并 config:', data.config)
+    Object.assign(config.value, data.config)
+  }
+  
+  console.log('加载完成，当前 tracks:', tracks.value.length, '个轨道')
+  console.log('tracks详情:', tracks.value)
+}
+
+// 获取时间轴数据的方法
+const getTimelineData = () => {
+  return {
+    tracks: tracks.value,
+    config: config.value
+  }
+}
+
 // 暴露方法
 defineExpose({
   addTrack,
   deleteTrack,
   validate,
-  config,
-  tracks
+  loadTimelineData,
+  getTimelineData
 })
 </script>
 

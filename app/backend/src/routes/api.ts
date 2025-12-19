@@ -721,6 +721,72 @@ router.get('/projects/:uuid/timeline', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/projects/:uuid/custom-actions', async (req: Request, res: Response) => {
+  try {
+    const { name, description, tracks, config } = req.body;
+    if (!name || !tracks || !Array.isArray(tracks)) {
+      return res.status(400).json({ success: false, error: '参数无效' });
+    }
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+    const filePath = path.join(project.folder_path, 'custom-actions.json');
+    let list: any[] = [];
+    if (fs.existsSync(filePath)) {
+      try {
+        list = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        if (!Array.isArray(list)) list = [];
+      } catch {
+        list = [];
+      }
+    }
+    const action = {
+      uuid: uuidv7(),
+      name,
+      description: description || '',
+      tracks,
+      config: config || {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    list.push(action);
+    fs.writeFileSync(filePath, JSON.stringify(list, null, 2));
+    await db.run(
+      'UPDATE project_index SET updated_at = ? WHERE uuid = ?',
+      [new Date().toISOString(), req.params.uuid]
+    );
+    res.json({ success: true, data: action });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/projects/:uuid/custom-actions', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.uuid]
+    );
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目未找到' });
+    }
+    const filePath = path.join(project.folder_path, 'custom-actions.json');
+    if (!fs.existsSync(filePath)) {
+      return res.json({ success: true, data: [] });
+    }
+    const list = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    res.json({ success: true, data: Array.isArray(list) ? list : [] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 配置multer用于音频上传
 const audioStorage = multer.diskStorage({
   destination: async (req, file, cb) => {

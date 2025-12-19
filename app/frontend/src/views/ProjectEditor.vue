@@ -125,12 +125,32 @@ onMounted(() => {
   
   window.addEventListener('save-project', handleSave)
   
+  // 监听“保存为自定义动作”
+  const handleSaveAsAction = async (event: Event) => {
+    const customEvent = event as CustomEvent
+    if (customEvent.detail?.projectUuid === projectUuid) {
+      const name: string = customEvent.detail?.name
+      if (!name) return
+      try {
+        if (!timelineEditorRef.value) throw new Error('时间轴编辑器未初始化')
+        const tracks = timelineEditorRef.value.tracks
+        const config = timelineEditorRef.value.config
+        await projectApi.saveCustomAction(projectUuid, { name, description: '', tracks, config })
+      } catch (error) {
+        console.error('保存为自定义动作失败:', error)
+      }
+    }
+  }
+  
+  window.addEventListener('save-as-action', handleSaveAsAction)
+  
   // 在卸载时移除监听器（需要在 onUnmounted 中添加）
   const originalOnUnmounted = () => {
     if (ws) {
       ws.close()
     }
     window.removeEventListener('save-project', handleSave)
+    window.removeEventListener('save-as-action', handleSaveAsAction)
   }
   
   onUnmounted(originalOnUnmounted)

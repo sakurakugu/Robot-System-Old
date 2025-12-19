@@ -1,6 +1,6 @@
 <template>
   <div class="main-layout">
-    <el-container>
+    <el-container class="root-container">
       <!-- 顶部工具栏 -->
       <el-header class="toolbar">
         <div class="toolbar-left">
@@ -27,6 +27,7 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="save">保存</el-dropdown-item>
+                  <el-dropdown-item command="save-as-action">保存为自定义动作</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -121,6 +122,14 @@
             >
               <el-icon><Clock /></el-icon>
             </div>
+            <div 
+              class="activity-icon" 
+              :class="{ active: activeView === 'actions' }"
+              @click="toggleView('actions')"
+              title="动作列表"
+            >
+              <el-icon><VideoPlay /></el-icon>
+            </div>
           </div>
         </div>
 
@@ -177,6 +186,11 @@
               <span class="robot-name">{{ robot.name }}</span>
             </div>
             <el-empty v-if="robots.length === 0" description="暂无机器人" />
+          </div>
+          
+          <!-- 动作列表 -->
+          <div v-show="activeView === 'actions'" class="action-list-panel">
+            <ActionList />
           </div>
 
           <!-- 历史记录容器 -->
@@ -310,10 +324,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, markRaw, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, markRaw, onMounted, onUnmounted, nextTick, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled, Clock } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled, Clock, VideoPlay } from '@element-plus/icons-vue'
+import TimelineEditor from '@/components/timeline/TimelineEditor.vue'
+import ActionList from './ActionList.vue'
 import { projectApi } from '@/api/project'
 import { wsClient } from '@/services/websocket'
 
@@ -369,7 +385,7 @@ const currentProjectName = ref('项目编辑器')
 const showLeftPanel = ref(true)
 const showBottomPanel = ref(true)
 const showRightPanel = ref(false)
-const activeView = ref<'explorer' | 'robots' | 'preview' | 'history' | null>('robots')
+const activeView = ref<'explorer' | 'robots' | 'actions' | 'preview' | 'history' | null>('robots')
 
 // 计算当前是否有活动编辑器
 const hasActiveEditor = computed(() => {
@@ -383,6 +399,8 @@ const getPanelTitle = computed(() => {
       return '资源管理器'
     case 'robots':
       return '机器人列表'
+    case 'actions':
+      return '动作列表'
     case 'history':
       return '历史记录'
     default:
@@ -394,7 +412,7 @@ const getPanelTitle = computed(() => {
 const currentExecutionId = ref<string | null>(null)
 
 // 切换侧栏视图
-const toggleView = (view: 'explorer' | 'robots' | 'preview' | 'history') => {
+const toggleView = (view: 'explorer' | 'robots' | 'actions' | 'preview' | 'history') => {
   if (view === 'preview') {
     // 预览视图只控制右侧面板
     if (activeView.value === 'preview') {
@@ -682,6 +700,17 @@ const handleEditCommand = (command: string) => {
     // 保持兼容性或根据需求移除
   } else if (command === 'save') {
     saveProject()
+  } else if (command === 'save-as-action') {
+    const projectUuid = route.params.uuid as string
+    if (!projectUuid) return
+    if (route.name !== 'ProjectEditor') {
+      ElMessage.warning('请在项目编辑页面进行保存为动作')
+      return
+    }
+    const name = window.prompt('输入自定义动作名称')
+    if (!name) return
+    const event = new CustomEvent('save-as-action', { detail: { projectUuid, name } })
+    window.dispatchEvent(event)
   }
 }
 
@@ -1209,6 +1238,7 @@ const handleFileClick = async (data: any) => {
 .main-container {
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* 左侧活动栏 */
@@ -1220,6 +1250,7 @@ const handleFileClick = async (data: any) => {
   flex-direction: column;
   justify-content: space-between;
   flex-shrink: 0;
+  height: 100%;
 }
 
 .activity-icons {
@@ -1355,6 +1386,7 @@ const handleFileClick = async (data: any) => {
 .main-container {
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* 侧边栏样式 */
@@ -1362,14 +1394,21 @@ const handleFileClick = async (data: any) => {
 .right-panel {
   background: #252526;
   border-right: 1px solid #3c3c3c;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+
+.left-panel {
+  min-height: 0;
+  overflow-y: auto !important;
 }
 
 .right-panel {
   border-right: none;
   border-left: 1px solid #3c3c3c;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -1400,6 +1439,7 @@ const handleFileClick = async (data: any) => {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  min-height: 0;
 }
 
 .robot-list::-webkit-scrollbar {
@@ -1416,13 +1456,15 @@ const handleFileClick = async (data: any) => {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  min-height: 0;
 }
 
 .history-container {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .file-explorer::-webkit-scrollbar {
@@ -1523,12 +1565,26 @@ const handleFileClick = async (data: any) => {
   flex: 1;
 }
 
+.action-list-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  min-height: 0;
+}
+
 /* 中间内容区 */
 .center-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+}
+
+.root-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-area {
@@ -1536,6 +1592,7 @@ const handleFileClick = async (data: any) => {
   overflow: hidden;
   padding: 0;
   background: #1e1e1e;
+  min-height: 0;
 }
 
 /* 空状态样式 */
@@ -1648,6 +1705,7 @@ const handleFileClick = async (data: any) => {
 /* Element Plus 样式覆盖 */
 :deep(.el-aside) {
   overflow: hidden;
+  height: 100%;
 }
 
 :deep(.el-button) {

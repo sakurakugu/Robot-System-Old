@@ -134,6 +134,16 @@ export const projectApi = {
     return api.post(`/projects/${uuid}/build-and-run`)
   },
 
+  // 保存为自定义动作
+  saveCustomAction(uuid: string, data: { name: string; description?: string; tracks: any[]; config: any }): Promise<{ success: boolean; data: any }> {
+    return api.post(`/projects/${uuid}/custom-actions`, data)
+  },
+
+  // 获取自定义动作列表
+  getCustomActions(uuid: string): Promise<{ success: boolean; data: any[] }> {
+    return api.get(`/projects/${uuid}/custom-actions`)
+  },
+
   // 停止执行
   stopExecution(uuid: string, executionId: string): Promise<{ success: boolean; message: string }> {
     return api.post(`/projects/${uuid}/stop-execution/${executionId}`)
@@ -144,4 +154,3 @@ export const projectApi = {
     return api.get(`/projects/${uuid}/executions`)
   }
 }
-

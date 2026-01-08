@@ -25,10 +25,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ActionBlock, Track } from '../types/timeline'
 
+// 机器人预览组件
 interface Props {
-  currentTime: number
-  isPlaying: boolean
-  tracks?: Track[]
+  currentTime: number // 当前时间
+  isPlaying: boolean  // 是否正在播放
+  tracks?: Track[]    // 动作轨道 
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -37,18 +38,18 @@ const props = withDefaults(defineProps<Props>(), {
   tracks: () => []
 })
 
-const canvasContainer = ref<HTMLDivElement | null>(null)
-const showGrid = ref(true)
-const currentActionName = ref<string>('')
+const canvasContainer = ref<HTMLDivElement | null>(null) // 渲染画布容器
+const showGrid = ref(true) // 是否显示网格
+const currentActionName = ref<string>('') // 当前动作名称
 
-let scene: THREE.Scene
-let camera: THREE.PerspectiveCamera
-let renderer: THREE.WebGLRenderer
-let controls: OrbitControls
-let robotModel: THREE.Group | null = null
-let mixer: THREE.AnimationMixer | null = null
-let gridHelper: THREE.GridHelper
-let animationId: number | null = null
+let scene: THREE.Scene                        // 场景
+let camera: THREE.PerspectiveCamera           // 相机
+let renderer: THREE.WebGLRenderer             // 渲染器
+let controls: OrbitControls                   // 轨道控制
+let robotModel: THREE.Group | null = null     // 机器人模型
+let mixer: THREE.AnimationMixer | null = null // 动画混合器
+let gridHelper: THREE.GridHelper              // 网格辅助器
+let animationId: number | null = null         // 动画ID
 
 // 存储机器人的默认姿态
 let defaultPose: {
@@ -57,6 +58,7 @@ let defaultPose: {
   scale: THREE.Vector3
 } | null = null
 
+// 格式化时间
 const formatTime = (time: number) => {
   const minutes = Math.floor(time / 60)
   const seconds = Math.floor(time % 60)
@@ -134,13 +136,13 @@ const initScene = () => {
 
 const loadRobotModel = () => {
   const loader = new GLTFLoader()
-  
+
   loader.load(
     '/models/robot_dog.glb',
     (gltf: any) => {
       const model = gltf.scene
       robotModel = model
-      
+
       model.traverse((child: any) => {
         if ((child as THREE.Mesh).isMesh) {
           child.castShadow = true
@@ -151,7 +153,7 @@ const loadRobotModel = () => {
       // 设置模型位置和缩放
       model.position.set(0, 0, 0)
       model.scale.set(1, 1, 1)
-      
+
       scene.add(model)
 
       // 如果模型包含动画，创建动画混合器
@@ -162,7 +164,7 @@ const loadRobotModel = () => {
 
       // 保存默认姿态
       saveDefaultPose()
-      
+
       console.log('机器人模型加载成功')
     },
     (progress: any) => {
@@ -177,7 +179,7 @@ const loadRobotModel = () => {
 
 const saveDefaultPose = () => {
   if (!robotModel) return
-  
+
   defaultPose = {
     position: robotModel.position.clone(),
     rotation: robotModel.rotation.clone(),
@@ -187,26 +189,26 @@ const saveDefaultPose = () => {
 
 const animate = () => {
   animationId = requestAnimationFrame(animate)
-  
+
   controls.update()
-  
+
   // 更新动画混合器
   if (mixer) {
     mixer.update(0.016) // 假设60fps
   }
-  
+
   renderer.render(scene, camera)
 }
 
 const handleResize = () => {
   if (!canvasContainer.value) return
-  
+
   const width = canvasContainer.value.clientWidth
   const height = canvasContainer.value.clientHeight
-  
+
   camera.aspect = width / height
   camera.updateProjectionMatrix()
-  
+
   renderer.setSize(width, height)
 }
 
@@ -215,7 +217,7 @@ const resetView = () => {
   camera.lookAt(0, 0.5, 0)
   controls.target.set(0, 0.5, 0)
   controls.update()
-  
+
   // 重置机器人姿态
   if (robotModel && defaultPose) {
     robotModel.position.copy(defaultPose.position)
@@ -234,22 +236,22 @@ const toggleGrid = () => {
 // 根据当前时间更新机器人动画
 const updateRobotAnimation = () => {
   if (!robotModel) return
-  
+
   const time = props.currentTime
   currentActionName.value = ''
-  
+
   // 遍历所有动作轨道
   for (const track of props.tracks) {
     if (track.type === 'action' && track.blocks && track.visible) {
       // 找到当前时间点正在执行的动作块
       for (const block of track.blocks) {
         const blockEndTime = block.startTime + block.duration
-        
+
         if (time >= block.startTime && time < blockEndTime) {
           // 当前正在执行这个动作
           currentActionName.value = block.name
           const progress = (time - block.startTime) / block.duration
-          
+
           // 应用动作到机器人模型
           applyActionToRobot(block, progress)
           break
@@ -262,16 +264,16 @@ const updateRobotAnimation = () => {
 // 应用动作到机器人模型
 const applyActionToRobot = (block: ActionBlock, progress: number) => {
   if (!robotModel) return
-  
+
   // 根据不同的动作类型应用不同的变换
   const actionType = block.actionType || ''
-  
+
   // 重置到默认姿态
   if (defaultPose && progress === 0) {
     robotModel.position.copy(defaultPose.position)
     robotModel.rotation.copy(defaultPose.rotation)
   }
-  
+
   // 根据动作类型应用变换
   switch (actionType) {
     case 'stand_up':
@@ -340,57 +342,57 @@ const applyActionToRobot = (block: ActionBlock, progress: number) => {
 // 站立动画
 const applyStandUpAnimation = (progress: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   // 从趴下姿态过渡到站立姿态
   const startHeight = -0.3
   const endHeight = 0
   const currentHeight = startHeight + (endHeight - startHeight) * easeInOutCubic(progress)
-  
+
   robotModel.position.y = defaultPose.position.y + currentHeight
 }
 
 // 趴下动画
 const applyLieDownAnimation = (progress: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   const startHeight = 0
   const endHeight = -0.3
   const currentHeight = startHeight + (endHeight - startHeight) * easeInOutCubic(progress)
-  
+
   robotModel.position.y = defaultPose.position.y + currentHeight
 }
 
 // 左右倾斜动画
 const applyLeanAnimation = (progress: number, direction: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   const maxRoll = 0.3 * direction // 最大倾斜角度（弧度）
   const roll = maxRoll * Math.sin(progress * Math.PI)
-  
+
   robotModel.rotation.z = defaultPose.rotation.z + roll
 }
 
 // 前后俯仰动画
 const applyPitchAnimation = (progress: number, direction: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   const maxPitch = 0.25 * direction
   const pitch = maxPitch * Math.sin(progress * Math.PI)
-  
+
   robotModel.rotation.x = defaultPose.rotation.x + pitch
 }
 
 // 移动动画
 const applyMoveAnimation = (progress: number, forwardDir: number, strafeDir: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   const distance = 0.5 // 移动距离
   const x = strafeDir * distance * progress
   const z = -forwardDir * distance * progress
-  
+
   robotModel.position.x = defaultPose.position.x + x
   robotModel.position.z = defaultPose.position.z + z
-  
+
   // 添加行走的上下晃动
   const bounce = Math.sin(progress * Math.PI * 4) * 0.05
   robotModel.position.y = defaultPose.position.y + bounce
@@ -399,24 +401,24 @@ const applyMoveAnimation = (progress: number, forwardDir: number, strafeDir: num
 // 转向动画
 const applyTurnAnimation = (progress: number, direction: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   const maxRotation = Math.PI / 4 * direction // 45度
   const rotation = maxRotation * progress
-  
+
   robotModel.rotation.y = defaultPose.rotation.y + rotation
 }
 
 // 头部动画
 const applyHeadAnimation = (progress: number, pitch: number, yaw: number) => {
   if (!robotModel) return
-  
+
   // 查找头部骨骼或部件
   const head = robotModel.getObjectByName('head') || robotModel.getObjectByName('Head')
-  
+
   if (head) {
     const targetPitch = pitch * Math.sin(progress * Math.PI)
     const targetYaw = yaw * Math.sin(progress * Math.PI)
-    
+
     head.rotation.x = targetPitch
     head.rotation.y = targetYaw
   }
@@ -425,12 +427,12 @@ const applyHeadAnimation = (progress: number, pitch: number, yaw: number) => {
 // 坐下动画
 const applySitAnimation = (progress: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   const sitHeight = -0.2
   const currentHeight = sitHeight * easeInOutCubic(progress)
-  
+
   robotModel.position.y = defaultPose.position.y + currentHeight
-  
+
   // 后腿弯曲的效果（如果有骨骼）
   const backTilt = 0.2 * easeInOutCubic(progress)
   robotModel.rotation.x = defaultPose.rotation.x + backTilt
@@ -439,16 +441,16 @@ const applySitAnimation = (progress: number) => {
 // 握手动画
 const applyShakeHandAnimation = (progress: number) => {
   if (!robotModel) return
-  
+
   // 查找前腿或手臂
-  const rightFrontLeg = robotModel.getObjectByName('right_front_leg') || 
-                        robotModel.getObjectByName('RightFrontLeg')
-  
+  const rightFrontLeg = robotModel.getObjectByName('right_front_leg') ||
+    robotModel.getObjectByName('RightFrontLeg')
+
   if (rightFrontLeg) {
     // 抬起前腿并摆动
     const lift = Math.sin(progress * Math.PI) * 0.5
     const shake = Math.sin(progress * Math.PI * 8) * 0.1
-    
+
     rightFrontLeg.rotation.x = -lift
     rightFrontLeg.rotation.z = shake
   }
@@ -457,13 +459,13 @@ const applyShakeHandAnimation = (progress: number) => {
 // 跳跃动画
 const applyJumpAnimation = (progress: number) => {
   if (!robotModel || !defaultPose) return
-  
+
   // 使用抛物线轨迹
   const jumpHeight = 0.5
   const height = jumpHeight * Math.sin(progress * Math.PI)
-  
+
   robotModel.position.y = defaultPose.position.y + height
-  
+
   // 添加轻微的前倾
   const pitch = Math.sin(progress * Math.PI * 2) * 0.1
   robotModel.rotation.x = defaultPose.rotation.x + pitch
@@ -492,13 +494,13 @@ onUnmounted(() => {
   if (animationId !== null) {
     cancelAnimationFrame(animationId)
   }
-  
+
   window.removeEventListener('resize', handleResize)
-  
+
   if (renderer) {
     renderer.dispose()
   }
-  
+
   if (controls) {
     controls.dispose()
   }
@@ -517,7 +519,7 @@ onUnmounted(() => {
   flex: 1;
   position: relative;
   overflow: hidden;
-  
+
   canvas {
     display: block;
   }
@@ -527,32 +529,32 @@ onUnmounted(() => {
   padding: 12px;
   background: #252525;
   border-top: 1px solid #333;
-  
+
   .control-row {
     display: flex;
     align-items: center;
     margin-bottom: 8px;
-    
+
     &:last-child {
       margin-bottom: 0;
     }
-    
+
     .label {
       font-size: 12px;
       color: #999;
       margin-right: 8px;
       min-width: 70px;
     }
-    
+
     .value {
       font-size: 12px;
       color: #fff;
       font-family: monospace;
     }
-    
+
     .el-button {
       margin-right: 8px;
-      
+
       &:last-child {
         margin-right: 0;
       }

@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv \
     build-essential \
+    python-is-python3 \
     && locale-gen zh_CN.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 

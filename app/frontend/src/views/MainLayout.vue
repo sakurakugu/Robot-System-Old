@@ -134,7 +134,7 @@
         </div>
 
         <!-- 左侧面板 -->
-        <el-aside v-show="showLeftPanel" width="250px" class="left-panel">
+        <el-aside v-show="showLeftPanel" :width="leftPanelWidth + 'px'" class="left-panel">
           <div class="panel-header">
             <h3>{{ getPanelTitle }}</h3>
             <div class="header-actions" v-if="activeView === 'robots'">
@@ -200,6 +200,13 @@
           </div>
         </el-aside>
 
+        <!-- 左侧垂直拖拽条 -->
+        <div
+          v-show="showLeftPanel"
+          class="vertical-resizer left-resizer"
+          @mousedown="startDragLeftResizer"
+        ></div>
+
         <!-- 中间内容区 -->
         <el-container class="center-container">
           <!-- 标签栏 -->
@@ -227,7 +234,7 @@
             </div>
           </div>
 
-          <el-main class="content-area">
+          <el-main class="content-area" :style="{ height: showBottomPanel ? `calc(100% - ${bottomPanelHeight}px)` : '100%' }">
             <div v-if="tabs.length === 0" class="empty-state">
               <div class="empty-content">
                 <el-icon class="empty-icon"><Monitor /></el-icon>
@@ -250,8 +257,15 @@
             </router-view>
           </el-main>
 
+          <!-- 底部水平拖拽条 -->
+          <div
+            v-show="showBottomPanel"
+            class="horizontal-resizer"
+            @mousedown="startDragBottomResizer"
+          ></div>
+
           <!-- 底部日志面板 -->
-          <div v-show="showBottomPanel" class="bottom-panel">
+          <div v-show="showBottomPanel" class="bottom-panel" :style="{ height: bottomPanelHeight + 'px' }">
             <div class="panel-header">
               <h3>日志</h3>
               <div class="header-actions">
@@ -271,7 +285,12 @@
         </el-container>
 
         <!-- 右侧预览面板 -->
-        <el-aside v-show="showRightPanel" width="400px" class="right-panel">
+        <div
+          v-show="showRightPanel"
+          class="vertical-resizer right-resizer"
+          @mousedown="startDragRightResizer"
+        ></div>
+        <el-aside v-show="showRightPanel" :width="rightPanelWidth + 'px'" class="right-panel">
           <div class="panel-header">
             <h3>实时预览</h3>
           </div>
@@ -388,6 +407,77 @@ const showLeftPanel = ref(true)
 const showBottomPanel = ref(true)
 const showRightPanel = ref(true) // 默认显示3D预览
 const activeView = ref<'explorer' | 'robots' | 'actions' | 'preview' | 'history' | null>('robots')
+
+// 可调整尺寸
+const leftPanelWidth = ref(250)
+const rightPanelWidth = ref(400)
+const bottomPanelHeight = ref(200)
+let dragStartX = 0
+let dragStartY = 0
+let initialLeftWidth = 0
+let initialRightWidth = 0
+let initialBottomHeight = 0
+let draggingLeft = false
+let draggingRight = false
+let draggingBottom = false
+
+const onDragLeft = (e: MouseEvent) => {
+  if (!draggingLeft) return
+  const delta = e.clientX - dragStartX
+  let newWidth = initialLeftWidth + delta
+  newWidth = Math.max(180, Math.min(600, newWidth))
+  leftPanelWidth.value = newWidth
+}
+
+const onDragRight = (e: MouseEvent) => {
+  if (!draggingRight) return
+  const delta = e.clientX - dragStartX
+  let newWidth = initialRightWidth - delta
+  newWidth = Math.max(250, Math.min(800, newWidth))
+  rightPanelWidth.value = newWidth
+}
+
+const onDragBottom = (e: MouseEvent) => {
+  if (!draggingBottom) return
+  const delta = e.clientY - dragStartY
+  let newHeight = initialBottomHeight - delta
+  newHeight = Math.max(120, Math.min(500, newHeight))
+  bottomPanelHeight.value = newHeight
+}
+
+const stopDrag = () => {
+  draggingLeft = false
+  draggingRight = false
+  draggingBottom = false
+  document.removeEventListener('mousemove', onDragLeft)
+  document.removeEventListener('mousemove', onDragRight)
+  document.removeEventListener('mousemove', onDragBottom)
+  document.removeEventListener('mouseup', stopDrag)
+}
+
+const startDragLeftResizer = (e: MouseEvent) => {
+  draggingLeft = true
+  dragStartX = e.clientX
+  initialLeftWidth = leftPanelWidth.value
+  document.addEventListener('mousemove', onDragLeft)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+const startDragRightResizer = (e: MouseEvent) => {
+  draggingRight = true
+  dragStartX = e.clientX
+  initialRightWidth = rightPanelWidth.value
+  document.addEventListener('mousemove', onDragRight)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+const startDragBottomResizer = (e: MouseEvent) => {
+  draggingBottom = true
+  dragStartY = e.clientY
+  initialBottomHeight = bottomPanelHeight.value
+  document.addEventListener('mousemove', onDragBottom)
+  document.addEventListener('mouseup', stopDrag)
+}
 
 // 计算当前是否有活动编辑器
 const hasActiveEditor = computed(() => {
@@ -1434,6 +1524,37 @@ const handleFileClick = async (data: any) => {
   overflow: hidden;
 }
 
+.vertical-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.vertical-resizer::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #3c3c3c;
+  opacity: 0.4;
+}
+
+.vertical-resizer:hover::after {
+  opacity: 0.8;
+}
+
+.left-resizer {
+  border-right: 1px solid #2d2d30;
+}
+
+.right-resizer {
+  border-left: 1px solid #2d2d30;
+}
+
 .panel-header {
   padding: 12px 15px;
   border-bottom: 1px solid #3c3c3c;
@@ -1646,12 +1767,34 @@ const handleFileClick = async (data: any) => {
 
 /* 底部面板 */
 .bottom-panel {
-  height: 200px;
   background: #252526;
   border-top: 1px solid #3c3c3c;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+}
+
+.horizontal-resizer {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.horizontal-resizer::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  height: 2px;
+  background: #3c3c3c;
+  opacity: 0.4;
+}
+
+.horizontal-resizer:hover::after {
+  opacity: 0.8;
 }
 
 .logs-content {

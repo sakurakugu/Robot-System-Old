@@ -5,6 +5,7 @@ import time
 import math
 import sys
 from pathlib import Path
+import socket
 
 # 根据平台和架构选择对应的静态库的路径
 arch = "x86_64" if sys.maxsize > 2**32 else "aarch64"
@@ -53,15 +54,32 @@ def execute_concurrently(*actions, _interval: float = 0):
             future.result()                         # 等待动作完成
 
 
+def get_local_ip():
+    """通过UDP连接获取本机对外的IP地址"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # 不会真的建立连接，仅用于获取本机出口IP
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception as e:
+        # 增加异常处理，避免网络问题导致程序崩溃
+        print(f"获取出口IP失败: {e}")
+        ip = None
+    finally:
+        s.close()
+    return ip
+
 
 class RobotDog:
     """机器狗基础接口封装"""
 
     def __init__(
-        self, name: str, robot_ip: str, local_ip: str, local_port: int
+        self, name: str, robot_ip: str, local_port: int, local_ip: str | None = None
     ) -> None:
         self.name = name
         self.app = mc_sdk_zsl_1_py.HighLevel()
+        if local_ip is None:
+            local_ip = get_local_ip()
         self.app.initRobot(local_ip, local_port, robot_ip)
 
     def get_current_ctrl_mode(self) -> int:
@@ -164,7 +182,7 @@ class RobotDog:
         Args:
             action (callable): 动作函数的引用
             interval (float): 重试间隔（秒）
-            action_name (str): 动作名称
+            action_name (str): 动作名称（用于日志输出）
         """
         while True:
             result = action()  # 执行动作

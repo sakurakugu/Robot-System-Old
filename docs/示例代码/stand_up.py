@@ -4,7 +4,6 @@ from lib.api import CrazyRobotDog
 dog_131 = CrazyRobotDog(
     name='131',               # 名称，用于日志输出
     robot_ip='192.168.0.2',   # 机器人IP
-    local_ip='192.168.0.214', # 本地IP
     local_port=10131          # 本地端口，一般设置为 `10000 + 狗狗编号`
 )
 

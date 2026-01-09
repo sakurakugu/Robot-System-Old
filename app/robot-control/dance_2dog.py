@@ -9,26 +9,16 @@ robot-launch restart 4
 from lib.api import CrazyRobotDog, execute_concurrently as ec
 import time
 
-# 狗狗配置
-DOGS_CONFIG = {
-    "131": ("192.168.0.85", 10085),
-    "47": ("192.168.0.89", 10089),
-}
-
-LOCAL_IP = "192.168.0.88"
-
 # 实例化狗1、2
 dog1 = CrazyRobotDog(
     name="47",
-    robot_ip=DOGS_CONFIG["47"][0],
-    local_ip=LOCAL_IP,
-    local_port=DOGS_CONFIG["47"][1],
+    robot_ip="192.168.0.85",
+    local_port=10085,
 )
 dog2 = CrazyRobotDog(
     name="131",
-    robot_ip=DOGS_CONFIG["131"][0],
-    local_ip=LOCAL_IP,
-    local_port=DOGS_CONFIG["131"][1],
+    robot_ip="192.168.0.89",
+    local_port=10089,
 )
 
 # 让狗站起来，如果已经站起来就在写入0

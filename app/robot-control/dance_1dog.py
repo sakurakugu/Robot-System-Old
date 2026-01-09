@@ -2,18 +2,10 @@
 from lib.api import CrazyRobotDog
 import time
 
-DOGS_CONFIG = {
-    "131": ("192.168.1.110", 10131),
-    "47": ("192.168.1.116", 10047),
-}
-
-LOCAL_IP = "192.168.1.105"
-
 dog1 = CrazyRobotDog(
     name="131",
-    robot_ip=DOGS_CONFIG["131"][0],
-    local_ip=LOCAL_IP,
-    local_port=DOGS_CONFIG["131"][1],
+    robot_ip="192.168.1.110",
+    local_port=10131,
 )
 
 dog1.stand_up(0)

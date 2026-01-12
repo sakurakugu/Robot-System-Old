@@ -48,7 +48,7 @@ check_network_mode() {
     echo ""
     echo "启用方法："
     echo "  1. 在 Windows 中搜索 'wsl settings'"
-    echo "  2. 开启 '镜像网络' 选项"
+    echo "  2. 在 [网络] -> [网络模式] 中开启 '镜像网络' 选项"
     echo "  3. 在 PowerShell 中运行: wsl --shutdown"
     echo "  4. 重新打开 WSL"
     echo ""
@@ -89,37 +89,37 @@ install_basic_tools() {
 
 # 配置WSL特定设置
 configure_wsl_settings() {
-    print_info "配置 WSL 设置..."
-    
-    # 创建或更新 .wslconfig (在Windows用户目录下)
-    print_info "WSL 配置文件位置: /mnt/c/Users/<用户名>/.wslconfig"
-    print_info "建议配置内容："
-    echo ""
-    echo "[wsl2]"
-    echo "memory=4GB"
-    echo "processors=2"
-    echo "networkingMode=mirrored"
-    echo ""
-    
-    # 创建 wsl.conf (在WSL内部)
-    if [ ! -f /etc/wsl.conf ]; then
-        print_info "创建 /etc/wsl.conf..."
-        sudo tee /etc/wsl.conf > /dev/null << 'EOF'
-[boot]
-systemd=true
-
-[network]
-generateResolvConf=true
-
-[interop]
-enabled=true
-appendWindowsPath=true
-EOF
-        print_success "已创建 /etc/wsl.conf"
-        print_warning "需要重启 WSL 才能生效 (在 PowerShell 运行: wsl --shutdown)"
-    else
-        print_info "/etc/wsl.conf 已存在"
-    fi
+#     print_info "配置 WSL 设置..."
+#    
+#     # 创建或更新 .wslconfig (在Windows用户目录下)
+#     print_info "WSL 配置文件位置: /mnt/c/Users/<用户名>/.wslconfig"
+#     print_info "建议配置内容："
+#     echo ""
+#     echo "[wsl2]"
+#     echo "memory=4GB"
+#     echo "processors=2"
+#     echo "networkingMode=mirrored"
+#     echo ""
+#    
+#     # 创建 wsl.conf (在WSL内部)
+#     if [ ! -f /etc/wsl.conf ]; then
+#         print_info "创建 /etc/wsl.conf..."
+#         sudo tee /etc/wsl.conf > /dev/null << 'EOF'
+# [boot]
+# systemd=true
+#
+# [network]
+# generateResolvConf=true
+#
+# [interop]
+# enabled=true
+# appendWindowsPath=true
+# EOF
+#         print_success "已创建 /etc/wsl.conf"
+#         print_warning "需要重启 WSL 才能生效 (在 PowerShell 运行: wsl --shutdown)"
+#     else
+#         print_info "/etc/wsl.conf 已存在"
+#     fi
 }
 
 # 检查Windows互操作性
@@ -141,7 +141,7 @@ check_windows_interop() {
 # 配置防火墙提示
 show_firewall_info() {
     echo ""
-    print_info "防火墙配置提示:"
+    print_info "防火墙配置提示（一般不用运行）:"
     echo "----------------------------------------"
     echo "如果局域网设备无法访问 WSL 服务，可能需要在 Windows 中配置防火墙："
     echo ""
@@ -194,7 +194,7 @@ install_dev_tools() {
     # 检查并安装 Node.js
     if ! command -v node &> /dev/null; then
         print_info "安装 Node.js..."
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
         sudo apt install -y nodejs
     fi
     
@@ -211,24 +211,24 @@ install_dev_tools() {
 
 # 创建快捷命令
 create_shortcuts() {
-    print_info "创建便捷命令..."
+#     print_info "创建便捷命令..."
     
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+#     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     
-    # 添加到 .bashrc
-    if [ -f ~/.bashrc ]; then
-        if ! grep -q "robot-dog aliases" ~/.bashrc; then
-            cat >> ~/.bashrc << EOF
+#     # 添加到 .bashrc
+#     if [ -f ~/.bashrc ]; then
+#         if ! grep -q "robot-dog aliases" ~/.bashrc; then
+#             cat >> ~/.bashrc << EOF
 
-# robot-dog aliases
-alias robot-start='cd "$SCRIPT_DIR" && ./start.sh'
-alias robot-stop='cd "$SCRIPT_DIR" && ./stop.sh'
-alias robot-log='cd "$SCRIPT_DIR" && tail -f logs/*.log'
-EOF
-            print_success "已添加快捷命令到 ~/.bashrc"
-            print_info "运行 'source ~/.bashrc' 或重新打开终端后生效"
-        fi
-    fi
+# # robot-dog aliases
+# alias robot-start='cd "$SCRIPT_DIR" && ./start.sh'
+# alias robot-stop='cd "$SCRIPT_DIR" && ./stop.sh'
+# alias robot-log='cd "$SCRIPT_DIR" && tail -f logs/*.log'
+# EOF
+#             print_success "已添加快捷命令到 ~/.bashrc"
+#             print_info "运行 'source ~/.bashrc' 或重新打开终端后生效"
+#         fi
+#     fi
 }
 
 # 主函数

@@ -247,7 +247,7 @@ check_project_files() {
     
     check_path "$SCRIPT_DIR/app/backend/src/index.ts" "后端入口文件" true
     check_path "$SCRIPT_DIR/app/frontend/src/main.ts" "前端入口文件" true
-    check_path "$SCRIPT_DIR/robot-control" "机器狗控制目录" true
+    check_path "$SCRIPT_DIR/app/robot-control" "机器狗控制目录" true
     check_path "$SCRIPT_DIR/start.sh" "启动脚本" true
     check_path "$SCRIPT_DIR/stop.sh" "停止脚本" true
     

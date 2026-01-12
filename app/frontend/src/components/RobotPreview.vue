@@ -71,7 +71,8 @@ const initScene = () => {
 
   // 创建场景
   scene = new THREE.Scene()
-  scene.background = new THREE.Color(0x1a1a1a)
+  const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--el-bg-color-page').trim()
+  scene.background = new THREE.Color(bgColor || '#1a1a1a')
 
   // 创建相机
   const width = canvasContainer.value.clientWidth
@@ -512,7 +513,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a1a;
+  background: var(--el-bg-color-page);
 }
 
 .canvas-container {
@@ -527,8 +528,8 @@ onUnmounted(() => {
 
 .preview-controls {
   padding: 12px;
-  background: #252525;
-  border-top: 1px solid #333;
+  background: var(--el-bg-color);
+  border-top: 1px solid var(--el-border-color);
 
   .control-row {
     display: flex;
@@ -541,14 +542,14 @@ onUnmounted(() => {
 
     .label {
       font-size: 12px;
-      color: #999;
+      color: var(--el-text-color-secondary);
       margin-right: 8px;
       min-width: 70px;
     }
 
     .value {
       font-size: 12px;
-      color: #fff;
+      color: var(--el-text-color-primary);
       font-family: monospace;
     }
 

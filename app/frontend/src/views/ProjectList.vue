@@ -1,110 +1,124 @@
 <template>
   <div class="project-list">
     <el-container>
-      <el-header>
-        <div class="header-content">
-          <h1>机器狗管理系统</h1>
-          <div class="header-actions">
-            <el-radio-group v-model="viewMode" size="default">
-              <el-radio-button value="grid">
-                <el-icon><Grid /></el-icon>
-                宫格
-              </el-radio-button>
-              <el-radio-button value="list">
-                <el-icon><List /></el-icon>
-                列表
-              </el-radio-button>
-            </el-radio-group>
-            <el-button @click="handleImportClick">
-              <el-icon class="import-btn"><Upload /></el-icon>
-              导入工程
+      <el-aside width="60px" class="left-bar">
+        <div class="left-bar-content">
+          <div class="top-icons">
+            <el-button class="left-icon" text>
+              <el-icon><Folder /></el-icon>
             </el-button>
-            <el-button type="primary" @click="showCreateDialog = true">
-              <el-icon><Plus /></el-icon>
-              新建项目
+          </div>
+          <div class="bottom-settings">
+            <el-button class="settings-btn" text @click="openSettings" title="设置">
+              <el-icon><Setting /></el-icon>
             </el-button>
           </div>
         </div>
-      </el-header>
+      </el-aside>
+      <el-container>
+        <el-header>
+          <div class="header-content">
+            <h1>机器狗管理系统</h1>
+            <div class="header-actions">
+              <el-radio-group v-model="viewMode" size="default">
+                <el-radio-button value="grid">
+                  <el-icon><Menu /></el-icon>
+                  卡片
+                </el-radio-button>
+                <el-radio-button value="list">
+                  <el-icon><List /></el-icon>
+                  列表
+                </el-radio-button>
+              </el-radio-group>
+              <el-button @click="handleImportClick">
+                <el-icon class="import-btn"><Upload /></el-icon>
+                导入工程
+              </el-button>
+              <el-button type="primary" @click="showCreateDialog = true">
+                <el-icon><Plus /></el-icon>
+                新建项目
+              </el-button>
+            </div>
+          </div>
+        </el-header>
 
-      <el-main>
-        <div v-if="loading" class="loading">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <p>加载中...</p>
-        </div>
-
-        <div v-else-if="projects.length === 0" class="empty">
-          <el-empty description="暂无项目">
-            <el-button type="primary" @click="showCreateDialog = true">创建第一个项目</el-button>
-          </el-empty>
-        </div>
-
-        <div v-else class="projects-container">
-          <!-- 宫格视图 -->
-          <div v-if="viewMode === 'grid'" class="projects-grid">
-            <el-card
-              v-for="project in projects"
-              :key="project.uuid"
-              class="project-card"
-              shadow="hover"
-              @click="openProject(project.uuid)"
-            >
-              <div class="project-thumbnail">
-                <el-icon><Folder /></el-icon>
-              </div>
-              <div class="project-info">
-                <h3>{{ project.name }}</h3>
-                <p class="description">{{ project.description || '无描述' }}</p>
-                <div class="project-meta">
-                  <span>创建于: {{ formatDate(project.created_at) }}</span>
-                  <span v-if="project.updated_at">最后修改: {{ formatDate(project.updated_at) }}</span>
-                </div>
-              </div>
-              <div class="project-actions" @click.stop>
-                <el-button type="danger" size="small" @click="deleteProject(project)">
-                  <el-icon><Delete /></el-icon>
-                </el-button>
-              </div>
-            </el-card>
+        <el-main>
+          <div v-if="loading" class="loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <p>加载中...</p>
           </div>
 
-          <!-- 列表视图 -->
-          <div v-else class="projects-list">
-            <el-card
-              v-for="project in projects"
-              :key="project.uuid"
-              class="project-list-item"
-              shadow="hover"
-              @click="openProject(project.uuid)"
-            >
-              <div class="list-item-content">
-                <div class="list-item-icon">
+          <div v-else-if="projects.length === 0" class="empty">
+            <el-empty description="暂无项目">
+              <el-button type="primary" @click="showCreateDialog = true">创建第一个项目</el-button>
+            </el-empty>
+          </div>
+
+          <div v-else class="projects-container">
+            <div v-if="viewMode === 'grid'" class="projects-grid">
+              <el-card
+                v-for="project in projects"
+                :key="project.uuid"
+                class="project-card"
+                shadow="hover"
+                @click="openProject(project.uuid)"
+              >
+                <div class="project-thumbnail">
                   <el-icon><Folder /></el-icon>
                 </div>
-                <div class="list-item-info">
+                <div class="project-info">
                   <h3>{{ project.name }}</h3>
                   <p class="description">{{ project.description || '无描述' }}</p>
-                </div>
-                <div class="list-item-meta">
-                  <div class="meta-item">
-                    <span class="meta-label">创建于</span>
-                    <span class="meta-value">{{ formatDate(project.created_at) }}</span>
-                  </div>
-                  <div v-if="project.updated_at" class="meta-item">
-                    <span class="meta-label">最后修改</span>
-                    <span class="meta-value">{{ formatDate(project.updated_at) }}</span>
+                  <div class="project-meta">
+                    <span>创建于: {{ formatDate(project.created_at) }}</span>
+                    <span v-if="project.updated_at">最后修改: {{ formatDate(project.updated_at) }}</span>
                   </div>
                 </div>
-                <div class="list-item-actions" @click.stop>
+                <div class="project-actions" @click.stop>
                   <el-button type="danger" size="small" @click="deleteProject(project)">
                     <el-icon><Delete /></el-icon>
                   </el-button>
                 </div>
-              </div>
-            </el-card>
+              </el-card>
+            </div>
+
+            <div v-else class="projects-list">
+              <el-card
+                v-for="project in projects"
+                :key="project.uuid"
+                class="project-list-item"
+                shadow="hover"
+                @click="openProject(project.uuid)"
+              >
+                <div class="list-item-content">
+                  <div class="list-item-icon">
+                    <el-icon><Folder /></el-icon>
+                  </div>
+                  <div class="list-item-info">
+                    <h3>{{ project.name }}</h3>
+                    <p class="description">{{ project.description || '无描述' }}</p>
+                  </div>
+                  <div class="list-item-meta">
+                    <div class="meta-item">
+                      <span class="meta-label">创建于</span>
+                      <span class="meta-value">{{ formatDate(project.created_at) }}</span>
+                    </div>
+                    <div v-if="project.updated_at" class="meta-item">
+                      <span class="meta-label">最后修改</span>
+                      <span class="meta-value">{{ formatDate(project.updated_at) }}</span>
+                    </div>
+                  </div>
+                  <div class="list-item-actions" @click.stop>
+                    <el-button type="danger" size="small" @click="deleteProject(project)">
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+              </el-card>
+            </div>
           </div>
-        </div>
-      </el-main>
+        </el-main>
+      </el-container>
     </el-container>
 
     <!-- 隐藏的文件选择器 -->
@@ -157,6 +171,10 @@ const newProject = ref({
   name: '',
   description: ''
 })
+
+const openSettings = () => {
+  router.push('/settings')
+}
 
 const loadProjects = async () => {
   loading.value = true
@@ -295,12 +313,53 @@ onMounted(() => {
 .project-list {
   width: 100%;
   height: 100%;
-  background: #f5f7fa;
+  background: var(--el-bg-color-page);
+}
+
+.project-list > .el-container {
+  height: 100%;
+}
+
+.left-bar {
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
+  height: 100%;
+}
+
+.left-bar-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+}
+
+.left-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+}
+
+.bottom-settings {
+  padding-bottom: 8px;
+}
+
+.settings-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
 }
 
 .el-header {
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   padding: 0 40px;
@@ -322,14 +381,33 @@ onMounted(() => {
   margin-right: 20px;
 }
 
+.header-actions .el-radio-button__inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+  height: 32px;
+  padding: 0 12px;
+}
+
+.header-actions .el-radio-button__inner .el-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
 .header-actions .import-btn {
+  margin-right: 8px;
+}
+
+.header-actions .el-button .el-icon {
   margin-right: 8px;
 }
 
 .header-content h1 {
   font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .el-main {
@@ -343,7 +421,7 @@ onMounted(() => {
   justify-content: center;
   height: 400px;
   font-size: 48px;
-  color: #409eff;
+  color: var(--el-color-primary);
 }
 
 .loading p {
@@ -423,12 +501,12 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 5px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .list-item-info .description {
   font-size: 14px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -449,13 +527,13 @@ onMounted(() => {
 
 .meta-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-bottom: 4px;
 }
 
 .meta-value {
   font-size: 13px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .list-item-actions {
@@ -480,12 +558,12 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 10px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .project-info .description {
   font-size: 14px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-bottom: 10px;
   min-height: 40px;
   overflow: hidden;
@@ -498,7 +576,7 @@ onMounted(() => {
 
 .project-meta {
   font-size: 12px;
-  color: #c0c4cc;
+  color: var(--el-text-color-placeholder);
   display: flex;
   flex-direction: column;
   gap: 5px;

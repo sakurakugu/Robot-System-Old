@@ -126,8 +126,8 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #252526;
-  color: #cccccc;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
 }
 
 .action-list-content {
@@ -146,18 +146,18 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   padding: 10px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--el-border-color);
   border-radius: 6px;
-  background: #2d2d30;
+  background: var(--el-fill-color);
   transition: all 0.2s;
-  color: #cccccc;
+  color: var(--el-text-color-regular);
 }
 
 .action-card:hover {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
   border-color: #409eff;
   transform: translateY(-1px);
-  background: #37373d;
+  background: var(--el-fill-color-light);
 }
 
 .action-icon {
@@ -168,7 +168,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2a2d2e;
+  background: var(--el-fill-color);
   border-radius: 6px;
 }
 
@@ -179,40 +179,40 @@ onMounted(async () => {
 .action-name {
   font-size: 13px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--el-text-color-primary);
   margin-bottom: 4px;
 }
 
 .action-desc {
   font-size: 11px;
-  color: #a0a0a0;
+  color: var(--el-text-color-secondary);
   margin-bottom: 4px;
   line-height: 1.4;
 }
 
 .action-method {
   font-size: 11px;
-  color: #9aa0a6;
+  color: var(--el-text-color-secondary);
   font-family: monospace;
-  background: #2a2d2e;
+  background: var(--el-fill-color-light);
   padding: 2px 4px;
   border-radius: 3px;
   display: inline-block;
 }
 
 :deep(.el-collapse) {
-  --el-collapse-border-color: #3c3c3c;
-  --el-collapse-header-bg-color: #252526;
-  --el-collapse-content-bg-color: #252526;
-  --el-collapse-text-color: #cccccc;
+  --el-collapse-border-color: var(--el-border-color);
+  --el-collapse-header-bg-color: var(--el-bg-color);
+  --el-collapse-content-bg-color: var(--el-bg-color);
+  --el-collapse-text-color: var(--el-text-color-primary);
 }
 
 :deep(.el-collapse-item__header) {
-  color: #cccccc;
+  color: var(--el-text-color-primary);
 }
 
 :deep(.el-collapse-item__wrap) {
-  background: #252526;
-  border-bottom-color: #3c3c3c;
+  background: var(--el-bg-color);
+  border-bottom-color: var(--el-border-color);
 }
 </style>

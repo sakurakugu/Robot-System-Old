@@ -350,7 +350,7 @@ const handleTrackClick = (e: MouseEvent) => {
 .block-name {
   font-size: 12px;
   font-weight: 500;
-  color: #fff;
+  color: var(--el-text-color-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -358,7 +358,7 @@ const handleTrackClick = (e: MouseEvent) => {
 
 .block-duration {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--el-text-color-secondary);
 }
 
 .resize-handle {
@@ -367,7 +367,7 @@ const handleTrackClick = (e: MouseEvent) => {
   bottom: 0;
   width: 6px;
   cursor: ew-resize;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--el-fill-color-light);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -378,12 +378,12 @@ const handleTrackClick = (e: MouseEvent) => {
 
 .resize-handle.left {
   left: 0;
-  border-left: 2px solid rgba(255, 255, 255, 0.5);
+  border-left: 2px solid var(--el-border-color);
 }
 
 .resize-handle.right {
   right: 0;
-  border-right: 2px solid rgba(255, 255, 255, 0.5);
+  border-right: 2px solid var(--el-border-color);
 }
 
 .empty-hint {
@@ -391,7 +391,7 @@ const handleTrackClick = (e: MouseEvent) => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: #666;
+  color: var(--el-text-color-placeholder);
   font-size: 12px;
   pointer-events: none;
   user-select: none;

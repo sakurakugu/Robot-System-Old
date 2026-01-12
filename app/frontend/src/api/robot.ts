@@ -60,6 +60,14 @@ export function testRobotConnection(projectUuid: string, robotUuid: string) {
   return api.post(`/projects/${projectUuid}/robots/${robotUuid}/test-connection`)
 }
 
+export function connectRobot(projectUuid: string, robotUuid: string) {
+  return api.post(`/projects/${projectUuid}/robots/${robotUuid}/connect`)
+}
+
+export function restartMotion(projectUuid: string, robotUuid: string) {
+  return api.post(`/projects/${projectUuid}/robots/${robotUuid}/restart-motion`)
+}
+
 // 执行动作序列
 export function executeActions(projectUuid: string, data: ExecuteActionsData) {
   return api.post(`/projects/${projectUuid}/execute-actions`, data)

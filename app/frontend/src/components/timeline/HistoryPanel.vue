@@ -185,13 +185,13 @@ const formatTime = (timestamp: number) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1e1e1e;
-  border-right: 1px solid #333;
+  background: var(--el-bg-color-page);
+  border-right: 1px solid var(--el-border-color);
 }
 
 .history-header {
   padding: 12px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--el-border-color);
   flex-shrink: 0;
 }
 
@@ -199,7 +199,7 @@ const formatTime = (timestamp: number) => {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 500;
-  color: #fff;
+  color: var(--el-text-color-primary);
 }
 
 .history-actions {
@@ -210,14 +210,14 @@ const formatTime = (timestamp: number) => {
   .el-button {
     width: 32px;
     height: 32px;
-    background: #2a2a2a;
-    border-color: #3a3a3a;
-    color: #aaa;
+    background: var(--el-bg-color);
+    border-color: var(--el-border-color);
+    color: var(--el-text-color-secondary);
 
     &:hover:not(:disabled) {
-      background: #3a3a3a;
-      border-color: #4a4a4a;
-      color: #fff;
+      background: var(--el-fill-color);
+      border-color: var(--el-border-color);
+      color: var(--el-text-color-primary);
     }
 
     &:disabled {
@@ -237,15 +237,15 @@ const formatTime = (timestamp: number) => {
   }
 
   &::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--el-bg-color-page);
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #3a3a3a;
+    background: var(--el-border-color);
     border-radius: 3px;
 
     &:hover {
-      background: #4a4a4a;
+      background: var(--el-border-color);
     }
   }
 }
@@ -256,23 +256,23 @@ const formatTime = (timestamp: number) => {
   gap: 10px;
   padding: 10px;
   margin-bottom: 4px;
-  background: #2a2a2a;
+  background: var(--el-bg-color);
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: #333;
-    border-color: #409eff;
+    background: var(--el-fill-color);
+    border-color: var(--el-color-primary);
   }
 
   &.is-active {
-    background: #2a4a6a;
-    border-color: #409eff;
+    background: var(--el-color-primary);
+    border-color: var(--el-color-primary);
 
     .history-item-description {
-      color: #fff;
+      color: var(--el-text-color-primary);
       font-weight: 500;
     }
   }
@@ -293,9 +293,9 @@ const formatTime = (timestamp: number) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #3a3a3a;
+  background: var(--el-fill-color);
   border-radius: 4px;
-  color: #409eff;
+  color: var(--el-color-primary);
   font-size: 14px;
 }
 
@@ -306,7 +306,7 @@ const formatTime = (timestamp: number) => {
 
 .history-item-description {
   font-size: 13px;
-  color: #ccc;
+  color: var(--el-text-color-regular);
   margin-bottom: 4px;
   line-height: 1.4;
   word-break: break-all;
@@ -317,12 +317,12 @@ const formatTime = (timestamp: number) => {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: #888;
+  color: var(--el-text-color-secondary);
 }
 
 .history-item-track {
   padding: 2px 6px;
-  background: #3a3a3a;
+  background: var(--el-fill-color);
   border-radius: 3px;
   max-width: 120px;
   overflow: hidden;
@@ -336,7 +336,7 @@ const formatTime = (timestamp: number) => {
 
 .history-item-indicator {
   flex-shrink: 0;
-  color: #409eff;
+  color: var(--el-color-primary);
   font-size: 16px;
 }
 
@@ -346,7 +346,7 @@ const formatTime = (timestamp: number) => {
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #666;
+  color: var(--el-text-color-placeholder);
 
   .el-icon {
     font-size: 48px;

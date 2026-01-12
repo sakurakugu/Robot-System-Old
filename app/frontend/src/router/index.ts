@@ -5,6 +5,7 @@ import ProjectEditor from '../views/ProjectEditor.vue'
 import RobotManager from '../views/RobotManager.vue'
 import Help from '../views/Help.vue'
 import About from '../views/About.vue'
+import Settings from '../views/Settings.vue'
 import CodeEditor from '../components/CodeEditor.vue'
 
 const routes = [
@@ -12,6 +13,11 @@ const routes = [
     path: '/',
     name: 'ProjectList',
     component: ProjectList
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings
   },
   {
     path: '/project/:uuid',
@@ -26,6 +32,11 @@ const routes = [
         path: 'robots',
         name: 'RobotManager',
         component: RobotManager
+      },
+      {
+        path: 'settings',
+        name: 'ProjectSettings',
+        component: Settings
       },
       {
         path: 'help',

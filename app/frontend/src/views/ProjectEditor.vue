@@ -181,7 +181,7 @@ defineExpose({
 .project-editor {
   width: 100%;
   height: 100%;
-  background: #1e1e1e;
+  background: var(--el-bg-color-page);
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -7,8 +7,34 @@ import { initMainDatabase } from './database';
 import apiRoutes from './routes/api';
 import { WebSocketService } from './services/websocket';
 import { pythonExecutor } from './services/python-executor';
+import fs from 'fs';
+import path from 'path';
+import util from 'util';
 
 async function main() {
+  const logDir = path.join(__dirname, '../../..', 'logs');
+  const logFile = path.join(logDir, 'backend.log');
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+  } catch {}
+  const stream = fs.createWriteStream(logFile, { flags: 'a' });
+  const origLog = console.log;
+  const origErr = console.error;
+  const write = (level: 'INFO' | 'ERROR', args: any[]) => {
+    try {
+      const line = `[${new Date().toISOString()}] ${level} ${util.format.apply(null, args)}\n`;
+      stream.write(line);
+    } catch {}
+  };
+  console.log = (...args: any[]) => {
+    origLog(...args);
+    write('INFO', args);
+  };
+  console.error = (...args: any[]) => {
+    origErr(...args);
+    write('ERROR', args);
+  };
+
   console.log('启动机器人狗控制系统后端...');
   console.log(`数据目录: ${CONFIG.DATA_DIR}`);
   console.log(`项目目录: ${CONFIG.PROJECTS_DIR}`);

@@ -76,16 +76,13 @@
         <div class="toolbar-right">
           <el-button-group class="panel-toggles">
             <el-button :type="showLeftPanel ? 'primary' : ''" size="small" @click="showLeftPanel = !showLeftPanel">
-              <el-icon><Menu /></el-icon>
-              左侧栏
+              <el-icon><font-awesome-icon :icon="['far','square-caret-left']" /></el-icon>
             </el-button>
             <el-button :type="showBottomPanel ? 'primary' : ''" size="small" @click="showBottomPanel = !showBottomPanel">
-              <el-icon><Bottom /></el-icon>
-              底栏
+              <el-icon><font-awesome-icon :icon="['far','square-caret-down']" /></el-icon>
             </el-button>
             <el-button :type="showRightPanel ? 'primary' : ''" size="small" @click="showRightPanel = !showRightPanel">
-              <el-icon><Grid /></el-icon>
-              右侧栏
+              <el-icon><font-awesome-icon :icon="['far','square-caret-right']" /></el-icon>
             </el-button>
           </el-button-group>
           <el-button size="small" @click="exportProject">导出</el-button>
@@ -129,6 +126,15 @@
               title="动作列表"
             >
               <el-icon><VideoPlay /></el-icon>
+            </div>
+          </div>
+          <div class="activity-bottom">
+            <div 
+              class="activity-icon"
+              title="设置"
+              @click="openSettingsTab"
+            >
+              <el-icon><Setting /></el-icon>
             </div>
           </div>
         </div>
@@ -373,24 +379,24 @@ const activeTab = computed(() => {
   const projectUuid = route.params.uuid as string
   if (!projectUuid) return ''
   
+  // 优先根据当前路由匹配已有标签
+  const byFullPath = tabs.value.find(t => t.route === route.fullPath)
+  if (byFullPath) return byFullPath.id
+  const byPath = tabs.value.find(t => t.route === route.path)
+  if (byPath) return byPath.id
+
   if (route.name === 'RobotManager') {
     return `robots-${projectUuid}`
-  } else if (route.name === 'FileEditor') {
-    // 这里需要根据查询参数找到对应的标签ID
-    // 我们可以遍历 tabs 找到 route 匹配的 tab
+  }
+  if (route.name === 'ProjectSettings') {
+    return `settings-${projectUuid}`
+  }
+  if (route.name === 'FileEditor') {
+    // 文件编辑页需要通过完整路径定位标签
     const currentTab = tabs.value.find(t => t.route === route.fullPath)
-    if (currentTab) {
-      return currentTab.id
-    }
-    // 如果找不到精确匹配，尝试模糊匹配（因为 query 参数顺序可能不同）
+    if (currentTab) return currentTab.id
     const fileName = route.query.name
     if (fileName) {
-      // 注意：这里假设文件名是唯一的，或者我们需要更复杂的逻辑来匹配路径
-      // 由于我们之前用 file-${path} 作为 ID，但这里只拿到了文件名，所以可能需要改进
-      // 实际上，我们在创建 tab 时保存了 route，所以上面的精确匹配应该能工作
-      // 如果不行，可能需要重新设计 tab ID 的生成方式或者路由参数传递方式
-      
-      // 尝试从 tabs 中找到 label 匹配的
       const tab = tabs.value.find(t => t.label === fileName)
       return tab ? tab.id : ''
     }
@@ -610,7 +616,7 @@ watch(
     console.log('路由变化:', route.name, route.path, projectUuid)
     console.log('当前标签数量:', tabs.value.length)
     
-    if ((route.name === 'ProjectEditor' || route.name === 'RobotManager' || route.name === 'Help' || route.name === 'About') && projectUuid) {
+    if ((route.name === 'ProjectEditor' || route.name === 'RobotManager' || route.name === 'ProjectSettings' || route.name === 'Help' || route.name === 'About') && projectUuid) {
       // 检查 query 参数，如果包含 empty=true，则不自动创建标签
       if (route.query.empty === 'true') {
         return
@@ -664,6 +670,19 @@ watch(
           // 更新现有标签的名称
           console.log('更新机器人管理标签:', tabId)
           existingTab.label = `${currentProjectName.value} - 机器人管理`
+        }
+      } else if (route.name === 'ProjectSettings') {
+        const tabId = `settings-${projectUuid}`
+        const existingTab = tabs.value.find(tab => tab.id === tabId)
+        if (!existingTab) {
+          console.log('添加设置标签:', tabId)
+          tabs.value.push({
+            id: tabId,
+            label: '设置',
+            icon: markRaw(Setting),
+            route: `/project/${projectUuid}/settings`,
+            closable: true
+          })
         }
       } else if (route.name === 'Help') {
         const tabId = `help-${projectUuid}`
@@ -775,6 +794,16 @@ const addRobot = async () => {
 const goToRobotManager = () => {
   const projectUuid = route.params.uuid as string
   router.push(`/project/${projectUuid}/robots`)
+}
+
+// 打开项目设置页（标签方式）
+const openSettingsTab = () => {
+  const projectUuid = route.params.uuid as string
+  if (!projectUuid) return
+  router.push({
+    name: 'ProjectSettings',
+    params: { uuid: projectUuid }
+  })
 }
 
 // 日志相关
@@ -1206,14 +1235,14 @@ const handleFileClick = async (data: any) => {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: #1e1e1e;
+  background: var(--el-bg-color-page);
 }
 
 /* 顶部工具栏 */
 .toolbar {
   height: 38px !important;
-  background: #2d2d30;
-  border-bottom: 1px solid #3c3c3c;
+  background: var(--el-fill-color);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1250,7 +1279,7 @@ const handleFileClick = async (data: any) => {
 .menu-item {
   padding: 4px 12px;
   font-size: 13px;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
   cursor: pointer;
   border-radius: 3px;
   transition: background 0.2s;
@@ -1260,7 +1289,7 @@ const handleFileClick = async (data: any) => {
 }
 
 .menu-item:hover {
-  background: #505050;
+  background: var(--el-fill-color-light);
 }
 
 /* 下拉菜单样式 */
@@ -1280,59 +1309,59 @@ const handleFileClick = async (data: any) => {
 
 /* 运行下拉菜单深色主题 */
 .run-dropdown-popper {
-  background: #252526 !important;
-  border: 1px solid #3c3c3c !important;
+  background: var(--el-bg-color) !important;
+  border: 1px solid var(--el-border-color) !important;
   padding: 4px 0 !important;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5) !important;
 }
 
 .run-dropdown-popper .el-dropdown-menu {
-  background: #252526 !important;
-  border: 1px solid #3c3c3c !important;
+  background: var(--el-bg-color) !important;
+  border: 1px solid var(--el-border-color) !important;
   box-shadow: none !important;
 }
 
 .run-dropdown-popper .el-dropdown-menu__item {
-  color: #cccccc !important;
+  color: var(--el-text-color-primary) !important;
   font-size: 13px !important;
   padding: 8px 20px !important;
   transition: background 0.2s !important;
 }
 
 .run-dropdown-popper .el-dropdown-menu__item:hover {
-  background: #2a2d2e !important;
-  color: #ffffff !important;
+  background: var(--el-fill-color-light) !important;
+  color: var(--el-text-color-primary) !important;
 }
 
 .run-dropdown-popper .el-dropdown-menu__item.is-disabled {
-  color: #666666 !important;
+  color: var(--el-text-color-placeholder) !important;
   cursor: not-allowed !important;
 }
 
 .run-dropdown-popper .el-dropdown-menu__item.is-disabled:hover {
   background: transparent !important;
-  color: #666666 !important;
+  color: var(--el-text-color-placeholder) !important;
 }
 
 /* Popper箭头样式 */
 .run-dropdown-popper .el-popper__arrow::before {
-  background: #252526 !important;
-  border: 1px solid #3c3c3c !important;
+  background: var(--el-bg-color) !important;
+  border: 1px solid var(--el-border-color) !important;
 }
 
 /* 覆盖Element Plus的默认白色边框 */
 :global(.run-dropdown-popper) {
-  border-color: #3c3c3c !important;
+  border-color: var(--el-border-color) !important;
 }
 
 :global(.run-dropdown-popper .el-dropdown-menu) {
-  border-color: #3c3c3c !important;
+  border-color: var(--el-border-color) !important;
 }
 
 
 .project-title {
   font-size: 13px;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
   font-weight: 400;
 }
 
@@ -1357,8 +1386,8 @@ const handleFileClick = async (data: any) => {
 /* 左侧活动栏 */
 .activity-bar {
   width: 48px;
-  background: #333333;
-  border-right: 1px solid #2d2d30;
+  background: var(--el-fill-color);
+  border-right: 1px solid var(--el-border-color);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1373,6 +1402,13 @@ const handleFileClick = async (data: any) => {
   padding-top: 5px;
 }
 
+.activity-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 5px;
+}
+
 .activity-icon {
   width: 48px;
   height: 48px;
@@ -1380,7 +1416,7 @@ const handleFileClick = async (data: any) => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #858585;
+  color: var(--el-text-color-regular);
   font-size: 24px;
   transition: all 0.2s;
   position: relative;
@@ -1388,11 +1424,11 @@ const handleFileClick = async (data: any) => {
 }
 
 .activity-icon:hover {
-  color: #ffffff;
+  color: var(--el-text-color-primary);
 }
 
 .activity-icon.active {
-  color: #ffffff;
+  color: var(--el-text-color-primary);
   border-left-color: #007acc;
 }
 
@@ -1409,8 +1445,8 @@ const handleFileClick = async (data: any) => {
 /* VS Code 风格标签栏 */
 .tab-bar {
   height: 35px;
-  background: #252526;
-  border-bottom: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   overflow-x: auto;
@@ -1423,7 +1459,7 @@ const handleFileClick = async (data: any) => {
 }
 
 .tab-bar::-webkit-scrollbar-thumb {
-  background: #424242;
+  background: var(--el-border-color);
 }
 
 .tab-list {
@@ -1438,24 +1474,24 @@ const handleFileClick = async (data: any) => {
   gap: 8px;
   height: 100%;
   padding: 0 12px;
-  background: #2d2d30;
-  color: #969696;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-regular);
   cursor: pointer;
   user-select: none;
   transition: all 0.1s;
-  border-right: 1px solid #252526;
+  border-right: 1px solid var(--el-bg-color);
   position: relative;
   flex-shrink: 0;
 }
 
 .tab-item:hover {
-  background: #2a2d2e;
-  color: #cccccc;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-primary);
 }
 
 .tab-item.active {
-  background: #1e1e1e;
-  color: #ffffff;
+  background: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
   border-bottom: 2px solid #007acc;
 }
 
@@ -1505,8 +1541,8 @@ const handleFileClick = async (data: any) => {
 /* 侧边栏样式 */
 .left-panel,
 .right-panel {
-  background: #252526;
-  border-right: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1519,7 +1555,7 @@ const handleFileClick = async (data: any) => {
 
 .right-panel {
   border-right: none;
-  border-left: 1px solid #3c3c3c;
+  border-left: 1px solid var(--el-border-color);
   min-height: 0;
   overflow: hidden;
 }
@@ -1539,7 +1575,7 @@ const handleFileClick = async (data: any) => {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #3c3c3c;
+  background: var(--el-border-color);
   opacity: 0.4;
 }
 
@@ -1548,28 +1584,28 @@ const handleFileClick = async (data: any) => {
 }
 
 .left-resizer {
-  border-right: 1px solid #2d2d30;
+  border-right: 1px solid var(--el-border-color);
 }
 
 .right-resizer {
-  border-left: 1px solid #2d2d30;
+  border-left: 1px solid var(--el-border-color);
 }
 
 .panel-header {
   padding: 12px 15px;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-  background: #2d2d30;
+  background: var(--el-fill-color);
 }
 
 .panel-header h3 {
   font-size: 13px;
   font-weight: 500;
   margin: 0;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
   text-transform: uppercase;
 }
 
@@ -1629,13 +1665,13 @@ const handleFileClick = async (data: any) => {
 
 .node-icon {
   font-size: 16px;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
   flex-shrink: 0;
 }
 
 .node-label {
   font-size: 13px;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1643,7 +1679,7 @@ const handleFileClick = async (data: any) => {
 
 :deep(.el-tree) {
   background: transparent;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
 }
 
 :deep(.el-tree-node__content) {
@@ -1654,7 +1690,7 @@ const handleFileClick = async (data: any) => {
 }
 
 :deep(.el-tree-node__content:hover) {
-  background: #2a2d2e;
+  background: var(--el-fill-color-light);
 }
 
 :deep(.el-tree-node.is-current > .el-tree-node__content) {
@@ -1672,15 +1708,15 @@ const handleFileClick = async (data: any) => {
   gap: 10px;
   padding: 8px 12px;
   margin-bottom: 4px;
-  background: #2d2d30;
+  background: var(--el-fill-color);
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
 }
 
 .robot-item:hover {
-  background: #37373d;
+  background: var(--el-fill-color-light);
 }
 
 .robot-item.active {
@@ -1692,7 +1728,7 @@ const handleFileClick = async (data: any) => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #666;
+  background: var(--el-text-color-placeholder);
   flex-shrink: 0;
 }
 
@@ -1735,7 +1771,7 @@ const handleFileClick = async (data: any) => {
   flex: 1;
   overflow: hidden;
   padding: 0;
-  background: #1e1e1e;
+  background: var(--el-bg-color-page);
   min-height: 0;
 }
 
@@ -1745,8 +1781,8 @@ const handleFileClick = async (data: any) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1e1e1e;
-  color: #cccccc;
+  background: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
 }
 
 .empty-content {
@@ -1755,20 +1791,20 @@ const handleFileClick = async (data: any) => {
 
 .empty-icon {
   font-size: 64px;
-  color: #3c3c3c;
+  color: var(--el-border-color);
   margin-bottom: 20px;
 }
 
 .sub-text {
   font-size: 13px;
-  color: #666;
+  color: var(--el-text-color-placeholder);
   margin-top: 10px;
 }
 
 /* 底部面板 */
 .bottom-panel {
-  background: #252526;
-  border-top: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-top: 1px solid var(--el-border-color);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1789,7 +1825,7 @@ const handleFileClick = async (data: any) => {
   right: 0;
   top: 1px;
   height: 2px;
-  background: #3c3c3c;
+  background: var(--el-border-color);
   opacity: 0.4;
 }
 
@@ -1810,18 +1846,18 @@ const handleFileClick = async (data: any) => {
 }
 
 .logs-content::-webkit-scrollbar-thumb {
-  background: #424242;
+  background: var(--el-border-color);
   border-radius: 5px;
 }
 
 .log-item {
   padding: 2px 0;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
   line-height: 1.5;
 }
 
 .empty-logs {
-  color: #666;
+  color: var(--el-text-color-placeholder);
   text-align: center;
   margin-top: 20px;
 }
@@ -1837,12 +1873,12 @@ const handleFileClick = async (data: any) => {
 }
 
 .preview-placeholder {
-  background: #1e1e1e;
-  border: 2px dashed #3c3c3c;
+  background: var(--el-bg-color-page);
+  border: 2px dashed var(--el-border-color);
   border-radius: 8px;
   padding: 40px;
   text-align: center;
-  color: #666;
+  color: var(--el-text-color-placeholder);
 }
 
 /* 底部状态栏 */

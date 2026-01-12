@@ -319,14 +319,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  background: #252526;
-  border-bottom: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
 }
 
 .audio-name {
   flex: 1;
   font-size: 12px;
-  color: #d4d4d4;
+  color: var(--el-text-color-regular);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -346,9 +346,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: #666;
+  color: var(--el-text-color-placeholder);
   cursor: pointer;
-  border: 2px dashed #3c3c3c;
+  border: 2px dashed var(--el-border-color);
   border-radius: 4px;
   margin: 4px;
   transition: all 0.2s;
@@ -356,9 +356,9 @@ onUnmounted(() => {
 
 .upload-area:hover,
 .upload-area.drag-over {
-  background: rgba(78, 201, 176, 0.1);
-  border-color: #4ec9b0;
-  color: #4ec9b0;
+  background: color-mix(in oklab, var(--el-color-primary) 10%, transparent);
+  border-color: var(--el-color-primary);
+  color: var(--el-color-primary);
 }
 
 .upload-area p {
@@ -368,6 +368,6 @@ onUnmounted(() => {
 
 .upload-hint {
   font-size: 10px !important;
-  color: #555 !important;
+  color: var(--el-text-color-secondary) !important;
 }
 </style>

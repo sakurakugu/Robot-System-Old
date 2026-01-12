@@ -9,6 +9,7 @@ import { pythonExecutor } from '../services/python-executor';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { spawn } from 'child_process';
 
 const router = express.Router();
 
@@ -513,7 +514,86 @@ router.post('/projects/:projectUuid/robots/:robotUuid/test-connection', async (r
       return res.status(404).json({ success: false, error: 'Robot not found' });
     }
 
-    // 使用Python执行器测试连接
+    console.log('测试连接开始', req.params.projectUuid, req.params.robotUuid, robot.robot_ip);
+    const ip = robot.robot_ip;
+    const user = 'firefly';
+    const args = [
+      '-o', 'BatchMode=yes',
+      '-o', 'ConnectTimeout=3',
+      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'UserKnownHostsFile=/dev/null',
+      `${user}@${ip}`,
+      'exit'
+    ];
+
+    const result = await new Promise<{ success: boolean; message: string }>((resolve) => {
+      const proc = spawn('ssh', args);
+      let stderr = '';
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true, message: 'SSH 测试成功' });
+        } else if (stderr.includes('Permission denied')) {
+          resolve({ success: true, message: 'SSH 可达'}); // SSH 可达，但认证失败（算测试连接成功）
+        } else if (stderr.includes('Connection timed out')) {
+          resolve({ success: false, message: 'SSH 连接超时' });
+        } else {
+          resolve({ success: false, message: stderr || 'SSH 测试失败' });
+        }
+      });
+      proc.on('error', () => {
+        resolve({ success: false, message: '无法执行ssh命令' });
+      });
+    });
+
+    // 更新机器人状态
+    // const projectDb2 = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    // await projectDb2.open();
+    // await projectDb2.run(
+    //   'UPDATE robots SET status = ?, updated_at = ? WHERE uuid = ?',
+    //   [result.success ? 'online' : 'offline', new Date().toISOString(), req.params.robotUuid]
+    // );
+    // await projectDb2.close();
+
+    console.log('测试连接结果', req.params.projectUuid, req.params.robotUuid, result.success, result.message);
+    res.json({ 
+      success: result.success, 
+      connected: result.success,
+      message: result.message,
+      robot: robot
+    });
+  } catch (error: any) {
+    console.error('测试连接异常', req.params.projectUuid, req.params.robotUuid, error?.message || error);
+    res.status(500).json({ 
+      success: false, 
+      connected: false,
+      error: error.message 
+    });
+  }
+});
+
+// 通过 Python 连接
+router.post('/projects/:projectUuid/robots/:robotUuid/connect', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    const robot = await projectDb.get('SELECT * FROM robots WHERE uuid = ?', [req.params.robotUuid]);
+    await projectDb.close();
+
+    if (!robot) {
+      return res.status(404).json({ success: false, error: 'Robot not found' });
+    }
+
     const result = await pythonExecutor.testConnection({
       name: robot.name,
       robot_ip: robot.robot_ip,
@@ -521,7 +601,6 @@ router.post('/projects/:projectUuid/robots/:robotUuid/test-connection', async (r
       local_port: robot.local_port,
     });
 
-    // 更新机器人状态
     const projectDb2 = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
     await projectDb2.open();
     await projectDb2.run(
@@ -530,18 +609,64 @@ router.post('/projects/:projectUuid/robots/:robotUuid/test-connection', async (r
     );
     await projectDb2.close();
 
-    res.json({ 
-      success: result.success, 
+    // 成功后自动检测并修改配置
+    let autoMessage = '';
+    let mode: 'ap' | 'wifi' | undefined = undefined;
+    if (result.success) {
+      const auto = await pythonExecutor.autoConfigure({
+        name: robot.name,
+        robot_ip: robot.robot_ip,
+        local_ip: robot.local_ip,
+        local_port: robot.local_port,
+      });
+      autoMessage = auto.message;
+      mode = auto.mode;
+      // 可选：根据模式再写入一些标记到数据库
+    }
+
+    res.json({
+      success: result.success,
       connected: result.success,
-      message: result.message,
-      robot: robot
+      message: result.success ? (result.message + (autoMessage ? `；${autoMessage}` : '')) : result.message,
+      mode
     });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      connected: false,
-      error: error.message 
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 重启运控
+router.post('/projects/:projectUuid/robots/:robotUuid/restart-motion', async (req: Request, res: Response) => {
+  try {
+    const db = await getMainDatabase();
+    const project = await db.get<Project>(
+      'SELECT * FROM project_index WHERE uuid = ?',
+      [req.params.projectUuid]
+    );
+
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const projectDb = new ProjectDatabase(path.join(project.folder_path, 'project.db'));
+    await projectDb.open();
+    const robot = await projectDb.get('SELECT * FROM robots WHERE uuid = ?', [req.params.robotUuid]);
+    await projectDb.close();
+
+    if (!robot) {
+      return res.status(404).json({ success: false, error: 'Robot not found' });
+    }
+
+    const result = await pythonExecutor.restartMotionControl({
+      name: robot.name,
+      robot_ip: robot.robot_ip,
+      local_ip: robot.local_ip,
+      local_port: robot.local_port,
     });
+
+    res.json({ success: result.success, message: result.message });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

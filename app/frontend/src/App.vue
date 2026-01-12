@@ -1,10 +1,12 @@
 <template>
   <div id="app">
+    <DevTopFab />
     <router-view />
   </div>
 </template>
 
 <script setup lang="ts">
+import DevTopFab from './components/DevTopFab.vue'
 </script>
 
 <style>
@@ -19,5 +21,7 @@ html, body, #app {
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
 }
 </style>

@@ -685,8 +685,14 @@ const applyHistoryForward = (record: HistoryRecord) => {
   emit('update:tracks', tracks.value)
 }
 
-// 键盘事件处理
 const handleKeyDown = (e: KeyboardEvent) => {
+  const target = e.target as HTMLElement | null
+  if (target) {
+    const editable = target.closest('input, textarea, [contenteditable], select')
+    if (editable) {
+      return
+    }
+  }
   // Ctrl+Z 撤销
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
     e.preventDefault()
@@ -1383,15 +1389,15 @@ defineExpose({
   width: 100%;
   height: 100%;
   display: flex;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--el-bg-color-page);
+  color: var(--el-text-color-regular);
 }
 
 .history-sidebar {
   width: 100%;
   height: 100%;
   border-right: none;
-  background: #1e1e1e;
+  background: var(--el-bg-color-page);
   display: flex;
   flex-direction: column;
 }
@@ -1405,8 +1411,8 @@ defineExpose({
 
 .timeline-toolbar {
   height: 45px;
-  background: #2d2d30;
-  border-bottom: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1424,18 +1430,18 @@ defineExpose({
 }
 
 .separator {
-  color: #555;
+  color: var(--el-text-color-secondary);
   margin: 0 5px;
 }
 
 .zoom-level {
   font-size: 12px;
-  color: #888;
+  color: var(--el-text-color-secondary);
 }
 
 .time-duration {
   font-size: 12px;
-  color: #888;
+  color: var(--el-text-color-secondary);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1443,7 +1449,7 @@ defineExpose({
 
 .time-display {
   font-size: 13px;
-  color: #cccccc;
+  color: var(--el-text-color-regular);
   font-family: monospace;
   padding: 0 10px;
   display: flex;
@@ -1458,7 +1464,7 @@ defineExpose({
 }
 
 .time-editable:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--el-fill-color-light);
 }
 
 .timeline-content {
@@ -1471,15 +1477,15 @@ defineExpose({
 
 .timeline-ruler {
   height: 40px;
-  background: #252526;
-  border-bottom: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   flex-shrink: 0;
 }
 
 .ruler-track-label {
   width: 200px;
-  border-right: 1px solid #3c3c3c;
+  border-right: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1508,13 +1514,13 @@ defineExpose({
 .tick-line {
   width: 1px;
   height: 8px;
-  background: #555;
+  background: var(--el-text-color-placeholder);
   margin-top: 32px;
 }
 
 .ruler-tick.major .tick-line {
   height: 14px;
-  background: #888;
+  background: var(--el-text-color-secondary);
   margin-top: 26px;
 }
 
@@ -1523,7 +1529,7 @@ defineExpose({
   top: 5px;
   left: 5px;
   font-size: 11px;
-  color: #888;
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
   user-select: none;
 }
@@ -1580,13 +1586,13 @@ defineExpose({
 
 .track-row {
   display: flex;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--el-border-color);
 }
 
 .track-label {
   width: 200px;
-  background: #252526;
-  border-right: 1px solid #3c3c3c;
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -1626,7 +1632,7 @@ defineExpose({
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: #333;
+  background: var(--el-fill-color);
   display: inline-block;
   flex-shrink: 0;
 }
@@ -1656,13 +1662,13 @@ defineExpose({
   flex-shrink: 0;
   cursor: pointer;
   transition: all 0.2s;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--el-border-color);
+  background: var(--el-fill-color-light);
 }
 
 .robot-binding:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--el-fill-color);
+  border-color: var(--el-border-color);
 }
 
 .binding-text {
@@ -1674,7 +1680,7 @@ defineExpose({
 .track-content {
   position: relative;
   flex: 1;
-  background: #1e1e1e;
+  background: var(--el-bg-color-page);
 }
 
 .grid-lines {
@@ -1691,13 +1697,13 @@ defineExpose({
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #2a2a2a;
+  background: var(--el-border-color);
 }
 
 .empty-state {
   padding: 60px;
   text-align: center;
-  color: #666;
+  color: var(--el-text-color-placeholder);
 }
 
 .empty-state p {
@@ -1707,7 +1713,7 @@ defineExpose({
 
 .robot-selector-header {
   margin-bottom: 15px;
-  color: #ccc;
+  color: var(--el-text-color-regular);
   font-size: 14px;
 }
 
@@ -1721,8 +1727,8 @@ defineExpose({
 }
 
 .robot-select-card {
-  border: 1px solid #3c3c3c;
-  background: #252526;
+  border: 1px solid var(--el-border-color);
+  background: var(--el-bg-color);
   border-radius: 8px;
   padding: 15px;
   cursor: pointer;
@@ -1736,26 +1742,26 @@ defineExpose({
 }
 
 .robot-select-card:hover {
-  border-color: #555;
-  background: #2d2d30;
+  border-color: var(--el-border-color);
+  background: var(--el-fill-color);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .robot-select-card.active {
-  border-color: #0e639c;
-  background: rgba(14, 99, 156, 0.2);
-  box-shadow: 0 0 0 1px #0e639c inset;
+  border-color: var(--el-color-primary);
+  background: color-mix(in oklab, var(--el-color-primary) 20%, transparent);
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
 }
 
 .card-icon {
   font-size: 28px;
-  color: #888;
+  color: var(--el-text-color-secondary);
   margin-bottom: 5px;
 }
 
 .robot-select-card.active .card-icon {
-  color: #fff;
+  color: var(--el-text-color-primary);
 }
 
 .robot-icon {
@@ -1791,7 +1797,7 @@ defineExpose({
 .card-name {
   font-weight: 600;
   font-size: 14px;
-  color: #ccc;
+  color: var(--el-text-color-regular);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1800,22 +1806,22 @@ defineExpose({
 
 .card-ip {
   font-size: 11px;
-  color: #888;
+  color: var(--el-text-color-secondary);
   font-family: monospace;
 }
 
 .card-desc {
   font-size: 12px;
-  color: #666;
+  color: var(--el-text-color-placeholder);
 }
 
 .selection-mark {
   position: absolute;
   top: 5px;
   left: 5px;
-  color: #0e639c;
+  color: var(--el-color-primary);
   font-size: 16px;
-  background: rgba(30, 30, 30, 0.8);
+  background: var(--el-bg-color-page);
   border-radius: 50%;
   padding: 2px;
 }

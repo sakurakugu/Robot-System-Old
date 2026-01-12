@@ -20,7 +20,7 @@ class RobotDog:
 
         Returns:
             int: 控制模式值
-                - 0: 阻尼模式，设备未使能
+                - 0: 阻尼模式，设备未开启
                 - 1: 站立状态/打招呼状态
                 - 10: 设备趴下时触发电机自由状态
                 - 18: 移动状态
@@ -49,9 +49,9 @@ class RobotDog:
         """姿态控制（不传任何参数既是复位）
 
         Args:
-            roll_rate (float): 绕 X 轴角速度（rad/s），∈ (-0.6, 0.6)
+            roll_rate (float) : 绕 X 轴角速度（rad/s），∈ (-0.6, 0.6)
             pitch_rate (float): 绕 Y 轴角速度（rad/s），∈ (-0.6, 0.6)
-            yaw_rate (float): 绕 Z 轴角速度（rad/s），∈ (-0.6, 0.6)
+            yaw_rate (float)  : 绕 Z 轴角速度（rad/s），∈ (-0.6, 0.6)
             height_vel (float): 垂直高度速度（m/s），∈ (-0.5, 0.5)
 
         Notes:

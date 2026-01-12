@@ -200,7 +200,7 @@ const onTrackClick = (e: MouseEvent) => {
   width: 12px;
   height: 12px;
   background: #ce9178;
-  border: 2px solid #1e1e1e;
+  border: 2px solid var(--el-bg-color-page);
   border-radius: 50%;
   cursor: move;
   transition: all 0.2s;
@@ -217,8 +217,8 @@ const onTrackClick = (e: MouseEvent) => {
   top: -25px;
   left: 50%;
   transform: translateX(-50%);
-  background: #252526;
-  color: #d4d4d4;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-regular);
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 10px;
@@ -226,7 +226,7 @@ const onTrackClick = (e: MouseEvent) => {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--el-border-color);
 }
 
 .keyframe:hover .keyframe-tooltip {
@@ -239,7 +239,7 @@ const onTrackClick = (e: MouseEvent) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: var(--el-text-color-placeholder);
   font-size: 12px;
   border: 1px dashed #3c3c3c;
   border-radius: 4px;

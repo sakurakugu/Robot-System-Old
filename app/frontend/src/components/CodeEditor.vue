@@ -15,7 +15,6 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Document } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   fileName: string
@@ -34,8 +33,8 @@ watch(() => props.initialContent, (newContent) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #1e1e1e;
-  color: #d4d4d4;
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
 }
 
 .editor-content {
@@ -52,8 +51,8 @@ watch(() => props.initialContent, (newContent) => {
 
 :deep(.el-textarea__inner) {
   height: 100%;
-  background-color: #1e1e1e;
-  color: #d4d4d4;
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
   border: none;
   border-radius: 0;
   padding: 10px 20px;

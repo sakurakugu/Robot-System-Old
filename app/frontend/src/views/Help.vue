@@ -11,7 +11,7 @@
 <style scoped>
 .help-page {
   padding: 20px;
-  color: #cccccc;
+  color: var(--el-text-color-primary);
 }
 
 .content {

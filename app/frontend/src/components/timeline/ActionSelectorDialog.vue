@@ -340,24 +340,24 @@ const handleConfirm = () => {
   flex-direction: column;
   align-items: center;
   padding: 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--el-border-color);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
-  background: #fafafa;
+  background: var(--el-bg-color);
 }
 
 .action-card:hover {
-  border-color: #409eff;
-  background: #f0f7ff;
+  border-color: var(--el-color-primary);
+  background: var(--el-fill-color-light);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .action-card.selected {
-  border-color: #409eff;
-  background: #ecf5ff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+  border-color: var(--el-color-primary);
+  background: var(--el-fill-color);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--el-color-primary) 20%, transparent);
 }
 
 .action-icon {
@@ -373,13 +373,13 @@ const handleConfirm = () => {
 .action-name {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin-bottom: 4px;
 }
 
 .action-desc {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .action-params {
@@ -388,12 +388,12 @@ const handleConfirm = () => {
 
 .param-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-top: 4px;
 }
 
 :deep(.el-tabs--border-card) {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color);
   box-shadow: none;
 }
 

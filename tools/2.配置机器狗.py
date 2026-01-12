@@ -9,6 +9,7 @@ import sys
 import time
 import re
 import socket
+import argparse
 from typing import Optional, Tuple
 
 def 确保存在包(package_name, import_name=None):
@@ -60,6 +61,7 @@ class RobotConfigurator:
         self.password = password
         self.target_port = target_port
         self.client: Optional[paramiko.SSHClient] = None
+        self.auto_confirm = False  # 是否自动确认（用于命令行模式）
     
     def 获取用户输入的IP(self, prompt_prefix: str = "本机", show_network_info: bool = True) -> Optional[str]:
         """获取用户输入的IP地址，支持自动检测和查看网络信息
@@ -347,7 +349,11 @@ class RobotConfigurator:
         print("\n⚠️  准备重启运控...")
         print("⚠️  请确保机器狗已经卧倒，否则会急停！")
         
-        response = input("确认机器狗已卧倒？(Yes/no): ").strip().lower() or "yes"
+        if self.auto_confirm:
+            print("自动确认模式：假定机器狗已卧倒")
+            response = "yes"
+        else:
+            response = input("确认机器狗已卧倒？(Yes/no): ").strip().lower() or "yes"
             
         if response != "yes":
             print("取消重启运控")
@@ -398,6 +404,75 @@ class RobotConfigurator:
         
         # 修改 SDK 配置
         if not self.修改SDK配置(local_ip, self.target_port):
+            return False
+        
+        # 重启运控
+        return self.重启运动控制()
+    
+    def 配置AP直连模式_自动(self, local_ip: str) -> bool:
+        """配置 AP 直连模式（命令行自动模式）"""
+        print("\n" + "="*50)
+        print("AP 直连模式配置（自动）")
+        print("="*50)
+        print(f"本机 IP: {local_ip}")
+        
+        # 修改 SDK 配置
+        if not self.修改SDK配置(local_ip):
+            return False
+        
+        # 修改运控脚本（AP 模式不需要 SDK_CLIENT_IP）
+        if not self.修改运控启动脚本(None):
+            return False
+        
+        # 重启运控
+        return self.重启运动控制()
+    
+    def 仅修改SDK配置并重启_自动(self, local_ip: str) -> bool:
+        """仅修改 SDK 配置并重启运控（命令行自动模式）"""
+        print("\n" + "="*50)
+        print("修改 SDK 配置并重启运控（自动）")
+        print("="*50)
+        print(f"本机 IP: {local_ip}")
+        
+        # 修改 SDK 配置
+        if not self.修改SDK配置(local_ip, self.target_port):
+            return False
+        
+        # 重启运控
+        return self.重启运动控制()
+    
+    def 配置WIFI局域网模式_自动(self, ssid: str, password: str, local_ip: str) -> bool:
+        """配置 WIFI 局域网模式（命令行自动模式）"""
+        print("\n" + "="*50)
+        print("WIFI 局域网模式配置（自动）")
+        print("="*50)
+        print(f"WIFI 名称: {ssid}")
+        print(f"本机 IP: {local_ip}")
+        
+        # 连接 WIFI
+        if not self.连接Wifi(ssid, password):
+            return False
+        
+        # 获取机器狗在 WIFI 网络中的 IP 和 MAC 地址
+        robot_ip, robot_mac = self.get_robot_wifi_ip()
+        if not robot_ip:
+            print("\n✗ 未能自动获取机器狗 WIFI IP")
+            if robot_mac:
+                print(f"提示: 可以在路由器中通过 MAC 地址 {robot_mac} 查找对应的 IP")
+            return False
+        
+        print(f"\n重要信息：")
+        print(f"机器狗 WIFI IP: {robot_ip}")
+        if robot_mac:
+            print(f"机器狗 MAC 地址: {robot_mac}")
+        print(f"后续请使用此 IP 通过 SSH 连接机器狗")
+        
+        # 修改 SDK 配置
+        if not self.修改SDK配置(local_ip):
+            return False
+        
+        # 修改运控脚本（WIFI 模式需要设置 SDK_CLIENT_IP）
+        if not self.修改运控启动脚本(robot_ip):
             return False
         
         # 重启运控
@@ -472,77 +547,233 @@ class RobotConfigurator:
         return self.重启运动控制()
 
 
+def parse_arguments():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(
+        description='机器狗自动配置脚本 - 支持 AP 直连模式和 WIFI 局域网模式的自动配置',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+使用示例:
+  # 交互式配置（默认模式）
+  python 配置机器狗.py
+  
+  # AP 直连模式 - 自动配置
+  python 配置机器狗.py --mode ap --local_ip 192.168.234.100 --port 10001
+  
+  # WIFI 局域网模式 - 自动配置
+  python 配置机器狗.py --mode wifi --wifi_name MyWiFi --wifi_password 12345678 \\
+      --local_ip 192.168.1.100 --port 10001
+  
+  # 仅修改 SDK 配置并重启
+  python 配置机器狗.py --mode sdk --local_ip 192.168.1.100 --port 10001 \\
+      --robot_ip 192.168.1.50
+  
+  # 指定机器狗 IP（用于 WIFI 模式）
+  python 配置机器狗.py --mode wifi --robot_ip 192.168.1.50 \\
+      --wifi_name MyWiFi --wifi_password 12345678
+
+配置模式说明:
+  ap   - AP 直连模式（机器狗作为热点）
+  wifi - WIFI 局域网模式（机器狗连接到 WIFI）
+  sdk  - 仅修改 SDK 配置并重启运控
+        '''
+    )
+    
+    # 基本参数
+    parser.add_argument('--mode', 
+                       choices=['ap', 'wifi', 'sdk'],
+                       help='配置模式: ap=AP直连, wifi=WIFI局域网, sdk=仅修改SDK配置')
+    
+    parser.add_argument('--robot_ip',
+                       help='机器狗 IP 地址 (默认: 192.168.234.1)')
+    
+    parser.add_argument('--local_ip',
+                       help='本机 IP 地址（用于 SDK 配置）')
+    
+    parser.add_argument('--port',
+                       type=int,
+                       help='机器狗端口号（1-65535）')
+    
+    # WIFI 模式参数
+    parser.add_argument('--wifi_name',
+                       help='WIFI 名称（WIFI 模式必需）')
+    
+    parser.add_argument('--wifi_password',
+                       help='WIFI 密码（WIFI 模式必需）')
+    
+    # 认证参数
+    parser.add_argument('--username',
+                       default='firefly',
+                       help='SSH 用户名 (默认: firefly)')
+    
+    parser.add_argument('--password',
+                       default='firefly',
+                       help='SSH 密码 (默认: firefly)')
+    
+    # 交互模式控制
+    parser.add_argument('--no-confirm',
+                       action='store_true',
+                       help='跳过重启运控的确认提示（自动确认）')
+    
+    return parser.parse_args()
+
+
+def validate_arguments(args):
+    """验证命令行参数的有效性"""
+    errors = []
+    
+    # 如果指定了模式，则需要某些必需参数
+    if args.mode:
+        if args.mode in ['ap', 'sdk']:
+            if not args.local_ip:
+                errors.append("--local_ip 是必需参数")
+            if not args.port:
+                errors.append("--port 是必需参数")
+        
+        if args.mode == 'wifi':
+            if not args.wifi_name:
+                errors.append("WIFI 模式需要 --wifi_name 参数")
+            if not args.wifi_password:
+                errors.append("WIFI 模式需要 --wifi_password 参数")
+            if not args.local_ip:
+                errors.append("WIFI 模式需要 --local_ip 参数")
+            if not args.port:
+                errors.append("--port 是必需参数")
+    
+    # 验证 IP 地址格式
+    ip_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+    if args.local_ip and not ip_pattern.match(args.local_ip):
+        errors.append(f"--local_ip 格式无效: {args.local_ip}")
+    if args.robot_ip and not ip_pattern.match(args.robot_ip):
+        errors.append(f"--robot_ip 格式无效: {args.robot_ip}")
+    
+    # 验证端口号
+    if args.port:
+        if args.port < 1 or args.port > 65535:
+            errors.append(f"--port 必须在 1-65535 之间: {args.port}")
+    
+    if errors:
+        print("✗ 参数验证失败:")
+        for error in errors:
+            print(f"  - {error}")
+        print("\n使用 --help 查看使用说明")
+        sys.exit(1)
+
+
 def main():
     """主函数"""
+    # 解析命令行参数
+    args = parse_arguments()
+    
+    # 如果提供了命令行参数，验证其有效性
+    if args.mode:
+        validate_arguments(args)
+    
     print("="*50)
     print("机器狗自动配置脚本")
     print("="*50)
     
     try:
-        while True:
-            print("\n" + "-"*25)
-            print("请选择配置模式:")
-            print("1. AP 直连模式")
-            print("2. WIFI 局域网模式")
-            print("3. 仅修改 SDK 配置并重启运控")
-            
-            choice = input("\n请输入选项 (1/2/3): ").strip()
-            
-            if choice == "1":
-                host = "192.168.234.1"
-                break
-            elif choice == "2":
-                print("\n注意: 需要先通过 AP 直连模式连接机器狗来配置 WIFI")
-                host = input("请输入机器狗 IP (默认: 192.168.234.1): ").strip() or "192.168.234.1"
-                break
-            elif choice == "3":
-                host = input("请输入机器狗 IP (默认: 192.168.234.1): ").strip() or "192.168.234.1"
-                break
-            else:
-                print("✗ 无效的选项，请重新输入")
-    
-        # 连接信息
-        # username = input("请输入用户名 (默认: firefly): ").strip() or "firefly"
-        # password = input("请输入密码 (默认: firefly): ").strip() or "firefly"
-        username="firefly"
-        password="firefly"
-        
-        # 输入并验证端口号
-        while True:
-            target_port_str = input("请输入机器狗编号（填入端口号）: ").strip()
-            if not target_port_str:
-                print("✗ 端口号不能为空")
-                continue
-            try:
-                target_port = int(target_port_str)
-                if 1 <= target_port <= 55535:
-                    target_port += 10000
+        # 确定配置模式
+        if args.mode:
+            choice = {'ap': '1', 'wifi': '2', 'sdk': '3'}[args.mode]
+            host = args.robot_ip or "192.168.234.1"
+            print(f"\n命令行模式: {args.mode.upper()}")
+            print(f"机器狗 IP: {host}")
+        else:
+            # 交互式模式
+            while True:
+                print("\n" + "-"*25)
+                print("请选择配置模式:")
+                print("1. AP 直连模式")
+                print("2. WIFI 局域网模式")
+                print("3. 仅修改 SDK 配置并重启运控")
+                
+                choice = input("\n请输入选项 (1/2/3): ").strip()
+                
+                if choice == "1":
+                    host = "192.168.234.1"
                     break
-                elif target_port > 55535 and target_port <= 65535:
+                elif choice == "2":
+                    print("\n注意: 需要先通过 AP 直连模式连接机器狗来配置 WIFI")
+                    host = input("请输入机器狗 IP (默认: 192.168.234.1): ").strip() or "192.168.234.1"
+                    break
+                elif choice == "3":
+                    host = input("请输入机器狗 IP (默认: 192.168.234.1): ").strip() or "192.168.234.1"
                     break
                 else:
-                    print("✗ 端口号必须在 1-65535 之间")
-            except ValueError:
-                print("✗ 请输入有效的数字")
+                    print("✗ 无效的选项，请重新输入")
+        
+        # 获取用户名和密码
+        username = args.username
+        password = args.password
+        
+        # 获取端口号
+        if args.port:
+            target_port = args.port
+            # 自动转换端口号（1-55535 加 10000）
+            if 1 <= target_port <= 55535:
+                target_port += 10000
+            print(f"端口号: {target_port}")
+        else:
+            # 交互式输入端口号
+            while True:
+                target_port_str = input("请输入机器狗编号（填入端口号）: ").strip()
+                if not target_port_str:
+                    print("✗ 端口号不能为空")
+                    continue
+                try:
+                    target_port = int(target_port_str)
+                    if 1 <= target_port <= 55535:
+                        target_port += 10000
+                        break
+                    elif target_port > 55535 and target_port <= 65535:
+                        break
+                    else:
+                        print("✗ 端口号必须在 1-65535 之间")
+                except ValueError:
+                    print("✗ 请输入有效的数字")
         
         # 创建配置器
         configurator = RobotConfigurator(target_port, host, username, password)
+        
+        # 如果使用命令行模式，设置跳过确认
+        if args.mode and args.no_confirm:
+            configurator.auto_confirm = True
         
         # 连接机器狗
         if not configurator.连接():
             print("\n✗ 无法连接到机器狗，请检查:")
             print("  1. 是否已连接到机器狗的 WIFI")
             print("  2. IP 地址是否正确")
-            # print("  3. 用户名和密码是否正确")
             return
         
         # 执行配置
         if choice == "1":
-            success = configurator.配置AP直连模式()
+            if args.mode and args.local_ip:
+                # 命令行模式 - AP 直连
+                success = configurator.配置AP直连模式_自动(args.local_ip)
+            else:
+                # 交互式模式
+                success = configurator.配置AP直连模式()
         elif choice == "2":
-            success = configurator.配置WIFI局域网模式()
+            if args.mode and args.wifi_name and args.wifi_password and args.local_ip:
+                # 命令行模式 - WIFI 局域网
+                success = configurator.配置WIFI局域网模式_自动(
+                    args.wifi_name, 
+                    args.wifi_password, 
+                    args.local_ip
+                )
+            else:
+                # 交互式模式
+                success = configurator.配置WIFI局域网模式()
         else:  # choice == "3"
-            success = configurator.仅修改SDK配置并重启()
+            if args.mode and args.local_ip:
+                # 命令行模式 - 仅修改 SDK
+                success = configurator.仅修改SDK配置并重启_自动(args.local_ip)
+            else:
+                # 交互式模式
+                success = configurator.仅修改SDK配置并重启()
         
         if success:
             print("\n" + "="*50)
@@ -557,8 +788,11 @@ def main():
         print("\n\n用户中断操作")
     except Exception as e:
         print(f"\n✗ 发生错误: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        configurator.断开连接()
+        if 'configurator' in locals():
+            configurator.断开连接()
 
 
 if __name__ == "__main__":

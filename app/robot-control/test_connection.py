@@ -8,14 +8,13 @@
 from lib.api import CrazyRobotDog
 import sys
 
-def test_robot_connection(name, robot_ip, local_ip, local_port):
+def test_robot_connection(name, robot_ip, local_port):
     """
     测试单个机器人连接
     
     Args:
         name: 机器人名称
         robot_ip: 机器人IP地址
-        local_ip: 本地IP地址
         local_port: 本地端口
         
     Returns:
@@ -24,13 +23,11 @@ def test_robot_connection(name, robot_ip, local_ip, local_port):
     try:
         print(f"正在测试机器人: {name}")
         print(f"  机器人IP: {robot_ip}")
-        print(f"  本地IP: {local_ip}")
         print(f"  本地端口: {local_port}")
         
         dog = CrazyRobotDog(
             name=name,
             robot_ip=robot_ip,
-            local_ip=local_ip,
             local_port=local_port
         )
         
@@ -47,13 +44,11 @@ if __name__ == "__main__":
         {
             "name": "131",
             "robot_ip": "192.168.1.110",
-            "local_ip": "192.168.1.105",
             "local_port": 10131
         },
         {
             "name": "47",
             "robot_ip": "192.168.1.116",
-            "local_ip": "192.168.1.105",
             "local_port": 10047
         }
     ]

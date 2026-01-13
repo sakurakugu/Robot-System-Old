@@ -77,16 +77,16 @@ install_project_dependencies() {
     print_info "安装项目依赖..."
     
     # 安装Node.js依赖
-    if [ -f "$SCRIPT_DIR/app/backend/package.json" ]; then
+    if [ -f "$SCRIPT_DIR/app/dance-choreo/backend/package.json" ]; then
         print_info "安装后端依赖..."
-        cd "$SCRIPT_DIR/app/backend"
+        cd "$SCRIPT_DIR/app/dance-choreo/backend"
         npm install
         print_success "后端依赖安装完成"
     fi
     
-    if [ -f "$SCRIPT_DIR/app/frontend-choreo/package.json" ]; then
+    if [ -f "$SCRIPT_DIR/app/dance-choreo/frontend/package.json" ]; then
         print_info "安装前端依赖..."
-        cd "$SCRIPT_DIR/app/frontend-choreo"
+        cd "$SCRIPT_DIR/app/dance-choreo/frontend"
         npm install
         print_success "前端依赖安装完成"
     fi

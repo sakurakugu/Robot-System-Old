@@ -13,7 +13,7 @@ import { pythonExecutor } from './services/python-executor';
 import { WebSocketService } from './services/websocket';
 
 async function main() {
-  const logDir = path.join(__dirname, '../../..', 'logs');
+  const logDir = path.join(__dirname, '../../../..', 'logs', 'dance-choreo');
   const logFile = path.join(logDir, 'backend.log');
   try {
     fs.mkdirSync(logDir, { recursive: true });

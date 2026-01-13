@@ -1,5 +1,5 @@
 {
-  "name": "robot-dog-backend",
+  "name": "dance-choreo-backend",
   "version": "0.1.0",
   "description": "Robot Dog Control System Backend",
   "main": "dist/index.js",

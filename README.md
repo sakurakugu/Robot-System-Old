@@ -40,13 +40,13 @@ chmod +x start.sh
 ./stop.sh
 
 # 查看后端日志
-tail -f logs/backend.log
+tail -f logs/dance-choreo/backend.log
 
 # 查看前端日志
 tail -f logs/frontend.log
 
 # 重新初始化数据库
-cd app/backend
+cd app/dance-choreo/backend
 npm run init-db
 
 # 运行示例程序
@@ -58,7 +58,7 @@ python3 dance_1dog.py
 删除主数据库后重新初始化：
 ```bash
 rm ~/.local/share/RobotDogControl/main.db
-cd app/backend
+cd app/dance-choreo/backend
 npm run init-db
 ```
 

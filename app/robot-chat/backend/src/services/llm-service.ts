@@ -1,0 +1,105 @@
+import axios from 'axios';
+import config from '../config';
+import { LLMOptions, LLMResponse, Message } from '../types';
+
+class LLMService {
+  private provider: string;
+
+  constructor() {
+    this.provider = config.llm.provider;
+  }
+
+  /**
+   * 调用LLM进行对话
+   */
+  async chat(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+    switch (this.provider) {
+      case 'openai':
+        return this.chatOpenAI(messages, options);
+      default:
+        throw new Error(`不支持的LLM提供商: ${this.provider}`);
+    }
+  }
+
+  /**
+   * OpenAI API调用
+   */
+  private async chatOpenAI(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+    const { openai } = config.llm;
+    if (!openai?.apiKey) {
+      throw new Error('OpenAI API密钥未配置');
+    }
+
+    const baseUrl = openai.baseUrl || 'https://api.openai.com/v1';
+    const url = `${baseUrl}/chat/completions`;
+
+    try {
+      const response = await axios.post(
+        url,
+        {
+          model: options?.model || openai.model || 'gpt-4',
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+          temperature: options?.temperature || 0.7,
+          max_tokens: options?.maxTokens || 1000,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openai.apiKey}`,
+          },
+          timeout: 30000,
+        }
+      );
+
+      const choice = response.data.choices[0];
+      return {
+        content: choice.message.content,
+        finishReason: choice.finish_reason,
+        usage: {
+          promptTokens: response.data.usage.prompt_tokens,
+          completionTokens: response.data.usage.completion_tokens,
+          totalTokens: response.data.usage.total_tokens,
+        },
+      };
+    } catch (error: any) {
+      console.error('OpenAI API调用失败:', error.response?.data || error.message);
+      throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  /**
+   * 构建系统提示词
+   */
+  getSystemPrompt(): string {
+    return `你是一只可爱的机器狗AI助手。你可以：
+1. 与用户进行自然对话
+2. 执行一些基本动作来配合对话
+
+可用动作列表：
+- stand_up: 站起来
+- sit_down: 坐下
+- turn_left/turn_right: 转向
+- shake_hand: 握手
+- wave: 挥手
+- nod: 点头
+- dance: 跳舞
+- walk_forward(steps): 前进，最多3步
+- walk_backward(steps): 后退，最多3步
+
+当用户要求你做动作时，请在回复中使用[ACTION:动作名称(参数)]格式，例如：
+- 用户："坐下" -> 回复："好的主人[ACTION:sit_down()]"
+- 用户："向前走两步" -> 回复："好的，我来走两步[ACTION:walk_forward(steps=2)]"
+- 用户："转个圈" -> 回复："好的，我来转一圈[ACTION:turn_left(angle=360)]"
+
+注意事项：
+1. 保持友好、可爱的语气
+2. 动作要安全，不要让我走太多步
+3. 如果用户要求危险动作，要委婉拒绝
+4. 一次回复中可以包含多个动作标记`;
+  }
+}
+
+export default LLMService;

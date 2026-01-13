@@ -36,10 +36,10 @@ async function init() {
   // 测试查询
   const db = await getMainDatabase();
   const users = await db.all('SELECT * FROM users');
-  console.log('用户:', users);
+  // console.log('用户:', users);
 
   const projects = await db.all('SELECT * FROM project_index');
-  console.log('工程:', projects);
+  // console.log('工程:', projects);
 
   console.log('\n数据库初始化完成！');
 }

@@ -155,12 +155,14 @@ set_permissions() {
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     
     chmod +x "$SCRIPT_DIR/start.sh"
-    chmod +x "$SCRIPT_DIR/stop.sh"
-    chmod +x "$SCRIPT_DIR/test.sh"
-    chmod +x "$SCRIPT_DIR/setup.sh"
     
     if [ -d "$SCRIPT_DIR/scripts" ]; then
         chmod +x "$SCRIPT_DIR/scripts"/*.sh 2>/dev/null || true
+    fi
+
+    if [ -d "$SCRIPT_DIR/tools" ]; then
+        chmod +x "$SCRIPT_DIR/tools"/*.sh 2>/dev/null || true
+        chmod +x "$SCRIPT_DIR/tools"/*.py 2>/dev/null || true
     fi
     
     print_success "权限设置完成"

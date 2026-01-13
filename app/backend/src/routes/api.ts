@@ -594,11 +594,9 @@ router.post('/projects/:projectUuid/robots/:robotUuid/connect', async (req: Requ
       return res.status(404).json({ success: false, error: 'Robot not found' });
     }
 
-    const result = await pythonExecutor.testConnection({
+    const result = await pythonExecutor.testSshConnection({
       name: robot.name,
       robot_ip: robot.robot_ip,
-      local_ip: robot.local_ip,
-      local_port: robot.local_port,
     });
 
     const projectDb2 = new ProjectDatabase(path.join(project.folder_path, 'project.db'));

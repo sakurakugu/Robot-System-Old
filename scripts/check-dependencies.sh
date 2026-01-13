@@ -228,7 +228,7 @@ check_project_deps() {
     
     # Node.js项目依赖
     check_npm_packages "$SCRIPT_DIR/app/backend" "后端 (backend)"
-    check_npm_packages "$SCRIPT_DIR/app/frontend" "前端 (frontend)"
+    check_npm_packages "$SCRIPT_DIR/app/frontend-choreo" "前端 (frontend-choreo)"
     
     # Python包
     check_python_package "numpy" "NumPy" false
@@ -246,7 +246,7 @@ check_project_files() {
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     
     check_path "$SCRIPT_DIR/app/backend/src/index.ts" "后端入口文件" true
-    check_path "$SCRIPT_DIR/app/frontend/src/main.ts" "前端入口文件" true
+    check_path "$SCRIPT_DIR/app/frontend-choreo/src/main.ts" "前端入口文件" true
     check_path "$SCRIPT_DIR/app/robot-control" "机器狗控制目录" true
     check_path "$SCRIPT_DIR/start.sh" "启动脚本" true
     check_path "$SCRIPT_DIR/stop.sh" "停止脚本" true

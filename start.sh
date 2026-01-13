@@ -58,7 +58,7 @@ do_start() {
   cd ../..
 
   echo "📦 检查前端依赖..."
-  cd app/frontend
+  cd app/frontend-choreo
   if [ ! -d "node_modules" ]; then
       echo "   安装前端依赖..."
       npm install
@@ -94,7 +94,7 @@ do_start() {
   sleep 3
 
   echo "🚀 启动前端服务..."
-  cd app/frontend
+  cd app/frontend-choreo
   npm run dev > ../../logs/frontend.log 2>&1 &
   FRONTEND_PID=$!
   echo "   前端服务 PID: $FRONTEND_PID"

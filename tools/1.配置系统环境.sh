@@ -84,9 +84,9 @@ install_project_dependencies() {
         print_success "后端依赖安装完成"
     fi
     
-    if [ -f "$SCRIPT_DIR/app/frontend/package.json" ]; then
+    if [ -f "$SCRIPT_DIR/app/frontend-choreo/package.json" ]; then
         print_info "安装前端依赖..."
-        cd "$SCRIPT_DIR/app/frontend"
+        cd "$SCRIPT_DIR/app/frontend-choreo"
         npm install
         print_success "前端依赖安装完成"
     fi

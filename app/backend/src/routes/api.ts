@@ -1,42 +1,15 @@
-import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
-import multer from 'multer';
-import { v7 as uuidv7 } from 'uuid';
-import { getMainDatabase, ProjectDatabase } from '../database';
-import { PATHS, CONFIG } from '../config';
-import { pythonExecutor } from '../services/python-executor';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
 import { spawn } from 'child_process';
+import express, { Request, Response } from 'express';
+import fs from 'fs';
+import multer from 'multer';
+import os from 'os';
+import path from 'path';
+import { v7 as uuidv7 } from 'uuid';
+import { CONFIG, PATHS } from '../config';
+import { getMainDatabase, ProjectDatabase } from '../database';
+import { pythonExecutor } from '../services/python-executor';
 
 const router = express.Router();
-
-// 获取本地 IP
-router.get('/network/local-ip', (req: Request, res: Response) => {
-  try {
-    const interfaces = os.networkInterfaces();
-    const addresses: string[] = [];
-    
-    Object.keys(interfaces).forEach((ifname) => {
-      interfaces[ifname]?.forEach((iface) => {
-        // 跳过内部（即 127.0.0.1）和非 IPv4 地址
-        if ('IPv4' !== iface.family || iface.internal) {
-          return;
-        }
-        addresses.push(iface.address);
-      });
-    });
-
-    // 默认返回第一个找到的 IP，或者空字符串
-    const localIp = addresses.length > 0 ? addresses[0] : '';
-    
-    res.json({ success: true, data: { ip: localIp, all: addresses } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // 获取项目接口
 interface Project {
@@ -993,7 +966,7 @@ router.post('/projects/:uuid/upload-audio', audioUpload.single('audio'), async (
 
     // 返回相对于项目文件夹的路径
     const relativePath = path.relative(project.folder_path, req.file.path);
-    const audioUrl = `/api/v1/projects/${req.params.uuid}/audio/${req.file.filename}`;
+    const audioUrl = `/api/choreo/v1/projects/${req.params.uuid}/audio/${req.file.filename}`;
 
     res.json({
       success: true,

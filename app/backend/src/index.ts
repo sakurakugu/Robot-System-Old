@@ -1,15 +1,16 @@
-import express from 'express';
-import cors from 'cors';
 import bodyParser from 'body-parser';
-import http from 'http';
-import { CONFIG } from './config';
-import { initMainDatabase } from './database';
-import apiRoutes from './routes/api';
-import { WebSocketService } from './services/websocket';
-import { pythonExecutor } from './services/python-executor';
+import cors from 'cors';
+import express from 'express';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import util from 'util';
+import { CONFIG } from './config';
+import { initMainDatabase } from './database';
+import choreoApiRoutes from './routes/choreo-api';
+import sharedApiRoutes from './routes/shared-api';
+import { pythonExecutor } from './services/python-executor';
+import { WebSocketService } from './services/websocket';
 
 async function main() {
   const logDir = path.join(__dirname, '../../..', 'logs');
@@ -58,7 +59,8 @@ async function main() {
   });
 
   // API 路由
-  app.use('/api/v1', apiRoutes);
+  app.use('/api/choreo', choreoApiRoutes);
+  app.use('/api/shared', sharedApiRoutes);
 
   // 健康检查
   app.get('/health', (req, res) => {

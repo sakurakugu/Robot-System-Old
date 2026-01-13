@@ -122,7 +122,7 @@ onMounted(async () => {
 
 <style scoped>
 .action-list-container {
-  padding: 8px;
+  padding: 0 0 0 8px;
   height: 100%;
   display: flex;
   flex-direction: column;

@@ -353,7 +353,7 @@
 import { ref, computed, watch, markRaw, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Close, EditPen, Menu, Bottom, Grid, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled, Clock, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, EditPen, Setting, Plus, Monitor, Folder, Refresh, Document, FolderOpened, ArrowDown, QuestionFilled, InfoFilled, Clock, VideoPlay } from '@element-plus/icons-vue'
 import ActionList from './ActionList.vue'
 import RobotPreview from '@/components/RobotPreview.vue'
 import { projectApi } from '@/api/project'
@@ -751,6 +751,7 @@ onMounted(() => {
   wsClient.on('execution_output', handleExecutionOutput)
   wsClient.on('execution_error', handleExecutionError)
   wsClient.on('execution_complete', handleExecutionComplete)
+  window.addEventListener('robots_updated', onRobotsUpdated as any)
 })
 
 // 组件卸载时移除监听器
@@ -758,6 +759,7 @@ onUnmounted(() => {
   wsClient.off('execution_output', handleExecutionOutput)
   wsClient.off('execution_error', handleExecutionError)
   wsClient.off('execution_complete', handleExecutionComplete)
+  window.removeEventListener('robots_updated', onRobotsUpdated as any)
 })
 
 // 选择机器人
@@ -794,6 +796,14 @@ const addRobot = async () => {
 const goToRobotManager = () => {
   const projectUuid = route.params.uuid as string
   router.push(`/project/${projectUuid}/robots`)
+}
+
+const onRobotsUpdated = (event: CustomEvent) => {
+  const projectUuid = route.params.uuid as string
+  if (!projectUuid) return
+  const detailProjectUuid = (event as any)?.detail?.projectUuid
+  if (detailProjectUuid && detailProjectUuid !== projectUuid) return
+  loadRobots(projectUuid)
 }
 
 // 打开项目设置页（标签方式）
@@ -1748,7 +1758,7 @@ const handleFileClick = async (data: any) => {
 .action-list-panel {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 0;
   min-height: 0;
 }
 

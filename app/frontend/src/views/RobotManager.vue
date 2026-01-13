@@ -6,34 +6,40 @@
         <div class="local-ip-config">
           <label>本机IP:</label>
           <div class="ip-input-group">
-            <input 
-              v-model="unifiedLocalIp" 
-              type="text" 
-              placeholder="自动获取中..." 
-              @change="updateAllRobotsLocalIp"
-            />
+            <input v-model="unifiedLocalIp" type="text" placeholder="自动获取中..." @change="updateAllRobotsLocalIp" />
             <button class="btn-icon" @click="fetchLocalIp" title="刷新本机IP">
-              <el-icon><Refresh /></el-icon>
+              <el-icon>
+                <Refresh />
+              </el-icon>
             </button>
             <button class="btn-icon" @click="overwriteAllRobotsLocalIp" title="一键覆盖所有机器人的本地IP">
-              <el-icon><Download /></el-icon>
+              <el-icon>
+                <Download />
+              </el-icon>
             </button>
           </div>
         </div>
       </div>
-      <div class="actions">
+      <div class="actions" :class="[{ compact: actionsCompact }, { ultra: actionsUltra }]" ref="actionsRef">
         <el-radio-group v-model="viewMode" size="default">
           <el-radio-button value="card">
-            <el-icon><Menu /></el-icon>
-            卡片视图
+            <el-icon>
+              <Menu />
+            </el-icon>
+            <span class="view-label">卡片视图</span>
           </el-radio-button>
           <el-radio-button value="list">
-            <el-icon><List /></el-icon>
-            列表视图
+            <el-icon>
+              <List />
+            </el-icon>
+            <span class="view-label">列表视图</span>
           </el-radio-button>
         </el-radio-group>
         <button class="btn-primary" @click="openAddDialog">
-          + 添加机器人
+          <el-icon>
+            <Plus />
+          </el-icon>
+          <span class="btn-label">添加机器人</span>
         </button>
       </div>
     </div>
@@ -44,10 +50,10 @@
         <div class="card-header">
           <h3>{{ robot.name }}</h3>
           <span class="status-badge" :class="robot.status">
-            {{ statusText(robot.status) }}
+            <span class="status-label">{{ statusText(robot.status) }}</span>
           </span>
         </div>
-        
+
         <div class="card-body">
           <div class="info-row">
             <span class="label">机器人IP:</span>
@@ -65,21 +71,18 @@
             <span class="label">分组:</span>
             <span class="value">{{ robot.group_name }}</span>
           </div>
-          
+
           <!-- 连接错误信息 -->
           <div v-if="robot.status === 'offline' && connectionErrors[robot.uuid]" class="error-message">
             <span class="error-icon">⚠</span>
-            <span>{{ connectionErrors[robot.uuid] }}</span>
+            <span class="error-text">{{ connectionErrors[robot.uuid] }}</span>
+            <button class="error-close" @click="dismissError(robot.uuid)" title="关闭">×</button>
           </div>
         </div>
-        
-        <div class="card-footer">
-          <button 
-            class="btn-test" 
-            @click="testConnection(robot)" 
-            :disabled="testing[robot.uuid] || (robot.status === 'online' && connectReady[robot.uuid] === false)"
 
-            >
+        <div class="card-footer">
+          <button class="btn-test" @click="testConnection(robot)"
+            :disabled="testing[robot.uuid] || (robot.status === 'online' && connectReady[robot.uuid] === false)">
             {{ testing[robot.uuid] ? '测试中...' : (robot.status === 'online' ? '连接' : '测试连接') }}
           </button>
           <button class="btn-edit" @click="editRobot(robot)">编辑</button>
@@ -96,56 +99,52 @@
 
     <!-- 列表视图 -->
     <div v-else class="robot-list">
-      <table>
-        <thead>
-          <tr>
-            <th>名称</th>
-            <th>状态</th>
-            <th>机器人IP</th>
-            <th>本地IP</th>
-            <th>端口</th>
-            <th>分组</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="robot in robots" :key="robot.uuid">
-            <td>{{ robot.name }}</td>
-            <td>
-              <span class="status-badge" :class="robot.status">
-                {{ statusText(robot.status) }}
-              </span>
-            </td>
-            <td>{{ robot.robot_ip }}</td>
-            <td>{{ robot.local_ip }}</td>
-            <td>{{ robot.local_port }}</td>
-            <td>{{ robot.group_name || '-' }}</td>
-            <td class="actions-cell">
-              <button 
-                class="btn-small" 
-                @click="testConnection(robot)"
-                :disabled="testing[robot.uuid] || (robot.status === 'online' && connectReady[robot.uuid] === false)"
-              >
-                {{ testing[robot.uuid] ? '测试中' : (robot.status === 'online' ? '连接' : '测试') }}
-              </button>
-              <button class="btn-small" @click="editRobot(robot)">编辑</button>
-              <button class="btn-small btn-danger" @click="deleteRobotConfirm(robot)">删除</button>
-              
-              <!-- 错误提示 -->
-              <div v-if="robot.status === 'offline' && connectionErrors[robot.uuid]" class="error-tooltip">
-                {{ connectionErrors[robot.uuid] }}
-              </div>
-            </td>
-          </tr>
-          <tr v-if="robots.length === 0">
-            <td colspan="7" class="empty-cell">
-              暂无机器人，<a @click="openAddDialog">添加一个</a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>状态</th>
+              <th>机器人IP</th>
+              <th>本地IP</th>
+              <th>端口</th>
+              <th>分组</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="robot in robots" :key="robot.uuid">
+              <td>{{ robot.name }}</td>
+              <td>
+                <span class="status-badge" :class="robot.status">
+                  <span class="status-label">{{ statusText(robot.status) }}</span>
+                </span>
+              </td>
+              <td>{{ robot.robot_ip }}</td>
+              <td>{{ robot.local_ip }}</td>
+              <td>{{ robot.local_port }}</td>
+              <td>{{ robot.group_name || '-' }}</td>
+              <td class="actions-cell">
+                <button class="btn-small" @click="testConnection(robot)"
+                  :disabled="testing[robot.uuid] || (robot.status === 'online' && connectReady[robot.uuid] === false)">
+                  {{ testing[robot.uuid] ? '测试中' : (robot.status === 'online' ? '连接' : '测试') }}
+                </button>
+                <button class="btn-small" @click="editRobot(robot)">编辑</button>
+                <button class="btn-small btn-danger" @click="deleteRobotConfirm(robot)">删除</button>
+                <span v-if="robot.status === 'offline' && connectionErrors[robot.uuid]" class="error-indicator"
+                  :data-tip="connectionErrors[robot.uuid]" title="连接错误">⚠</span>
+              </td>
+            </tr>
+            <tr v-if="robots.length === 0">
+              <td colspan="7" class="empty-cell">
+                暂无机器人，<a @click="openAddDialog">添加一个</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    
+
     <!-- 添加/编辑对话框 -->
     <div v-if="showAddDialog || editingRobot" class="dialog-overlay" @click.self="closeDialog">
       <div class="dialog">
@@ -153,42 +152,37 @@
           <h3>{{ editingRobot ? '编辑机器人' : '添加机器人' }}</h3>
           <button class="close-btn" @click="closeDialog">×</button>
         </div>
-        
+
         <div class="dialog-body">
           <div class="form-group">
             <label>名称 *</label>
             <input v-model="formData.name" type="text" placeholder="例如：机器狗1" />
           </div>
-          
+
           <div class="form-group">
             <label>机器人IP *</label>
             <input v-model="formData.robot_ip" type="text" placeholder="例如：192.168.1.110" />
             <div v-if="formData.robot_ip && !isValidIp(formData.robot_ip)" class="input-error">IP格式不正确</div>
           </div>
-          
+
           <div class="form-group">
             <label>本地IP *</label>
             <input v-model="formData.local_ip" type="text" placeholder="例如：192.168.1.105" />
             <div v-if="formData.local_ip && !isValidIp(formData.local_ip)" class="input-error">IP格式不正确</div>
           </div>
-          
+
           <div class="form-group">
             <label>本地端口 *</label>
-            <input 
-              v-model="localPortInput" 
-              type="text" 
-              inputmode="numeric" 
-              placeholder="例如：10131" 
-            />
+            <input v-model="localPortInput" type="text" inputmode="numeric" placeholder="例如：10131" />
             <div v-if="localPortInput && !isValidPort(localPortInput)" class="input-error">端口需为1-65535的整数</div>
           </div>
-          
+
           <div class="form-group">
             <label>分组</label>
             <input v-model="formData.group_name" type="text" placeholder="选填，例如：舞蹈组" />
           </div>
         </div>
-        
+
         <div class="dialog-footer">
           <button class="btn-cancel" @click="closeDialog">取消</button>
           <button class="btn-primary" @click="saveRobot" :disabled="!isFormValid">
@@ -197,31 +191,31 @@
         </div>
       </div>
     </div>
-  
-  <!-- 重启运控确认对话框 -->
-  <div v-if="showRestartDialog" class="dialog-overlay" @click.self="closeRestartDialog">
-    <div class="dialog">
-      <div class="dialog-header">
-        <h3>重启运控</h3>
-        <button class="close-btn" @click="closeRestartDialog">×</button>
-      </div>
-      <div class="dialog-body">
-        <p>请确认设备已卧倒，避免急停。</p>
-        <p v-if="restarting">将在 {{ countdown }} 秒后执行重启，可随时取消。</p>
-      </div>
-      <div class="dialog-footer">
-        <button class="btn-cancel" @click="closeRestartDialog">取消</button>
-        <button class="btn-primary" @click="confirmRestart" :disabled="restarting">
-          {{ restarting ? '倒计时中' : '确认设备已卧倒' }}
-        </button>
+
+    <!-- 重启运控确认对话框 -->
+    <div v-if="showRestartDialog" class="dialog-overlay" @click.self="closeRestartDialog">
+      <div class="dialog">
+        <div class="dialog-header">
+          <h3>重启运控</h3>
+          <button class="close-btn" @click="closeRestartDialog">×</button>
+        </div>
+        <div class="dialog-body">
+          <p>请确认设备已卧倒，避免急停。</p>
+          <p v-if="restarting">将在 {{ countdown }} 秒后执行重启，可随时取消。</p>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn-cancel" @click="closeRestartDialog">取消</button>
+          <button class="btn-primary" @click="confirmRestart" :disabled="restarting">
+            {{ restarting ? '倒计时中' : '确认设备已卧倒' }}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRobots, addRobot, updateRobot, deleteRobot, testRobotConnection, connectRobot, restartMotion, type Robot, type RobotCreateData } from '../api/robot'
 import api from '../api/index'
@@ -245,6 +239,10 @@ const restartRobot = ref<Robot | null>(null)
 const restarting = ref(false)
 const countdown = ref(3)
 let countdownTimer: any = null
+const actionsRef = ref<HTMLElement | null>(null)
+const actionsCompact = ref(false)
+const actionsUltra = ref(false)
+let actionsObserver: ResizeObserver | null = null
 
 const formData = ref<RobotCreateData>({
   name: '',
@@ -312,7 +310,7 @@ async function updateAllRobotsLocalIp() {
     ElMessage.warning('请输入有效的本机IP')
     return
   }
-  
+
   // 批量更新所有机器人的本地IP（这里只是前端更新，如果需要保存到后端需要循环调用API）
   // 暂时只在添加新机器人时使用该IP作为默认值
 }
@@ -353,6 +351,7 @@ async function overwriteAllRobotsLocalIp() {
 
     await Promise.all(updatePromises)
     await loadRobots()
+    notifyRobotsUpdated()
     ElMessage.success('更新成功')
   } catch (error) {
     console.error('批量更新IP失败:', error)
@@ -363,7 +362,7 @@ async function overwriteAllRobotsLocalIp() {
 // 自动分配端口
 function getNextAvailablePort() {
   if (robots.value.length === 0) return 10000
-  
+
   const ports = robots.value.map(r => r.local_port).sort((a, b) => a - b)
   return ports[ports.length - 1] + 1
 }
@@ -448,6 +447,12 @@ function editRobot(robot: Robot) {
   localPortInput.value = String(robot.local_port)
 }
 
+function notifyRobotsUpdated() {
+  try {
+    window.dispatchEvent(new CustomEvent('robots_updated', { detail: { projectUuid: projectUuid.value } }))
+  } catch {}
+}
+
 async function saveRobot() {
   try {
     const payload: RobotCreateData = {
@@ -464,12 +469,14 @@ async function saveRobot() {
       if (result.success) {
         editingRobot.value.status = 'offline'
         await loadRobots()
+        notifyRobotsUpdated()
         closeDialog()
       }
     } else {
       const result: any = await addRobot(projectUuid.value, payload)
       if (result.success) {
         await loadRobots()
+        notifyRobotsUpdated()
         closeDialog()
       }
     }
@@ -489,11 +496,12 @@ async function deleteRobotConfirm(robot: Robot) {
   } catch {
     return
   }
-  
+
   try {
     const result: any = await deleteRobot(projectUuid.value, robot.uuid)
     if (result.success) {
       await loadRobots()
+      notifyRobotsUpdated()
     }
   } catch (error) {
     console.error('删除机器人失败:', error)
@@ -536,10 +544,55 @@ wsClient.on('robot_status_update', (data: any) => {
 })
 
 onMounted(() => {
-    loadRobots()
-    fetchLocalIp()
+  loadRobots()
+  fetchLocalIp()
   wsClient.joinProject(projectUuid.value)
+  // 观察头部动作区宽度，动态切换仅图标模式
+  if (actionsRef.value) {
+    actionsObserver = new ResizeObserver(() => {
+      updateActionsMode()
+    })
+    actionsObserver.observe(actionsRef.value)
+  }
+  updateActionsMode()
+  window.addEventListener('resize', checkActionsWidth)
+})
+
+function checkActionsWidth() {
+  updateActionsMode()
+}
+
+function updateActionsMode() {
+  const el = actionsRef.value
+  if (!el) return
+  actionsCompact.value = false
+  actionsUltra.value = false
+  requestAnimationFrame(() => {
+    const overflow1 = el.scrollWidth > el.clientWidth
+    if (overflow1) {
+      actionsCompact.value = true
+      actionsUltra.value = false
+      requestAnimationFrame(() => {
+        const overflow2 = el.scrollWidth > el.clientWidth
+        actionsUltra.value = overflow2
+      })
+    }
   })
+}
+
+function dismissError(uuid: string) {
+  if (connectionErrors.value[uuid]) {
+    delete connectionErrors.value[uuid]
+  }
+}
+
+onUnmounted(() => {
+  if (actionsObserver && actionsRef.value) {
+    actionsObserver.unobserve(actionsRef.value)
+  }
+  actionsObserver = null
+  window.removeEventListener('resize', checkActionsWidth)
+})
 
 function closeRestartDialog() {
   showRestartDialog.value = false
@@ -613,6 +666,7 @@ async function confirmRestart() {
   padding: 4px 8px;
   border-radius: 4px;
   width: 140px;
+  text-align: center;
 }
 
 .ip-input-group input:focus {
@@ -661,6 +715,49 @@ async function confirmRestart() {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.actions .el-radio-button__inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actions.compact .view-label {
+  display: none;
+}
+
+.actions.compact .el-radio-button__inner {
+  justify-content: center;
+}
+
+.actions.ultra .btn-primary .btn-label {
+  display: none;
+}
+
+.btn-primary .el-icon {
+  margin-right: 6px;
+}
+
+.actions.ultra .btn-primary {
+  justify-content: center;
+}
+
+.actions.ultra .btn-primary .el-icon {
+  margin-right: 0;
+}
+
+/* 作为兜底：窄屏时强制隐藏标签，避免逻辑误判 */
+@media (max-width: 1100px) {
+  .actions .view-label {
+    display: none;
+  }
+}
+
+@media (max-width: 1030px) {
+  .actions .btn-primary .btn-label {
+    display: none;
+  }
 }
 
 .input-error {
@@ -720,12 +817,14 @@ async function confirmRestart() {
   border-radius: 8px;
   padding: 16px;
   background: var(--el-bg-color);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   transition: box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
 }
 
 .robot-card:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   border-color: #007acc;
 }
 
@@ -749,6 +848,9 @@ async function confirmRestart() {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .status-badge.online {
@@ -766,8 +868,15 @@ async function confirmRestart() {
   color: #ce9178;
 }
 
+@media (max-width: 640px) {
+  .status-label {
+    display: none;
+  }
+}
+
 .card-body {
   margin-bottom: 12px;
+  flex: 1;
 }
 
 .info-row {
@@ -797,18 +906,41 @@ async function confirmRestart() {
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
 }
 
 .error-icon {
   font-size: 16px;
 }
 
+.error-text {
+  flex: 0 1 auto;
+}
+
+.error-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #ce9178;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.error-message:hover .error-close {
+  opacity: 1;
+}
+
 .card-footer {
   display: flex;
   gap: 8px;
+  margin-top: auto;
 }
 
-.btn-test, .btn-edit, .btn-delete {
+.btn-test,
+.btn-edit,
+.btn-delete {
   flex: 1;
   padding: 6px 12px;
   border: 1px solid var(--el-border-color);
@@ -848,13 +980,20 @@ async function confirmRestart() {
   background: var(--el-bg-color);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--el-border-color);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 800px;
 }
 
 thead {
@@ -873,6 +1012,7 @@ td {
   padding: 12px;
   border-bottom: 1px solid var(--el-border-color);
   color: var(--el-text-color-regular);
+  white-space: nowrap;
 }
 
 .actions-cell {
@@ -911,11 +1051,25 @@ td {
   cursor: not-allowed;
 }
 
-.error-tooltip {
+.error-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #ce9178;
+  line-height: 1;
+  position: relative;
+}
+
+.error-indicator::after {
+  content: attr(data-tip);
+  display: none;
   position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 6px 10px;
   background: rgba(206, 145, 120, 0.2);
   border: 1px solid #ce9178;
@@ -924,6 +1078,10 @@ td {
   color: #ce9178;
   white-space: nowrap;
   z-index: 10;
+}
+
+.error-indicator:hover::after {
+  display: block;
 }
 
 .empty-cell {
@@ -957,7 +1115,7 @@ td {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -971,7 +1129,7 @@ td {
   max-width: 500px;
   max-height: 90vh;
   overflow: auto;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   border: 1px solid var(--el-border-color);
 }
 
@@ -1035,7 +1193,7 @@ td {
 .form-group input:focus {
   outline: none;
   border-color: var(--el-color-primary);
-  box-shadow: 0 0 0 0.2rem rgba(0,122,204,0.25);
+  box-shadow: 0 0 0 0.2rem rgba(0, 122, 204, 0.25);
 }
 
 .dialog-footer {

@@ -1,121 +1,168 @@
 <template>
   <div class="robot-edit">
-    <div class="page-header">
-      <div class="left">
-        <button class="btn-back" @click="router.push('/robots')" title="返回">
-          <el-icon><ArrowLeft /></el-icon>
-        </button>
-      </div>
-      <h2>编辑机器人</h2>
-      <div class="right">
-        <button class="btn-primary" @click="saveRobot" :disabled="!isFormValid">保存</button>
-      </div>
-    </div>
+    <el-page-header @back="() => router.push('/robots')" class="page-header">
+      <template #content>
+        <div class="header-content">
+          <el-icon :size="24"><Bot /></el-icon>
+          <span class="title">编辑机器人</span>
+        </div>
+      </template>
+      <template #extra>
+        <el-button type="primary" @click="saveRobot" :disabled="!isFormValid" :icon="Select">
+          保存
+        </el-button>
+      </template>
+    </el-page-header>
 
-    <div v-if="error" class="error-hint">{{ error }}</div>
+    <el-alert
+      v-if="error"
+      :title="error"
+      type="error"
+      :closable="false"
+      style="margin: 0 0 20px"
+    />
 
-    <div class="grid">
-      <section class="card">
-        <div class="card-header">
-          <h3>基础信息</h3>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>名称 *</label>
-            <input v-model="formData.name" type="text" placeholder="例如：机器狗1" />
-          </div>
-          <div class="form-group">
-            <label>分组</label>
-            <input v-model="formData.group_name" type="text" placeholder="选填，例如：舞蹈组" />
-          </div>
-          <div class="form-group">
-            <label>UUID</label>
-            <input :value="uuid" type="text" disabled />
-          </div>
-        </div>
-      </section>
+    <div class="form-content" v-loading="loading">
+      <el-row :gutter="20">
+        <el-col :xs="24" :sm="24" :md="12" :lg="8">
+          <el-card shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <el-icon><InfoFilled /></el-icon>
+                <span>基础信息</span>
+              </div>
+            </template>
+            <el-form :model="formData" label-position="top">
+              <el-form-item label="名称" required>
+                <el-input v-model="formData.name" placeholder="例如：机器狗1" />
+              </el-form-item>
+              <el-form-item label="分组">
+                <el-input v-model="formData.group_name" placeholder="选填，例如：舞蹈组" />
+              </el-form-item>
+              <el-form-item label="UUID">
+                <el-input :value="uuid" disabled />
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </el-col>
 
-      <section class="card">
-        <div class="card-header">
-          <h3>网络配置</h3>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>机器人IP</label>
-            <input v-model="formData.robot_ip" type="text" placeholder="例如：192.168.1.110" />
-            <div v-if="formData.robot_ip && !isValidIp(formData.robot_ip)" class="input-error">IP格式不正确</div>
-          </div>
-          <div class="form-group">
-            <label>本地IP</label>
-            <input v-model="formData.local_ip" type="text" placeholder="例如：192.168.1.105" />
-            <div v-if="formData.local_ip && !isValidIp(formData.local_ip)" class="input-error">IP格式不正确</div>
-          </div>
-          <div class="form-group">
-            <label>本地端口</label>
-            <input v-model="localPortInput" type="text" inputmode="numeric" placeholder="例如：10131" />
-            <div v-if="localPortInput && !isValidPort(localPortInput)" class="input-error">端口需为1-65535的整数</div>
-          </div>
-        </div>
-      </section>
+        <el-col :xs="24" :sm="24" :md="12" :lg="8">
+          <el-card shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <el-icon><Connection /></el-icon>
+                <span>网络配置</span>
+              </div>
+            </template>
+            <el-form :model="formData" label-position="top">
+              <el-form-item label="机器人IP">
+                <el-input v-model="formData.robot_ip" placeholder="例如：192.168.1.110" />
+                <el-text v-if="formData.robot_ip && !isValidIp(formData.robot_ip)" type="danger" size="small">
+                  IP格式不正确
+                </el-text>
+              </el-form-item>
+              <el-form-item label="本地IP">
+                <el-input v-model="formData.local_ip" placeholder="例如：192.168.1.105" />
+                <el-text v-if="formData.local_ip && !isValidIp(formData.local_ip)" type="danger" size="small">
+                  IP格式不正确
+                </el-text>
+              </el-form-item>
+              <el-form-item label="本地端口">
+                <el-input v-model="localPortInput" placeholder="例如：10131" />
+                <el-text v-if="localPortInput && !isValidPort(localPortInput)" type="danger" size="small">
+                  端口需为1-65535的整数
+                </el-text>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </el-col>
 
-      <section class="card">
-        <div class="card-header">
-          <h3>AI 配置</h3>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>回复温度</label>
-            <input v-model.number="formData.ai_temperature" type="number" step="0.1" min="0" max="2" />
-          </div>
-          <div class="form-group">
-            <label>系统提示词</label>
-            <textarea v-model="formData.ai_system_prompt" rows="4" placeholder="例如：保持安全、简洁、友好" />
-          </div>
-          <div class="form-group">
-            <label>角色名称</label>
-            <input v-model="formData.ai_role_name" type="text" placeholder="例如：导航助手、舞蹈导师" />
-          </div>
-          <div class="form-group">
-            <label>使用模型</label>
-            <select v-model="formData.ai_model">
-              <option value="">请选择模型</option>
-              <option v-for="m in availableModels" :key="m.value" :value="m.value">
-                {{ m.label }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>音色</label>
-            <select v-model="formData.ai_voice">
-              <option value="">请选择音色</option>
-              <option value="female-soft">女声-温柔</option>
-              <option value="female-bright">女声-活泼</option>
-              <option value="male-deep">男声-低沉</option>
-              <option value="male-bright">男声-洪亮</option>
-              <option value="child">童声</option>
-              <option value="robotic">电子音</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>意图识别</label>
-            <select v-model="formData.ai_intent">
-              <option value="">请选择方案</option>
-              <option value="rule-based">规则引擎</option>
-              <option value="llm-classifier">LLM分类器</option>
-              <option value="hybrid">混合策略</option>
-            </select>
-          </div>
-        </div>
-      </section>
+        <el-col :xs="24" :sm="24" :md="24" :lg="8">
+          <el-card shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <el-icon><MagicStick /></el-icon>
+                <span>AI 配置</span>
+              </div>
+            </template>
+            <el-form :model="formData" label-position="top">
+              <el-form-item label="回复温度">
+                <el-slider
+                  v-model="formData.ai_temperature"
+                  :min="0"
+                  :max="2"
+                  :step="0.1"
+                  show-input
+                  :input-size="'small'"
+                />
+              </el-form-item>
+              <el-form-item label="使用模型">
+                <el-select v-model="formData.ai_model" placeholder="请选择模型" style="width: 100%">
+                  <el-option
+                    v-for="m in availableModels"
+                    :key="m.value"
+                    :label="m.label"
+                    :value="m.value"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="音色">
+                <el-select v-model="formData.ai_voice" placeholder="请选择音色" style="width: 100%">
+                  <el-option label="女声-温柔" value="female-soft" />
+                  <el-option label="女声-活泼" value="female-bright" />
+                  <el-option label="男声-低沉" value="male-deep" />
+                  <el-option label="男声-洪亮" value="male-bright" />
+                  <el-option label="童声" value="child" />
+                  <el-option label="电子音" value="robotic" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="意图识别">
+                <el-select v-model="formData.ai_intent" placeholder="请选择方案" style="width: 100%">
+                  <el-option label="规则引擎" value="rule-based" />
+                  <el-option label="LLM分类器" value="llm-classifier" />
+                  <el-option label="混合策略" value="hybrid" />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </el-col>
+
+        <el-col :span="24">
+          <el-card shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <el-icon><ChatLineRound /></el-icon>
+                <span>系统提示词</span>
+              </div>
+            </template>
+            <el-form :model="formData" label-position="top">
+              <el-form-item label="角色名称">
+                <el-input v-model="formData.ai_role_name" placeholder="例如：导航助手、舞蹈导师" />
+              </el-form-item>
+              <el-form-item label="系统提示词">
+                <el-input
+                  v-model="formData.ai_system_prompt"
+                  type="textarea"
+                  :rows="6"
+                  placeholder="例如：保持安全、简洁、友好"
+                />
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
   </div>
-  </template>
+</template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import {
+  InfoFilled, Connection, MagicStick, ChatLineRound, Select
+} from '@element-plus/icons-vue'
+import { Bot } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -253,101 +300,42 @@ onMounted(() => {
   height: 100%;
   overflow: auto;
   background: var(--el-bg-color-page);
-  color: var(--el-text-color-primary);
 }
+
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 20px;
-}
-.page-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: var(--el-text-color-primary);
-}
-.page-header .left { display: flex; align-items: center; }
-.btn-back {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--el-border-color);
-  background: var(--el-fill-color);
-  color: var(--el-text-color-primary);
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-.btn-back:hover { background: var(--el-fill-color-light); }
-.page-header .right { display: flex; gap: 10px; }
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
-  line-height: 32px;
-  padding: 0 16px;
-  background: var(--el-color-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-primary:hover { background: var(--el-color-primary); }
-.btn-primary:disabled { background: var(--el-border-color); cursor: not-allowed; }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
-}
-.card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
+  padding: 16px;
+  background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.form-content {
+  min-height: 400px;
+}
+
 .card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--el-border-color);
-}
-.card-header h3 { margin: 0; font-size: 18px; color: var(--el-text-color-primary); }
-.card-body { padding: 20px; }
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; margin-bottom: 6px; font-weight: 500; color: var(--el-text-color-primary); }
-.form-group input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--el-border-color);
-  background: var(--el-fill-color);
+  gap: 8px;
+  font-weight: 600;
   color: var(--el-text-color-primary);
-  border-radius: 4px;
-  font-size: 14px;
 }
-.form-group select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--el-border-color);
-  background: var(--el-fill-color);
-  color: var(--el-text-color-primary);
-  border-radius: 4px;
-  font-size: 14px;
+
+:deep(.el-card) {
+  margin-bottom: 20px;
 }
-.form-group input:focus {
-  outline: none;
-  border-color: var(--el-color-primary);
-  box-shadow: 0 0 0 0.2rem rgba(0, 122, 204, 0.25);
-}
-.input-error { margin-top: 6px; font-size: 12px; color: var(--el-color-danger); }
-.error-hint { padding: 10px; color: var(--el-color-danger); }
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.8rem;
-  color: #9ecbff;
-  word-break: break-all;
+
+:deep(.el-card__body) {
+  padding-top: 10px;
 }
 </style>

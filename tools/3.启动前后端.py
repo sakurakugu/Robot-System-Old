@@ -9,8 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.utils import ROOT
-from scripts.orchestrator import start_all, stop_all, test_all
+from scripts.start.utils import ROOT
+from scripts.start.orchestrator import start_all, stop_all, test_all
 
 
 def parse_args() -> argparse.Namespace:

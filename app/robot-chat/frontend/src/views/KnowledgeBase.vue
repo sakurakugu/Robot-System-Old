@@ -1,30 +1,62 @@
 <template>
   <div class="page">
-    <div class="header">
-      <h2>知识库</h2>
-      <div class="actions">
-        <button @click="refresh" :disabled="loading">刷新</button>
-      </div>
-    </div>
-    <div class="content">
-      <div v-if="loading" class="hint">加载中...</div>
-      <div v-else class="grid">
-        <div v-for="doc in docs" :key="doc.uuid" class="card">
-          <div class="title">{{ doc.title }}</div>
-          <div class="meta">
-            <span>{{ doc.category || '未分类' }}</span>
-            <span>更新时间 {{ formatTime(doc.updated_at) }}</span>
-          </div>
-          <div class="excerpt">{{ doc.content.slice(0, 120) }}{{ doc.content.length > 120 ? '...' : '' }}</div>
+    <el-page-header @back="() => {}" class="page-header">
+      <template #content>
+        <div class="header-content">
+          <el-icon :size="24"><Collection /></el-icon>
+          <span class="title">知识库</span>
         </div>
-        <div v-if="docs.length === 0" class="hint">暂无文档</div>
-      </div>
+      </template>
+      <template #extra>
+        <el-button :icon="Refresh" @click="refresh" :loading="loading">
+          刷新
+        </el-button>
+      </template>
+    </el-page-header>
+
+    <div class="content" v-loading="loading">
+      <el-empty
+        v-if="!loading && docs.length === 0"
+        description="暂无文档"
+        :image-size="120"
+      />
+      <el-row :gutter="20" v-else>
+        <el-col
+          v-for="doc in docs"
+          :key="doc.uuid"
+          :xs="24"
+          :sm="12"
+          :md="8"
+          :lg="6"
+        >
+          <el-card shadow="hover" class="doc-card">
+            <template #header>
+              <div class="doc-header">
+                <el-icon><Document /></el-icon>
+                <span class="doc-title">{{ doc.title }}</span>
+              </div>
+            </template>
+            <div class="doc-meta">
+              <el-tag size="small" type="info">
+                {{ doc.category || '未分类' }}
+              </el-tag>
+              <el-text size="small" type="info">
+                {{ formatTime(doc.updated_at) }}
+              </el-text>
+            </div>
+            <el-text class="doc-excerpt" line-clamp="3">
+              {{ doc.content }}
+            </el-text>
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Collection, Refresh, Document } from '@element-plus/icons-vue'
 
 type Doc = {
   uuid: string
@@ -46,23 +78,69 @@ const refresh = async () => {
 
 const formatTime = (val?: string | null) => {
   if (!val) return '-'
-  try { return new Date(val).toLocaleString() } catch { return val }
+  try { return new Date(val).toLocaleString('zh-CN') } catch { return val }
 }
 </script>
 
 <style scoped>
-.page { height: 100%; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-.header { display: flex; align-items: center; justify-content: space-between; }
-.actions button { background-color: #2a2a2a; border: 1px solid #444; color: #e0e0e0; padding: 0.5rem 0.9rem; border-radius: 8px; }
-.content { flex: 1; overflow: auto; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
-.card { background-color: #2a2a2a; border: 1px solid #444; border-radius: 10px; padding: 0.9rem 1.1rem; }
-.title { font-weight: 600; margin-bottom: 0.5rem; }
-.meta { font-size: 0.8rem; color: #aaa; display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-.excerpt { color: #ddd; font-size: 0.95rem; }
-.hint { color: #bbb; padding: 0.5rem; }
-@media (prefers-color-scheme: light) {
-  .actions button { background-color: #fff; color: #333; border-color: #ddd; }
-  .card { background-color: #fff; border-color: #e0e0e0; }
+.page {
+  height: 100%;
+  padding: 20px;
+  background: var(--el-bg-color-page);
+  overflow: auto;
+}
+
+.page-header {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.content {
+  min-height: 400px;
+}
+
+.doc-card {
+  margin-bottom: 20px;
+  height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.doc-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.doc-excerpt {
+  color: var(--el-text-color-secondary);
+  line-height: 1.6;
 }
 </style>

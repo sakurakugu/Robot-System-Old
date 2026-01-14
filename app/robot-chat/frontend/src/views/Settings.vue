@@ -1,38 +1,49 @@
 <template>
   <div class="page">
-    <div class="header">
-      <h2>设置</h2>
-    </div>
+    <el-page-header @back="() => {}" class="page-header">
+      <template #content>
+        <div class="header-content">
+          <el-icon :size="24"><Tools /></el-icon>
+          <span class="title">系统设置</span>
+        </div>
+      </template>
+    </el-page-header>
+
     <div class="content">
-      <div class="card">
-        <div class="row">
-          <label class="label">后端地址</label>
-          <input v-model="serverUrl" placeholder="http://localhost:3000" />
-        </div>
-        <div class="row">
-          <label class="label">WebSocket路径</label>
-          <input v-model="wsPath" placeholder="/api/conversation/connect" />
-        </div>
-        <div class="row">
-          <label class="label">主题</label>
-          <select v-model="theme">
-            <option value="system">跟随系统</option>
-            <option value="dark">深色</option>
-            <option value="light">浅色</option>
-          </select>
-        </div>
-        <div class="actions">
-          <button @click="save">保存</button>
-          <span v-if="saved" class="hint">已保存</span>
-        </div>
-      </div>
+      <el-card shadow="hover">
+        <el-form :model="formData" label-width="140px" label-position="left">
+          <el-form-item label="后端地址">
+            <el-input v-model="serverUrl" placeholder="http://localhost:3000" />
+          </el-form-item>
+          <el-form-item label="WebSocket路径">
+            <el-input v-model="wsPath" placeholder="/api/conversation/connect" />
+          </el-form-item>
+          <el-form-item label="主题">
+            <el-radio-group v-model="theme">
+              <el-radio value="system">跟随系统</el-radio>
+              <el-radio value="dark">深色</el-radio>
+              <el-radio value="light">浅色</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="save" :icon="Select">
+              保存
+            </el-button>
+            <el-text v-if="saved" type="success" style="margin-left: 12px">
+              已保存
+            </el-text>
+          </el-form-item>
+        </el-form>
+      </el-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { Tools, Select } from '@element-plus/icons-vue'
 
+const formData = ref({})
 const serverUrl = ref('')
 const wsPath = ref('/api/conversation/connect')
 const theme = ref<'system' | 'dark' | 'light'>('system')
@@ -54,18 +65,35 @@ const save = () => {
 </script>
 
 <style scoped>
-.page { height: 100%; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-.header { display: flex; align-items: center; justify-content: space-between; }
-.content { flex: 1; overflow: auto; }
-.card { background-color: #2a2a2a; border: 1px solid #444; border-radius: 12px; padding: 1rem; max-width: 720px; }
-.row { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 0.75rem; margin: 0.75rem 0; }
-.label { color: #bbb; }
-input, select { width: 100%; background-color: #1a1a1a; border: 1px solid #444; color: #e0e0e0; padding: 0.6rem 0.75rem; border-radius: 8px; }
-.actions { margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; }
-button { background-color: #646cff; color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 8px; }
-.hint { color: #7ee787; font-size: 0.9rem; }
-@media (prefers-color-scheme: light) {
-  .card { background-color: #fff; border-color: #e0e0e0; }
-  input, select { background-color: #fff; color: #333; border-color: #ddd; }
+.page {
+  height: 100%;
+  padding: 20px;
+  background: var(--el-bg-color-page);
+  overflow: auto;
+}
+
+.page-header {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.content {
+  max-width: 800px;
+}
+
+:deep(.el-card__body) {
+  padding: 30px;
 }
 </style>

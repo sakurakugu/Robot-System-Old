@@ -3,23 +3,20 @@ import config from '../config';
 import { LLMOptions, LLMResponse, Message } from '../types';
 
 class LLMService {
-  private provider: string;
-
-  constructor() {
-    this.provider = config.llm.provider;
-  }
+  constructor() {}
 
   /**
    * 调用LLM进行对话
    */
   async chat(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    switch (this.provider) {
+    const provider = config.llm.provider;
+    switch (provider) {
       case 'openai':
         return this.chatOpenAI(messages, options);
       case 'bigmodel':
         return this.chatBigModel(messages, options);
       default:
-        throw new Error(`不支持的LLM提供商: ${this.provider}`);
+        throw new Error(`不支持的LLM提供商: ${provider}`);
     }
   }
 
@@ -110,8 +107,25 @@ class LLMService {
         },
       };
     } catch (error: any) {
-      console.error('BigModel API调用失败:', error.response?.data || error.message);
-      throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
+      const errorData = error.response?.data;
+      console.error('BigModel API调用失败:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: errorData,
+        message: error.message
+      });
+      
+      // 提取错误信息
+      let errorMessage = error.message;
+      if (errorData?.error) {
+        errorMessage = errorData.error.message || errorData.error.code || JSON.stringify(errorData.error);
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      }
+      
+      throw new Error(`LLM调用失败: ${errorMessage}`);
     }
   }
 

@@ -1,122 +1,257 @@
 <template>
   <div class="chatview">
-    <aside class="sidebar">
-      <div class="robot-selector">
-        <h3>选择机器人</h3>
-        <div class="selector-row">
-          <input v-model="searchQuery" type="text" placeholder="搜索名称或UUID" />
-        </div>
-        <div class="selector-row">
-          <select v-model="selectedUuid">
-            <option v-for="r in filteredRobots" :key="r.uuid" :value="r.uuid">
-              {{ r.name || r.uuid }} ({{ r.uuid }})
-            </option>
-          </select>
-        </div>
-        <div class="selector-actions">
-          <button class="btn-primary" @click="applySelection" :disabled="!selectedUuid">设为当前</button>
-        </div>
-      </div>
-      <div class="robot-info">
-        <h3>机器狗信息</h3>
-        <div class="info-item">
-          <label>ID:</label>
-          <span class="robot-id">{{ robotId }}</span>
-        </div>
-        <div class="info-item">
-          <label>状态:</label>
-          <span :class="robotStatus">{{ robotStatus }}</span>
-        </div>
-      </div>
+    <el-aside width="320px" class="sidebar">
+      <el-card shadow="never" class="selector-card">
+        <template #header>
+          <div class="card-header">
+            <el-icon><Bot /></el-icon>
+            <span>选择机器人</span>
+          </div>
+        </template>
+        <el-select
+          v-model="selectedUuid"
+          placeholder="搜索并选择机器人"
+          filterable
+          style="width: 100%; margin-bottom: 12px"
+        >
+          <el-option
+            v-for="r in robots"
+            :key="r.uuid"
+            :label="r.name || r.uuid"
+            :value="r.uuid"
+          >
+            <div class="robot-option">
+              <span>{{ r.name || '未命名' }}</span>
+              <span class="robot-uuid">{{ r.uuid.substring(0, 8) }}</span>
+            </div>
+          </el-option>
+        </el-select>
+        <el-button
+          type="primary"
+          @click="applySelection"
+          :disabled="!selectedUuid"
+          style="width: 100%"
+        >
+          设为当前
+        </el-button>
+      </el-card>
 
-      <div class="controls">
-        <button @click="connect" :disabled="isConnected" class="btn-primary">
-          {{ isConnected ? '已连接' : '连接服务器' }}
-        </button>
-        <button @click="disconnect" :disabled="!isConnected" class="btn-danger">
-          断开连接
-        </button>
-        <button @click="clearHistory" class="btn-secondary">
-          清空历史
-        </button>
-      </div>
+      <el-card shadow="never" class="info-card">
+        <template #header>
+          <div class="card-header">
+            <el-icon><InfoFilled /></el-icon>
+            <span>机器狗信息</span>
+          </div>
+        </template>
+        <el-descriptions :column="1" border size="small">
+          <el-descriptions-item label="ID">
+            <el-text type="info" size="small" class="robot-id">{{ robotId }}</el-text>
+          </el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="robotStatus === 'online' ? 'success' : 'info'" size="small">
+              {{ robotStatus === 'online' ? '在线' : '离线' }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-card>
 
-      <div class="stats">
-        <h3>统计信息</h3>
-        <div class="stat-item">
-          <label>消息数:</label>
-          <span>{{ messageCount }}</span>
-        </div>
-        <div class="stat-item">
-          <label>平均延迟:</label>
-          <span>{{ avgLatency }}ms</span>
-        </div>
-      </div>
-    </aside>
+      <el-card shadow="never" class="controls-card">
+        <template #header>
+          <div class="card-header">
+            <el-icon><Connection /></el-icon>
+            <span>连接控制</span>
+          </div>
+        </template>
+        <el-space direction="vertical" style="width: 100%" :size="10">
+          <el-button
+            type="success"
+            @click="connect"
+            :disabled="isConnected"
+            :icon="isConnected ? SuccessFilled : Link"
+            style="width: 100%"
+          >
+            {{ isConnected ? '已连接' : '连接服务器' }}
+          </el-button>
+          <el-button
+            type="danger"
+            @click="disconnect"
+            :disabled="!isConnected"
+            :icon="Close"
+            style="width: 100%"
+          >
+            断开连接
+          </el-button>
+          <el-button
+            @click="clearHistory"
+            :icon="Delete"
+            style="width: 100%"
+          >
+            清空历史
+          </el-button>
+        </el-space>
+      </el-card>
+
+      <el-card shadow="never" class="stats-card">
+        <template #header>
+          <div class="card-header">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>统计信息</span>
+          </div>
+        </template>
+        <el-descriptions :column="1" border size="small">
+          <el-descriptions-item label="消息数">
+            <el-text type="primary">{{ messageCount }}</el-text>
+          </el-descriptions-item>
+          <el-descriptions-item label="平均延迟">
+            <el-text type="warning">{{ avgLatency }}ms</el-text>
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-card>
+    </el-aside>
 
     <section class="content">
       <div class="chat-area" ref="chatArea">
-        <div v-if="messages.length === 0" class="empty-state">
-          <p>还没有对话记录，发送一条消息开始吧！</p>
-        </div>
+        <el-empty
+          v-if="messages.length === 0"
+          description="还没有对话记录，发送一条消息开始吧！"
+          :image-size="120"
+        >
+          <template #image>
+            <el-icon :size="80" color="#909399"><ChatDotSquare /></el-icon>
+          </template>
+        </el-empty>
+        
         <div
           v-for="msg in messages"
           :key="msg.id"
-          class="message"
-          :class="msg.type"
+          class="message-wrapper"
+          :class="[{ 'align-right': msg.type === 'user' && msg.target === 'ai' }, msg.type]"
         >
-          <div class="message-header">
-            <span class="message-sender">{{ msg.type === 'user' ? '用户' : 'AI' }}</span>
-            <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
-          </div>
-          <div class="message-content">{{ msg.text }}</div>
-          <div v-if="msg.actions && msg.actions.length > 0" class="message-actions">
-            <span class="action-label">动作:</span>
-            <span
-              v-for="action in msg.actions"
-              :key="action"
-              class="action-badge"
-            >
-              {{ action }}
-            </span>
-          </div>
-          <div v-if="msg.latency" class="message-meta">
-            <span>延迟: {{ msg.latency }}ms</span>
+          <el-avatar :size="36" class="message-avatar">
+            <el-icon v-if="msg.type === 'user'"><User /></el-icon>
+            <el-icon v-else><Bot /></el-icon>
+          </el-avatar>
+          <div class="message-bubble">
+            <div class="message-header">
+              <span class="message-sender">{{ msg.type === 'user' ? '用户' : 'AI助手' }}</span>
+              <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+            </div>
+            <div class="message-content">{{ msg.text }}</div>
+            <div v-if="msg.actions && msg.actions.length > 0" class="message-actions">
+              <el-icon><Lightning /></el-icon>
+              <el-tag
+                v-for="action in msg.actions"
+                :key="action"
+                size="small"
+                type="success"
+                effect="plain"
+              >
+                {{ action }}
+              </el-tag>
+            </div>
+            <div v-if="msg.latency" class="message-meta">
+              <el-icon><Clock /></el-icon>
+              <span>{{ msg.latency }}ms</span>
+            </div>
+            <div v-if="msg.sentToRobot !== undefined" class="robot-status">
+              <el-tag
+                v-if="msg.sendingToRobot"
+                size="small"
+                type="info"
+                effect="plain"
+              >
+                <el-icon class="is-loading"><Loading /></el-icon>
+                发送中...
+              </el-tag>
+              <el-tag
+                v-else-if="msg.sentToRobot"
+                size="small"
+                type="success"
+                effect="plain"
+              >
+                <el-icon><Select /></el-icon>
+                已发送到机器狗
+              </el-tag>
+              <el-tag
+                v-else
+                size="small"
+                type="warning"
+                effect="plain"
+              >
+                <el-icon><WarningFilled /></el-icon>
+                未发送到机器狗
+              </el-tag>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="input-area">
-        <textarea
+        <el-input
           v-model="inputText"
-          placeholder="输入消息... (按 Ctrl+Enter 发送)"
-          @keydown.ctrl.enter="sendMessage"
-          rows="3"
-        ></textarea>
-        <button
-          @click="sendMessage"
-          :disabled="!isConnected || !inputText.trim()"
-          class="btn-send"
-        >
-          发送
-        </button>
+          type="textarea"
+          :rows="3"
+          placeholder="输入消息... (按 Ctrl+Enter 发送给大模型, Shift+Enter 发送给机器狗)"
+          @keydown.ctrl.enter="() => sendMessage('ai')"
+          @keydown.shift.enter.prevent="() => sendMessage('robot')"
+          resize="none"
+        />
+        <div class="button-group">
+          <el-button
+            type="success"
+            @click="() => sendMessage('robot')"
+            :disabled="!isConnected || !inputText.trim()"
+            :icon="Bot"
+          >
+            发送给机器狗
+          </el-button>
+          <el-button
+            type="primary"
+            @click="() => sendMessage('ai')"
+            :disabled="!isConnected || !inputText.trim()"
+            :icon="Promotion"
+          >
+            发送给大模型
+          </el-button>
+        </div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import {
+  ChatDotSquare,
+  Clock,
+  Close,
+  Connection,
+  DataAnalysis,
+  Delete,
+  InfoFilled,
+  Lightning,
+  Link,
+  Loading,
+  Promotion,
+  Select,
+  SuccessFilled,
+  User,
+  WarningFilled
+} from '@element-plus/icons-vue'
+import { Bot } from 'lucide-vue-next'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '../composables/useWebSocket'
 
 type Message = {
   id: string
   type: 'user' | 'ai'
+  target?: 'ai' | 'robot'
   text: string
   timestamp: number
   actions?: string[]
   latency?: number
+  sentToRobot?: boolean
+  sendingToRobot?: boolean
 }
 
 const {
@@ -140,15 +275,7 @@ let requestTimestamps = new Map<number, number>()
 
 type RobotItem = { uuid: string; name?: string }
 const robots = ref<RobotItem[]>([])
-const searchQuery = ref('')
 const selectedUuid = ref<string>('')
-const filteredRobots = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return robots.value
-  return robots.value.filter(r =>
-    (r.name || '').toLowerCase().includes(q) || r.uuid.toLowerCase().includes(q)
-  )
-})
 
 const connect = async () => {
   if (selectedUuid.value) {
@@ -169,23 +296,57 @@ const applySelection = () => {
   }
 }
 
-const sendMessage = () => {
+const sendMessage = (target: 'ai' | 'robot') => {
   if (!inputText.value.trim() || !isConnected.value) return
 
   const text = inputText.value.trim()
   const timestamp = Date.now()
 
-  messages.value.push({
+  const userMessage: Message = {
     id: `user-${timestamp}`,
     type: 'user',
+    target,
     text,
     timestamp,
-  })
+  }
 
-  requestTimestamps.set(timestamp, Date.now())
-  sendText(text)
+  if (target === 'robot') {
+    // 直接发送到机器狗
+    userMessage.sentToRobot = false
+    userMessage.sendingToRobot = true
+    messages.value.push(userMessage)
+    
+    sendToRobot(text).then(success => {
+      userMessage.sendingToRobot = false
+      userMessage.sentToRobot = success
+    })
+  } else {
+    // 发送给大模型
+    messages.value.push(userMessage)
+    requestTimestamps.set(timestamp, Date.now())
+    sendText(text)
+  }
+
   inputText.value = ''
   scrollToBottom()
+}
+
+const sendToRobot = async (text: string): Promise<boolean> => {
+  try {
+    // 这里需要调用实际的机器狗API
+    // 假设有一个发送到机器狗的接口
+    const response = await fetch(`/api/robot/${robotId.value}/command`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    })
+    return response.ok
+  } catch (error) {
+    console.error('发送到机器狗失败:', error)
+    return false
+  }
 }
 
 const clearHistory = () => {
@@ -224,15 +385,37 @@ onMessage((data) => {
       avgLatency.value = Math.round(totalLatency / messageCount.value)
     }
 
-    messages.value.push({
+    const aiMessage: Message = {
       id: `ai-${timestamp}`,
       type: 'ai',
       text: data.data.text,
       timestamp,
       actions: data.data.actions,
       latency,
-    })
+      sentToRobot: false,
+      sendingToRobot: true,
+    }
 
+    messages.value.push(aiMessage)
+    scrollToBottom()
+
+    // 自动发送AI响应到机器狗
+    sendToRobot(data.data.text).then(success => {
+      aiMessage.sendingToRobot = false
+      aiMessage.sentToRobot = success
+    })
+  } else if (data.type === 'error') {
+    const timestamp = Date.now()
+    const aiMessage: Message = {
+      id: `ai-${timestamp}`,
+      type: 'ai',
+      text: `发生错误：${data.data?.message || '未知错误'}`,
+      timestamp,
+      actions: [],
+      sentToRobot: false,
+      sendingToRobot: false,
+    }
+    messages.value.push(aiMessage)
     scrollToBottom()
   }
 });
@@ -261,201 +444,188 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   overflow: hidden;
+  gap: 1px;
+  background: var(--el-border-color-lighter);
 }
+
 .sidebar {
-  width: 280px;
-  background-color: #2a2a2a;
-  border-right: 1px solid #444;
-  padding: 1.5rem;
+  background: var(--el-bg-color);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 16px;
+  padding: 20px;
   overflow-y: auto;
 }
-.robot-selector h3 {
-  font-size: 1rem;
-  margin-bottom: 0.75rem;
-  color: #9bbcff;
+.sidebar :deep(.el-card),
+.sidebar :deep(.el-card__body),
+.sidebar :deep(.el-card__header),
+.sidebar :deep(.el-descriptions),
+.sidebar :deep(.el-space) {
+  overflow: visible;
 }
-.selector-row { margin-bottom: 0.5rem; }
-.selector-row input,
-.selector-row select {
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: var(--el-fill-color);
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
   color: var(--el-text-color-primary);
 }
-.selector-actions { display: flex; gap: 0.5rem; }
-.robot-info h3,
-.stats h3 {
-  font-size: 1rem;
-  margin-bottom: 1rem;
-  color: #646cff;
-}
-.info-item,
-.stat-item {
+
+.robot-option {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
 }
-.info-item label,
-.stat-item label {
-  color: #999;
+
+.robot-uuid {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  font-family: monospace;
 }
+
 .robot-id {
   font-family: monospace;
-  font-size: 0.75rem;
-  color: #64b5f6;
   word-break: break-all;
 }
-.controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+
+.selector-card,
+.info-card,
+.controls-card,
+.stats-card {
+  margin-bottom: 0;
 }
-.btn-primary,
-.btn-secondary,
-.btn-danger {
-  width: 100%;
-  padding: 0.7rem;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-.btn-primary {
-  background-color: #646cff;
-  color: white;
-}
-.btn-primary:hover:not(:disabled) {
-  background-color: #535bf2;
-}
-.btn-secondary {
-  background-color: #555;
-  color: white;
-}
-.btn-secondary:hover {
-  background-color: #666;
-}
-.btn-danger {
-  background-color: #f44336;
-  color: white;
-}
-.btn-danger:hover:not(:disabled) {
-  background-color: #d32f2f;
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+
 .content {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--el-bg-color);
 }
+
 .chat-area {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
+  background: var(--el-fill-color-lighter);
 }
-.empty-state {
+
+.message-wrapper {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #999;
-  font-size: 1.1rem;
+  gap: 12px;
+  animation: slideIn 0.3s ease-out;
 }
-.message {
+
+.message-wrapper.align-right {
+  flex-direction: row-reverse;
+}
+
+.message-avatar {
+  flex-shrink: 0;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.message-wrapper.user .message-avatar {
+  background: var(--el-color-success-light-9);
+  color: var(--el-color-success);
+}
+
+.message-bubble {
   max-width: 70%;
-  padding: 1rem;
+  padding: 12px 16px;
   border-radius: 12px;
-  animation: fadeIn 0.3s ease-in-out;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
-.message.user {
-  align-self: flex-end;
-  background-color: #646cff;
+
+.message-wrapper.user .message-bubble {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
 }
-.message.ai {
-  align-self: flex-start;
-  background-color: #2a2a2a;
-  border: 1px solid #444;
-}
+
 .message-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  opacity: 0.8;
 }
+
 .message-sender {
   font-weight: 600;
 }
-.message-time {
-  opacity: 0.7;
-}
+
 .message-content {
-  line-height: 1.5;
+  line-height: 1.6;
   word-wrap: break-word;
+  white-space: pre-wrap;
 }
+
 .message-actions {
-  margin-top: 0.5rem;
+  margin-top: 12px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
   flex-wrap: wrap;
 }
-.action-label {
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-.action-badge {
-  background-color: rgba(100, 108, 255, 0.3);
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-family: monospace;
-}
+
 .message-meta {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
   opacity: 0.6;
 }
+
 .input-area {
-  border-top: 1px solid #444;
-  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--el-border-color);
+  padding: 20px;
   display: flex;
-  gap: 1rem;
-  background-color: #2a2a2a;
+  gap: 12px;
+  background: white;
 }
-.input-area textarea {
-  flex: 1;
-  resize: none;
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 130px;
+}
+
+.button-group .el-button {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.input-area :deep(.el-textarea__inner) {
   font-family: inherit;
 }
-.btn-send {
-  padding: 0.7rem 2rem;
-  background-color: #646cff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
+
+.robot-status {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
-.btn-send:hover:not(:disabled) {
-  background-color: #535bf2;
+
+.robot-status .el-tag :deep(.el-tag__content) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
-@keyframes fadeIn {
+
+@keyframes slideIn {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -463,17 +633,6 @@ button:disabled {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-@media (prefers-color-scheme: light) {
-  .sidebar,
-  .input-area {
-    background-color: #ffffff;
-    border-color: #e0e0e0;
-  }
-  .message.ai {
-    background-color: #ffffff;
-    border-color: #e0e0e0;
   }
 }
 </style>

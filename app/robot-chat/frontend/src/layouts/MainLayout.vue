@@ -1,156 +1,175 @@
 <template>
-  <div class="layout">
-    <header class="header">
-      <!-- <h1>机器狗管理控制台</h1> -->
-      <h1>机器狗</h1>
-  </header>
-    <div class="content">
-      <nav class="rail" :style="{ width: railWidth + 'px' }" :class="{ narrow: isNarrow }">
-        <router-link to="/robots" class="link" active-class="active">
-          <el-icon class="icon"><List /></el-icon>
-          <span class="label">机器人管理</span>
-          <span class="pill">管理</span>
-        </router-link>
-        <router-link to="/chat" class="link" active-class="active">
-          <el-icon class="icon"><ChatLineSquare /></el-icon>
-          <span class="label">机器人对话</span>
-          <span class="pill">对话</span>
-        </router-link>
-        <router-link to="/params" class="link" active-class="active">
-          <el-icon class="icon"><Setting /></el-icon>
-          <span class="label">参数管理</span>
-          <span class="pill">参数</span>
-        </router-link>
-        <router-link to="/kb" class="link" active-class="active">
-          <el-icon class="icon"><Collection /></el-icon>
-          <span class="label">知识库</span>
-          <span class="pill">知识</span>
-        </router-link>
-        <router-link to="/settings" class="link" active-class="active">
-          <el-icon class="icon"><Setting /></el-icon>
-          <span class="label">设置</span>
-          <span class="pill">设置</span>
-        </router-link>
-      </nav>
-      <div class="rail-resizer" @mousedown="startResize"></div>
-      <main class="main">
+  <el-container class="layout-container">
+    <el-header class="layout-header">
+      <div class="header-content">
+        <el-icon class="logo-icon" :size="24"><Bot /></el-icon>
+        <h1>机器狗管理平台</h1>
+      </div>
+    </el-header>
+    <el-container class="main-container">
+      <el-aside :width="asideWidth + 'px'" class="layout-aside" :class="{ collapsed: isCollapse }">
+        <el-menu
+          :default-active="activeMenu"
+          class="el-menu-vertical"
+          :collapse="isCollapse"
+          :collapse-transition="false"
+          router
+        >
+          <el-menu-item index="/robots">
+            <el-icon><List /></el-icon>
+            <template #title>机器人管理</template>
+          </el-menu-item>
+          <el-menu-item index="/chat">
+            <el-icon><ChatLineSquare /></el-icon>
+            <template #title>机器人对话</template>
+          </el-menu-item>
+          <el-menu-item index="/params">
+            <el-icon><Setting /></el-icon>
+            <template #title>参数管理</template>
+          </el-menu-item>
+          <el-menu-item index="/kb">
+            <el-icon><Collection /></el-icon>
+            <template #title>知识库</template>
+          </el-menu-item>
+          <el-menu-item index="/settings">
+            <el-icon><Tools /></el-icon>
+            <template #title>系统设置</template>
+          </el-menu-item>
+        </el-menu>
+        <div class="collapse-toggle" @click="toggleCollapse">
+          <el-icon><DArrowLeft v-if="!isCollapse" /><DArrowRight v-else /></el-icon>
+        </div>
+      </el-aside>
+      <el-main class="layout-main">
         <router-view />
-      </main>
-    </div>
-  </div>
+      </el-main>
+    </el-container>
+  </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { ChatLineSquare, Setting, Collection, List } from '@element-plus/icons-vue'
+import { useRoute } from 'vue-router'
+import { ChatLineSquare, Setting, Collection, List, Tools, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
+import { Bot } from 'lucide-vue-next'
 
-const railWidth = ref(200)
-const isResizing = ref(false)
-const startX = ref(0)
-const startWidth = ref(200)
-const minWidth = 115
-const maxWidth = 360
-const isNarrow = computed(() => railWidth.value <= 150) // 当宽度小于等于最小宽度时，认为是窄屏
+const route = useRoute()
+const isCollapse = ref(false)
+const asideWidth = computed(() => isCollapse.value ? 64 : 200)
 
-function onMouseMove(e: MouseEvent) {
-  if (!isResizing.value) return
-  const delta = e.clientX - startX.value
-  const next = Math.min(maxWidth, Math.max(minWidth, startWidth.value + delta))
-  railWidth.value = next
-}
+const activeMenu = computed(() => {
+  const path = route.path
+  if (path.startsWith('/robots')) return '/robots'
+  if (path.startsWith('/chat')) return '/chat'
+  if (path.startsWith('/params')) return '/params'
+  if (path.startsWith('/kb')) return '/kb'
+  if (path.startsWith('/settings')) return '/settings'
+  return path
+})
 
-function onMouseUp() {
-  if (!isResizing.value) return
-  isResizing.value = false
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
-}
-
-function startResize(e: MouseEvent) {
-  isResizing.value = true
-  startX.value = e.clientX
-  startWidth.value = railWidth.value
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
+const toggleCollapse = () => {
+  isCollapse.value = !isCollapse.value
 }
 </script>
 
 <style scoped>
-.layout {
-  display: flex;
-  flex-direction: column;
+.layout-container {
   height: 100vh;
-  background: radial-gradient(1200px 600px at 20% -10%, #2a2a2a 0%, #1a1a1a 60%, #121212 100%);
-  color: #e0e0e0;
+  width: 100%;
 }
-.header {
+
+.layout-header {
+  height: 60px !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
-  padding: 1rem 1.5rem;
-  background: linear-gradient(180deg, rgba(40,40,40,0.9) 0%, rgba(32,32,32,0.9) 100%);
-  border-bottom: 1px solid #3a3a3a;
-  backdrop-filter: saturate(140%) blur(6px);
+  padding: 0 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-.header h1 { font-size: 1.25rem; font-weight: 600; }
-.content { display: flex; flex: 1; overflow: hidden; }
-.rail {
-  width: 200px;
-  background: rgba(30, 30, 30, 0.7);
-  border-right: 1px solid #3a3a3a;
-  padding: 0.75rem 0.75rem 0.75rem 0.5rem;
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+}
+
+.logo-icon {
+  font-size: 24px;
+}
+
+.layout-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.main-container {
+  height: calc(100vh - 60px);
+}
+
+.layout-aside {
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
+  transition: width 0.3s;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  backdrop-filter: blur(8px);
 }
-.link {
+
+.layout-aside.collapsed {
+  overflow: hidden;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.el-menu-vertical {
+  border: none;
+  flex: 1;
+}
+
+.el-menu-vertical:not(.el-menu--collapse) {
   width: 100%;
-  padding: 0.6rem 0.6rem;
-  color: #e0e0e0;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: background-color 0.2s, border-color 0.2s, transform 0.08s;
 }
-.link:hover { background-color: #262626; border-color: #3a3a3a; transform: translateY(-1px); }
-.link.active { background-color: #2f315a; border-color: #646cff; color: #ffffff; }
-.icon {
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
+
+.layout-aside.collapsed .el-menu-vertical {
+  overflow: hidden;
+  overflow-x: hidden;
+  min-width: 0;
+  scrollbar-width: none;
+}
+
+.layout-aside.collapsed .collapse-toggle {
+  overflow: hidden;
+}
+
+.layout-aside.collapsed ::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.collapse-toggle {
+  height: 40px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  color: #9bbcff;
+  cursor: pointer;
+  border-top: 1px solid var(--el-border-color);
+  color: var(--el-text-color-regular);
+  transition: all 0.3s;
 }
-.label { flex: 1; font-size: 14px; }
-.pill {
-  font-size: 12px;
-  color: #9bbcff;
-  border: 1px solid rgba(100,108,255,0.25);
-  background: rgba(100,108,255,0.12);
-  padding: 2px 6px;
-  border-radius: 999px;
+
+.collapse-toggle:hover {
+  background: var(--el-fill-color-light);
+  color: var(--el-color-primary);
 }
-.rail .pill { display: none; }
-.rail.narrow .label { display: none; }
-.rail.narrow .pill { display: inline-block; margin: 0 auto; }
-.rail.narrow .link { justify-content: center; }
-.main { flex: 1; overflow: auto; }
-.rail-resizer {
-  width: 6px;
-  cursor: col-resize;
-  background: transparent;
-}
-.rail-resizer:hover { background: rgba(100, 108, 255, 0.12); }
-@media (prefers-color-scheme: light) {
-  .layout { background: radial-gradient(1200px 600px at 20% -10%, #ffffff 0%, #f7f7fb 60%, #f2f3f7 100%); color: #333; }
-  .header { background: linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(248,248,252,0.85) 100%); border-color: #e0e0e0; }
-  .rail { background: rgba(250,250,250,0.8); border-color: #e0e0e0; }
-  .link { color: #333; border-color: #ddd; }
-  .link:hover { background-color: #f0f0ff; border-color: #646cff; }
-  .link.active { background-color: #e9eaff; }
+
+.layout-main {
+  background: var(--el-bg-color-page);
+  padding: 0;
+  overflow: auto;
 }
 </style>

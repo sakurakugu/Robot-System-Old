@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterable, Optional, Tuple
 from urllib import request, error
 
-ROOT: Path = Path(__file__).resolve().parents[1]
+ROOT: Path = Path(__file__).resolve().parents[2]
 LOGS_DIR: Path = ROOT / "logs"
 PID_DIR: Path = LOGS_DIR / "pid"
 

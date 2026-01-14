@@ -1,60 +1,77 @@
 <template>
   <div class="page">
-    <div class="header">
-      <h2>参数管理</h2>
-    </div>
+    <el-page-header @back="() => {}" class="page-header">
+      <template #content>
+        <div class="header-content">
+          <el-icon :size="24"><Setting /></el-icon>
+          <span class="title">参数管理</span>
+        </div>
+      </template>
+    </el-page-header>
     <div class="content">
-      <div class="card">
-        <div class="row">
-          <label class="label">模型服务商</label>
-          <select v-model="llmProvider">
-            <option v-for="p in providers" :key="p.value" :value="p.value">
-              {{ p.label }}
-            </option>
-          </select>
-        </div>
-        <div class="row">
-          <label class="label">使用模型</label>
-          <select v-model="llmModel">
-            <option v-for="m in availableModels" :key="m.value" :value="m.value">
-              {{ m.label }}
-            </option>
-          </select>
-        </div>
-        <div class="row">
-          <label class="label">API密钥</label>
-          <div class="input-group">
-            <div class="input-with-icon">
-              <input v-model="apiKeyField" :readonly="apiKeyReadOnly" :type="llmApiKeyType" placeholder="粘贴服务商API Key" />
-              <button v-if="!apiKeyReadOnly" class="eye-icon" @click="toggleApiKeyVisible" title="显示/隐藏">👁</button>
-            </div>
-            <button class="btn-icon" @click="pasteApiKey" title="粘贴">粘贴</button>
-            <button class="btn-icon" v-if="apiKeyReadOnly && llmHasApiKey" @click="enableEditApiKey" title="编辑">编辑</button>
-          </div>
-        </div>
-        <div class="row">
-          <label class="label">后端地址</label>
-          <input v-model="serverUrl" placeholder="http://localhost:3001" />
-        </div>
-        <div class="row">
-          <label class="label">WebSocket路径</label>
-          <input v-model="wsPath" placeholder="/api/conversation/connect" />
-        </div>
-        <div class="row">
-          <label class="label">最大历史轮数</label>
-          <input type="number" min="0" v-model.number="maxHistory" />
-        </div>
-        <div class="actions">
-          <button @click="save">保存</button>
-          <span class="hint" v-if="saved">已保存</span>
-        </div>
-      </div>
+      <el-card shadow="hover">
+        <el-form :model="formData" label-width="120px" label-position="left">
+          <el-form-item label="模型服务商">
+            <el-select v-model="llmProvider" placeholder="请选择服务商" style="width: 100%">
+              <el-option
+                v-for="p in providers"
+                :key="p.value"
+                :label="p.label"
+                :value="p.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="使用模型">
+            <el-select v-model="llmModel" placeholder="请选择模型" style="width: 100%">
+              <el-option
+                v-for="m in availableModels"
+                :key="m.value"
+                :label="m.label"
+                :value="m.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="API密钥">
+            <el-input
+              v-model="apiKeyField"
+              :readonly="apiKeyReadOnly"
+              :type="llmApiKeyType"
+              placeholder="粘贴服务商API Key"
+            >
+              <template #append>
+                <el-button-group>
+                  <el-button :icon="View" @click="toggleApiKeyVisible" v-if="!apiKeyReadOnly" />
+                  <el-button :icon="CopyDocument" @click="pasteApiKey" />
+                  <el-button :icon="Edit" @click="enableEditApiKey" v-if="apiKeyReadOnly && llmHasApiKey" />
+                </el-button-group>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-divider />
+          <el-form-item label="后端地址">
+            <el-input v-model="serverUrl" placeholder="http://localhost:3001" />
+          </el-form-item>
+          <el-form-item label="WebSocket路径">
+            <el-input v-model="wsPath" placeholder="/api/conversation/connect" />
+          </el-form-item>
+          <el-form-item label="最大历史轮数">
+            <el-input-number v-model="maxHistory" :min="0" :max="100" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="save" :icon="Select">保存</el-button>
+            <el-text v-if="saved" type="success" style="margin-left: 12px">已保存</el-text>
+          </el-form-item>
+        </el-form>
+      </el-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
+import { Setting, View, CopyDocument, Edit, Select } from '@element-plus/icons-vue'
+
+const formData = ref({})
 
 const serverUrl = ref('')
 const wsPath = ref('/api/conversation/connect')
@@ -206,87 +223,33 @@ const save = () => {
 <style scoped>
 .page {
   height: 100%;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  padding: 20px;
+  background: var(--el-bg-color-page);
+  overflow: auto;
 }
-.header { display: flex; align-items: center; justify-content: space-between; }
-.content { flex: 1; overflow: auto; }
-.card {
-  background-color: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 12px;
-  padding: 1rem;
-  max-width: 720px;
-}
-.row {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0.75rem 0;
-}
-.label { color: #bbb; }
-input, textarea, select {
-  width: 100%;
-  background-color: #1a1a1a;
-  border: 1px solid #444;
-  color: #e0e0e0;
-  padding: 0.6rem 0.75rem;
+
+.page-header {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
   border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
-.actions { margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; }
-button {
-  background-color: #646cff;
-  color: #fff;
-  border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-}
-.input-group {
+
+.header-content {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
-.input-with-icon {
-  position: relative;
-  flex: 1;
+
+.content {
+  max-width: 800px;
 }
-.input-with-icon input {
-  padding-right: 2rem;
-}
-.eye-icon {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  color: #e0e0e0;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.btn-icon {
-  background-color: #444;
-  color: #fff;
-  border: none;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  writing-mode: horizontal-tb;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.hint { color: #7ee787; font-size: 0.9rem; }
-@media (prefers-color-scheme: light) {
-  .card { background-color: #fff; border-color: #e0e0e0; }
-  input, textarea, select { background-color: #fff; color: #333; border-color: #ddd; }
-  .btn-icon { background-color: #eee; color: #333; border: 1px solid #ddd; }
-  .eye-icon { color: #666; }
+
+:deep(.el-card__body) {
+  padding: 30px;
 }
 </style>

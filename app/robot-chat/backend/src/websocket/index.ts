@@ -4,7 +4,7 @@ import DatabaseService from '../database';
 import { ClientMessage, RobotConnection, ServerMessage } from '../types';
 import { generateUUIDv7, isValidRobotId } from '../utils/helpers';
 import LoggerService from '../utils/logger';
-import ConversationEngine from './conversation-engine';
+import ConversationEngine from '../services/conversation-engine';
 
 class WebSocketService {
   private wss: WebSocketServer | null = null;

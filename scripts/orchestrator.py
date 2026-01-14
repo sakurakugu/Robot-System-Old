@@ -26,6 +26,66 @@ DANCE_FRONTEND = ROOT / "app" / "dance-choreo" / "frontend"
 CHAT_BACKEND = ROOT / "app" / "robot-chat" / "backend"
 CHAT_FRONTEND = ROOT / "app" / "robot-chat" / "frontend"
 
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+def _parse_vite_port(vite_path: Path, default_port: int) -> int:
+    text = _read_text(vite_path)
+    import re
+    m = re.search(r"server\s*:\s*\{[^}]*port\s*:\s*(\d+)", text, re.S)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            pass
+    return default_port
+
+def _parse_env_port(env_path: Path, default_port: int) -> int:
+    text = _read_text(env_path)
+    import re
+    m = re.search(r"^PORT\s*=\s*(\d+)\s*$", text, re.M)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            pass
+    return default_port
+
+def _parse_ts_default_port(ts_config_path: Path, default_port: int) -> int:
+    text = _read_text(ts_config_path)
+    import re
+    m = re.search(r"parseInt\(\s*process\.env\.PORT\s*\|\|\s*'(\d+)'\s*,\s*10\s*\)", text)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            pass
+    return default_port
+
+def _dance_backend_port() -> int:
+    ts_path = DANCE_BACKEND / "src" / "config" / "index.ts"
+    return _parse_ts_default_port(ts_path, 3000)
+
+def _dance_frontend_port() -> int:
+    vite_path = DANCE_FRONTEND / "vite.config.ts"
+    return _parse_vite_port(vite_path, 5173)
+
+def _chat_backend_port() -> int:
+    env_path = CHAT_BACKEND / ".env"
+    if env_path.exists():
+        return _parse_env_port(env_path, 3001)
+    example = CHAT_BACKEND / ".env.example"
+    if example.exists():
+        return _parse_env_port(example, 3001)
+    return 3001
+
+def _chat_frontend_port() -> int:
+    vite_path = CHAT_FRONTEND / "vite.config.ts"
+    return _parse_vite_port(vite_path, 5174)
+
 
 def start_dance() -> List[Tuple[str, int]]:
     ensure_dirs()
@@ -40,13 +100,13 @@ def start_dance() -> List[Tuple[str, int]]:
 
     procs: List[Tuple[str, int]] = []
 
-    print("🚀 启动编舞系统后端...  (http://localhost:3000)")
+    print(f"🚀 启动编舞系统后端...  (http://localhost:{_dance_backend_port()})")
     backend_log = LOGS_DIR / "dance-choreo" / "backend.log"
     p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=DANCE_BACKEND, log_path=backend_log)
     write_pid("dance-backend", pid_backend)
     procs.append(("dance-backend", pid_backend))
 
-    print("🚀 启动编舞系统前端...  (http://localhost:5173)")
+    print(f"🚀 启动编舞系统前端...  (http://localhost:{_dance_frontend_port()})")
     frontend_log = LOGS_DIR / "dance-choreo" / "frontend.log"
     p_frontend, pid_frontend = spawn(["npm", "run", "dev"], cwd=DANCE_FRONTEND, log_path=frontend_log)
     write_pid("dance-frontend", pid_frontend)
@@ -66,15 +126,15 @@ def start_chat() -> List[Tuple[str, int]]:
 
     procs: List[Tuple[str, int]] = []
 
-    print("🚀 启动对话系统后端...  (http://localhost:3001)")
+    print(f"🚀 启动对话系统后端...  (http://localhost:{_chat_backend_port()})")
     backend_log = LOGS_DIR / "robot-chat" / "backend.log"
     p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=CHAT_BACKEND, log_path=backend_log)
     write_pid("chat-backend", pid_backend)
     procs.append(("chat-backend", pid_backend))
 
-    print("🚀 启动对话系统前端...  (http://localhost:5174)")
+    print(f"🚀 启动对话系统前端...  (http://localhost:{_chat_frontend_port()})")
     frontend_log = LOGS_DIR / "robot-chat" / "frontend.log"
-    p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", "5174"], cwd=CHAT_FRONTEND, log_path=frontend_log)
+    p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", str(_chat_frontend_port())], cwd=CHAT_FRONTEND, log_path=frontend_log)
     write_pid("chat-frontend", pid_frontend)
     procs.append(("chat-frontend", pid_frontend))
 
@@ -141,15 +201,18 @@ def test_all(app: str) -> bool:
 
     if app in ("all", "dance"):
         print("🧪 测试编舞系统 (Dance Choreo)...")
-        ok_all &= http_ok("http://localhost:3000/health")
-        ok_all &= http_ok("http://localhost:3000/api/projects")
-        ok_all &= http_ok("http://localhost:5173")
+        dbp = _dance_backend_port()
+        dfp = _dance_frontend_port()
+        ok_all &= http_ok(f"http://localhost:{dbp}/health")
+        ok_all &= http_ok(f"http://localhost:{dbp}/api/projects")
+        ok_all &= http_ok(f"http://localhost:{dfp}")
         print("✅ 编舞系统通过" if ok_all else "❌ 编舞系统异常")
     if app in ("all", "chat"):
         print("🧪 测试对话系统 (Robot Chat)...")
-        ok_chat = http_ok("http://localhost:3001/health")
-        ok_chat &= http_ok("http://localhost:5174")
+        cbp = _chat_backend_port()
+        cfp = _chat_frontend_port()
+        ok_chat = http_ok(f"http://localhost:{cbp}/health")
+        ok_chat &= http_ok(f"http://localhost:{cfp}")
         print("✅ 对话系统通过" if ok_chat else "❌ 对话系统异常")
         ok_all &= ok_chat
     return ok_all
-

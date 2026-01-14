@@ -6,6 +6,7 @@ import DatabaseService from './database';
 import createApiRoutes from './routes/api';
 import LoggerService from './utils/logger';
 import WebSocketService from './websocket';
+import { PostgresService } from './database/postgres';
 
 class Application {
   private app: express.Application;
@@ -13,12 +14,18 @@ class Application {
   private logger: LoggerService;
   private database: DatabaseService;
   private websocketService: WebSocketService;
+  private postgresService?: PostgresService;
 
   constructor() {
     this.app = express();
     this.logger = new LoggerService();
     this.database = new DatabaseService();
     this.websocketService = new WebSocketService(this.logger, this.database);
+    try {
+      this.postgresService = config.database.type === 'postgresql' ? new PostgresService() : undefined;
+    } catch {
+      this.postgresService = undefined;
+    }
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -49,7 +56,7 @@ class Application {
    */
   private setupRoutes(): void {
     // API路由
-    this.app.use('/api', createApiRoutes(this.database, this.websocketService));
+    this.app.use('/api', createApiRoutes(this.database, this.websocketService, this.postgresService));
 
     // 根路径
     this.app.get('/', (req, res) => {
@@ -101,15 +108,15 @@ class Application {
           wsPath: config.ws.path,
         });
 
-        console.log(`
-╔════════════════════════════════════════════════════╗
-║   机器狗对话管理系统 - Robot Dog Conversation      ║
-╠════════════════════════════════════════════════════╣
-║   HTTP服务: http://localhost:${config.port}                 ║
-║   WebSocket: ws://localhost:${config.port}${config.ws.path}   ║
-║   环境: ${config.nodeEnv}                            ║
-╚════════════════════════════════════════════════════╝
-        `);
+//         console.log(`
+// ╔════════════════════════════════════════════════════╗
+// ║   机器狗对话管理系统 - Robot Dog Conversation      ║
+// ╠════════════════════════════════════════════════════╣
+// ║   HTTP服务: http://localhost:${config.port}                 ║
+// ║   WebSocket: ws://localhost:${config.port}${config.ws.path}   ║
+// ║   环境: ${config.nodeEnv}                            ║
+// ╚════════════════════════════════════════════════════╝
+//         `);
       });
 
       // 优雅关闭

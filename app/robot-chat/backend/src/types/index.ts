@@ -140,6 +140,8 @@ export interface ConversationContext {
   history: Message[];
   maxHistory: number;
   systemPrompt?: string;
+  model?: string;
+  temperature?: number;
 }
 
 export interface Message {

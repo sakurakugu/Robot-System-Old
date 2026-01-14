@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { v7 as uuidv7 } from 'uuid'
 
 interface MessageHandler {
   (data: any): void
@@ -10,13 +11,20 @@ export function useWebSocket() {
   const robotId = ref('')
   const messageHandlers: MessageHandler[] = []
 
-  const generateUUID = (): string => {
-    // 简单的UUID v4生成
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0
-      const v = c === 'x' ? r : (r & 0x3) | 0x8
-      return v.toString(16)
-    })
+  const generateUUID = (): string => uuidv7()
+
+  const fetchUiConfig = async (): Promise<{ serverUrl?: string; wsPath?: string } | null> => {
+    try {
+      const res = await fetch('/api/config/ui').then(r => r.json())
+      if (res?.success && res.data) {
+        const serverUrl: string = res.data.serverUrl || ''
+        const wsPath: string = res.data.wsPath || '/api/conversation/connect'
+        localStorage.setItem('rc_server_url', serverUrl)
+        localStorage.setItem('rc_ws_path', wsPath)
+        return { serverUrl, wsPath }
+      }
+    } catch {}
+    return null
   }
 
   const connect = (): Promise<void> => {
@@ -27,8 +35,73 @@ export function useWebSocket() {
           robotId.value = generateUUID()
         }
 
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const wsUrl = `${protocol}//${window.location.hostname}:3000/api/conversation/connect?robotId=${robotId.value}`
+        let savedServer = localStorage.getItem('rc_server_url') || ''
+        let savedPath = localStorage.getItem('rc_ws_path') || '/api/conversation/connect'
+        if (!savedServer || !localStorage.getItem('rc_ws_path')) {
+          fetchUiConfig().then((cfg) => {
+            if (cfg) {
+              savedServer = cfg.serverUrl || savedServer
+              savedPath = cfg.wsPath || savedPath
+            }
+            // 继续发起连接
+            try {
+              let wsUrl = ''
+              if (savedServer) {
+                try {
+                  const u = new URL(savedServer)
+                  const wsScheme = u.protocol === 'https:' ? 'wss:' : 'ws:'
+                  wsUrl = `${wsScheme}//${u.host}${savedPath}?robotId=${robotId.value}`
+                } catch {
+                  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+                  wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+                }
+              } else {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+                wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+              }
+              ws.value = new WebSocket(wsUrl)
+              ws.value.onopen = () => {
+                console.log('WebSocket连接已建立')
+                isConnected.value = true
+                resolve()
+              }
+              ws.value.onmessage = (event) => {
+                try {
+                  const data = JSON.parse(event.data)
+                  console.log('收到消息:', data)
+                  messageHandlers.forEach((handler) => handler(data))
+                } catch (error) {
+                  console.error('解析消息失败:', error)
+                }
+              }
+              ws.value.onerror = (error) => {
+                console.error('WebSocket错误:', error)
+                reject(error)
+              }
+              ws.value.onclose = () => {
+                console.log('WebSocket连接已关闭')
+                isConnected.value = false
+              }
+            } catch (error) {
+              reject(error)
+            }
+          })
+          return
+        }
+        let wsUrl = ''
+        if (savedServer) {
+          try {
+            const u = new URL(savedServer)
+            const wsScheme = u.protocol === 'https:' ? 'wss:' : 'ws:'
+            wsUrl = `${wsScheme}//${u.host}${savedPath}?robotId=${robotId.value}`
+          } catch {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+            wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+          }
+        } else {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+          wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+        }
         
         ws.value = new WebSocket(wsUrl)
 

@@ -16,6 +16,8 @@ class LLMService {
     switch (this.provider) {
       case 'openai':
         return this.chatOpenAI(messages, options);
+      case 'bigmodel':
+        return this.chatBigModel(messages, options);
       default:
         throw new Error(`不支持的LLM提供商: ${this.provider}`);
     }
@@ -66,6 +68,49 @@ class LLMService {
       };
     } catch (error: any) {
       console.error('OpenAI API调用失败:', error.response?.data || error.message);
+      throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  /**
+   * BigModel API调用 (GLM系列)
+   */
+  private async chatBigModel(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+    const big = config.llm.bigmodel;
+    if (!big?.apiKey) {
+      throw new Error('BigModel API密钥未配置');
+    }
+    const baseUrl = big.baseUrl || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    const url = baseUrl;
+    try {
+      const response = await axios.post(
+        url,
+        {
+          model: options?.model || big.model || 'glm-4.5-flash',
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+          temperature: options?.temperature ?? 0.7,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${big.apiKey}`,
+          },
+          timeout: 30000,
+        }
+      );
+      const choice = response.data?.choices?.[0];
+      const msg = choice?.message || response.data?.data?.choices?.[0]?.message;
+      return {
+        content: msg?.content || '',
+        finishReason: choice?.finish_reason || 'stop',
+        usage: {
+          promptTokens: response.data?.usage?.prompt_tokens || 0,
+          completionTokens: response.data?.usage?.completion_tokens || 0,
+          totalTokens: response.data?.usage?.total_tokens || 0,
+        },
+      };
+    } catch (error: any) {
+      console.error('BigModel API调用失败:', error.response?.data || error.message);
       throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
     }
   }

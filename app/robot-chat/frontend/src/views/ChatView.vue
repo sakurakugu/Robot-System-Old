@@ -1,6 +1,22 @@
 <template>
   <div class="chatview">
     <aside class="sidebar">
+      <div class="robot-selector">
+        <h3>选择机器人</h3>
+        <div class="selector-row">
+          <input v-model="searchQuery" type="text" placeholder="搜索名称或UUID" />
+        </div>
+        <div class="selector-row">
+          <select v-model="selectedUuid">
+            <option v-for="r in filteredRobots" :key="r.uuid" :value="r.uuid">
+              {{ r.name || r.uuid }} ({{ r.uuid }})
+            </option>
+          </select>
+        </div>
+        <div class="selector-actions">
+          <button class="btn-primary" @click="applySelection" :disabled="!selectedUuid">设为当前</button>
+        </div>
+      </div>
       <div class="robot-info">
         <h3>机器狗信息</h3>
         <div class="info-item">
@@ -90,10 +106,11 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useWebSocket } from '../composables/useWebSocket'
 
-interface Message {
+type Message = {
   id: string
   type: 'user' | 'ai'
   text: string
@@ -111,6 +128,7 @@ const {
   onMessage,
 } = useWebSocket()
 
+const route = useRoute()
 const messages = ref<Message[]>([])
 const inputText = ref('')
 const chatArea = ref<HTMLElement>()
@@ -120,7 +138,22 @@ const avgLatency = ref(0)
 
 let requestTimestamps = new Map<number, number>()
 
+type RobotItem = { uuid: string; name?: string }
+const robots = ref<RobotItem[]>([])
+const searchQuery = ref('')
+const selectedUuid = ref<string>('')
+const filteredRobots = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return robots.value
+  return robots.value.filter(r =>
+    (r.name || '').toLowerCase().includes(q) || r.uuid.toLowerCase().includes(q)
+  )
+})
+
 const connect = async () => {
+  if (selectedUuid.value) {
+    robotId.value = selectedUuid.value
+  }
   await wsConnect()
   robotStatus.value = 'online'
 }
@@ -128,6 +161,12 @@ const connect = async () => {
 const disconnect = () => {
   wsDisconnect()
   robotStatus.value = 'offline'
+}
+
+const applySelection = () => {
+  if (selectedUuid.value) {
+    robotId.value = selectedUuid.value
+  }
 }
 
 const sendMessage = () => {
@@ -196,9 +235,22 @@ onMessage((data) => {
 
     scrollToBottom()
   }
-})
+});
 
-onMounted(() => {})
+onMounted(() => {
+  const uuid = route.params.uuid as string | undefined
+  if (uuid) {
+    robotId.value = uuid
+    selectedUuid.value = uuid
+  }
+  fetch('/api/robots')
+    .then(res => res.json())
+    .then(json => {
+      const list: any[] = json?.data?.robots || []
+      robots.value = list.map((r) => ({ uuid: r.uuid, name: r.name || '' }))
+    })
+    .catch(() => {})
+})
 onUnmounted(() => {
   disconnect()
 })
@@ -220,6 +272,22 @@ onUnmounted(() => {
   gap: 1.5rem;
   overflow-y: auto;
 }
+.robot-selector h3 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: #9bbcff;
+}
+.selector-row { margin-bottom: 0.5rem; }
+.selector-row input,
+.selector-row select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-primary);
+}
+.selector-actions { display: flex; gap: 0.5rem; }
 .robot-info h3,
 .stats h3 {
   font-size: 1rem;

@@ -2,7 +2,7 @@ import { Server } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 import DatabaseService from '../database';
 import { ClientMessage, RobotConnection, ServerMessage } from '../types';
-import { generateUUIDv7, isValidRobotId } from '../utils/helpers';
+import { uuidv7, isValidRobotId } from '../utils/helpers';
 import LoggerService from '../utils/logger';
 import ConversationEngine from '../services/conversation-engine';
 
@@ -44,7 +44,7 @@ class WebSocketService {
     let robotId = url.searchParams.get('robotId');
 
     if (!robotId || !isValidRobotId(robotId)) {
-      robotId = generateUUIDv7();
+      robotId = uuidv7();
       this.logger.info('生成新的机器狗ID', { robotId });
     }
 
@@ -150,7 +150,25 @@ class WebSocketService {
       this.logger.info('收到文本输入', { robotId, text });
 
       // 使用对话引擎处理
-      const response = await this.conversationEngine.processMessage(robotId, text);
+      let systemPrompt: string | undefined = undefined;
+      let temperature: number | undefined = undefined;
+      let model: string | undefined = undefined;
+      const robot = this.database.getRobot(robotId);
+      if (robot) {
+        model = robot.model || undefined;
+        try {
+          const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
+          systemPrompt = meta.ai_system_prompt || undefined;
+          temperature = typeof meta.ai_temperature === 'number' ? meta.ai_temperature : undefined;
+        } catch {}
+      }
+      const response = await this.conversationEngine.processMessage(robotId, text, {
+        history: [],
+        maxHistory: 10,
+        systemPrompt,
+        model,
+        temperature
+      });
 
       const processingTime = Date.now() - startTime;
 

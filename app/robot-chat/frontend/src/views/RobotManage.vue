@@ -67,9 +67,10 @@
         </div>
 
         <div class="card-footer">
-          <button class="btn-test" @click="robot.status === 'online' ? connectNow(robot) : testConnection(robot)" :disabled="testing[robot.uuid]">
+          <button class="btn-test" @click="testConnection(robot)" :disabled="testing[robot.uuid] || (robot.status === 'online' && connectReady[robot.uuid] === false)">
             {{ testing[robot.uuid] ? '测试中...' : (robot.status === 'online' ? '连接' : '测试连接') }}
           </button>
+          <button class="btn-chat" @click="openChat(robot)">对话</button>
           <button class="btn-edit" @click="editRobot(robot)">编辑</button>
           <button class="btn-delete" @click="deleteRobotConfirm(robot)">删除</button>
         </div>
@@ -107,9 +108,10 @@
               <td class="mono">{{ robot.uuid }}</td>
               <td>{{ formatTime(robot.last_connected) }}</td>
               <td class="actions-cell">
-                <button class="btn-small" @click="robot.status === 'online' ? connectNow(robot) : testConnection(robot)" :disabled="testing[robot.uuid]">
+                <button class="btn-small" @click="testConnection(robot)" :disabled="testing[robot.uuid] || (robot.status === 'online' && connectReady[robot.uuid] === false)">
                   {{ testing[robot.uuid] ? '测试中' : (robot.status === 'online' ? '连接' : '测试') }}
                 </button>
+                <button class="btn-small" @click="openChat(robot)">对话</button>
                 <button class="btn-small" @click="editRobot(robot)">编辑</button>
                 <button class="btn-small btn-danger" @click="deleteRobotConfirm(robot)">删除</button>
                 <span v-if="robot.status === 'offline' && connectionErrors[robot.uuid]" class="error-indicator"
@@ -126,10 +128,10 @@
       </div>
     </div>
 
-    <div v-if="showAddDialog || editingRobot" class="dialog-overlay" @click.self="closeDialog">
+    <div v-if="showAddDialog" class="dialog-overlay" @click.self="closeDialog">
       <div class="dialog">
         <div class="dialog-header">
-          <h3>{{ editingRobot ? '编辑机器人' : '添加机器人' }}</h3>
+          <h3>添加机器人</h3>
           <button class="close-btn" @click="closeDialog">×</button>
         </div>
         <div class="dialog-body">
@@ -160,7 +162,7 @@
         <div class="dialog-footer">
           <button class="btn-cancel" @click="closeDialog">取消</button>
           <button class="btn-primary" @click="saveRobot" :disabled="!isFormValid">
-            {{ editingRobot ? '保存' : '添加' }}
+            添加
           </button>
         </div>
       </div>
@@ -189,6 +191,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Menu, List, Refresh, Plus, Download } from '@element-plus/icons-vue'
 
@@ -204,11 +207,12 @@ type Robot = {
   group_name?: string | null
 }
 
+const router = useRouter()
+
 const robots = ref<Robot[]>([])
 const unifiedLocalIp = ref('')
 const viewMode = ref<'card' | 'list'>('card')
 const showAddDialog = ref(false)
-const editingRobot = ref<Robot | null>(null)
 const testing = ref<Record<string, boolean>>({})
 const connectionErrors = ref<Record<string, string>>({})
 const connectReady = ref<Record<string, boolean>>({})
@@ -359,43 +363,74 @@ function getNextAvailablePort() {
 }
 
 async function testConnection(robot: Robot) {
+  if (robot.status === 'online') {
+    return connectNow(robot)
+  }
   testing.value[robot.uuid] = true
   connectionErrors.value[robot.uuid] = ''
   try {
-    await new Promise((r) => setTimeout(r, 600))
-    if (robot.status !== 'online') {
+    const res = await fetch(`/api/robots/${robot.uuid}/test-connection`, { method: 'POST' })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+    if (json.success && json.connected) {
       robot.status = 'online'
-      connectReady.value[robot.uuid] = true
-      ElMessage.success('测试通过（示例）')
+      connectReady.value[robot.uuid] = false
+      setTimeout(() => {
+        connectReady.value[robot.uuid] = true
+      }, 1000)
+      ElMessage.success(json.message || '测试通过，请点击连接')
     } else {
-      ElMessage.success('已在线')
+      robot.status = 'offline'
+      const errMsg = json?.message || json?.error || '测试失败'
+      connectionErrors.value[robot.uuid] = errMsg
+      ElMessage.error(errMsg)
     }
   } catch (e: any) {
     robot.status = 'offline'
-    connectionErrors.value[robot.uuid] = e?.message || '测试失败'
-    ElMessage.error(connectionErrors.value[robot.uuid])
+    const errMsg = e?.message || '连接测试失败'
+    connectionErrors.value[robot.uuid] = errMsg
+    ElMessage.error(errMsg)
   } finally {
     testing.value[robot.uuid] = false
   }
 }
 
 async function connectNow(robot: Robot) {
-  if (connectReady.value[robot.uuid] === false) return
-  restartRobot.value = robot
-  countdown.value = 3
-  showRestartDialog.value = true
+  if (connectReady.value[robot.uuid] === false) {
+    return
+  }
+  testing.value[robot.uuid] = true
+  connectionErrors.value[robot.uuid] = ''
+  try {
+    const res = await fetch(`/api/robots/${robot.uuid}/connect`, { method: 'POST' })
+    const json = await res.json().catch(() => ({}))
+    if (res.ok && json.success) {
+      ElMessage.success(json.message || '连接成功')
+      restartRobot.value = robot
+      countdown.value = 3
+      showRestartDialog.value = true
+    } else {
+      robot.status = 'offline'
+      const errMsg = json?.message || json?.error || `HTTP ${res.status}`
+      connectionErrors.value[robot.uuid] = errMsg
+      ElMessage.error(errMsg || '连接失败')
+    }
+  } catch (e: any) {
+    robot.status = 'offline'
+    const errMsg = e?.message || '连接失败'
+    connectionErrors.value[robot.uuid] = errMsg
+    ElMessage.error(errMsg)
+  } finally {
+    testing.value[robot.uuid] = false
+  }
 }
 
 function editRobot(robot: Robot) {
-  editingRobot.value = robot
-  formData.value = {
-    name: robot.name || '',
-    robot_ip: robot.robot_ip || '',
-    local_ip: robot.local_ip || '',
-    local_port: robot.local_port || 10000,
-    group_name: robot.group_name || ''
-  }
-  localPortInput.value = String(formData.value.local_port)
+  router.push(`/robots/${robot.uuid}`)
+}
+
+function openChat(robot: Robot) {
+  router.push(`/chat/${robot.uuid}`)
 }
 
 function notifyRobotsUpdated() {
@@ -413,41 +448,28 @@ async function saveRobot() {
     group_name: formData.value.group_name || ''
   }
   try {
-    let saved: any = null
-    if (editingRobot.value) {
-      const res = await fetch(`/api/robots/${editingRobot.value.uuid}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
-      saved = json.data
-      Object.assign(editingRobot.value, saved)
-    } else {
-      const res = await fetch('/api/robots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
-      saved = json.data
-      robots.value.push({
-        uuid: saved.uuid,
-        name: saved.name || '',
-        model: saved.model || '',
-        status: saved.status || 'offline',
-        last_connected: saved.last_connected || null,
-        robot_ip: saved.robot_ip || '',
-        local_ip: saved.local_ip || '',
-        local_port: saved.local_port || 10000,
-        group_name: saved.group_name || ''
-      })
-    }
+    const res = await fetch('/api/robots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
+    const saved = json.data
+    robots.value.push({
+      uuid: saved.uuid,
+      name: saved.name || '',
+      model: saved.model || '',
+      status: saved.status || 'offline',
+      last_connected: saved.last_connected || null,
+      robot_ip: saved.robot_ip || '',
+      local_ip: saved.local_ip || '',
+      local_port: saved.local_port || 10000,
+      group_name: saved.group_name || ''
+    })
     notifyRobotsUpdated()
     closeDialog()
-    ElMessage.success(editingRobot.value ? '保存成功' : '添加成功')
+    ElMessage.success('添加成功')
   } catch (e: any) {
     ElMessage.error(e?.message || '保存失败')
   }
@@ -471,7 +493,6 @@ async function deleteRobotConfirm(robot: Robot) {
 
 function closeDialog() {
   showAddDialog.value = false
-  editingRobot.value = null
   formData.value = {
     name: '',
     robot_ip: '',
@@ -568,6 +589,7 @@ async function confirmRestart() {
     }
   }, 1000)
 }
+
 </script>
 
 <style scoped>
@@ -763,7 +785,19 @@ async function confirmRestart() {
   font-size: 13px;
   transition: all 0.2s;
 }
+.btn-chat {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid var(--el-border-color);
+  background: var(--el-fill-color);
+  color: var(--el-text-color-primary);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: all 0.2s;
+}
 .btn-test:hover { background: var(--el-color-primary); border-color: var(--el-color-primary); color: white; }
+.btn-chat:hover { background: var(--el-fill-color-light); }
 .btn-edit:hover { background: var(--el-fill-color-light); }
 .btn-delete { color: #f48771; }
 .btn-delete:hover { background: rgba(244, 135, 113, 0.2); border-color: #f48771; }
@@ -905,4 +939,26 @@ td {
   transition: background 0.2s;
 }
 .btn-cancel:hover { background: var(--el-fill-color-light); }
+.robot-detail {
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--el-border-color);
+}
+.detail-header h3 { margin: 0; font-size: 18px; color: var(--el-text-color-primary); }
+.detail-body { padding: 20px; }
+.detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--el-border-color);
+}
 </style>

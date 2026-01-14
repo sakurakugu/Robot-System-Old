@@ -1,7 +1,8 @@
 <template>
   <div class="layout">
     <header class="header">
-      <h1>机器狗管理控制台</h1>
+      <!-- <h1>机器狗管理控制台</h1> -->
+      <h1>机器狗</h1>
   </header>
     <div class="content">
       <nav class="rail" :style="{ width: railWidth + 'px' }" :class="{ narrow: isNarrow }">

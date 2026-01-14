@@ -26,8 +26,7 @@
     "better-sqlite3": "^12.6.0",
     "uuid": "^13.0.0",
     "axios": "^1.13.2",
-    "cors": "^2.8.5",
-    "pg": "^8.11.3"
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

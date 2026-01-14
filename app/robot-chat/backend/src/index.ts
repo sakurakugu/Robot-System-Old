@@ -6,7 +6,6 @@ import DatabaseService from './database';
 import createApiRoutes from './routes/api';
 import LoggerService from './utils/logger';
 import WebSocketService from './websocket';
-import { PostgresService } from './database/postgres';
 
 class Application {
   private app: express.Application;
@@ -14,21 +13,52 @@ class Application {
   private logger: LoggerService;
   private database: DatabaseService;
   private websocketService: WebSocketService;
-  private postgresService?: PostgresService;
 
   constructor() {
     this.app = express();
     this.logger = new LoggerService();
     this.database = new DatabaseService();
     this.websocketService = new WebSocketService(this.logger, this.database);
-    try {
-      this.postgresService = config.database.type === 'postgresql' ? new PostgresService() : undefined;
-    } catch {
-      this.postgresService = undefined;
-    }
 
+    this.loadPersistedConfig();
     this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  /**
+   * 从数据库加载持久化配置并覆盖内存配置
+   */
+  private loadPersistedConfig(): void {
+    try {
+      const s = this.database.getAllSettings();
+      const provider = s['llm.provider'];
+      if (provider && (['openai','bigmodel','anthropic','deepseek'].includes(provider))) {
+        (config.llm as any).provider = provider;
+      }
+      // OpenAI
+      const openaiApiKey = s['openai.apiKey'];
+      const openaiModel = s['openai.model'];
+      const openaiBaseUrl = s['openai.baseUrl'];
+      if (openaiApiKey || openaiModel || openaiBaseUrl) {
+        config.llm.openai = config.llm.openai || { apiKey: '', model: '' };
+        if (openaiApiKey) config.llm.openai.apiKey = openaiApiKey;
+        if (openaiModel) config.llm.openai.model = openaiModel;
+        if (openaiBaseUrl) config.llm.openai.baseUrl = openaiBaseUrl;
+      }
+      // BigModel
+      const bigApiKey = s['bigmodel.apiKey'];
+      const bigModel = s['bigmodel.model'];
+      const bigBaseUrl = s['bigmodel.baseUrl'];
+      if (bigApiKey || bigModel || bigBaseUrl) {
+        config.llm.bigmodel = config.llm.bigmodel || { apiKey: '', model: '' };
+        if (bigApiKey) config.llm.bigmodel.apiKey = bigApiKey;
+        if (bigModel) config.llm.bigmodel.model = bigModel;
+        if (bigBaseUrl) config.llm.bigmodel.baseUrl = bigBaseUrl;
+      }
+      this.logger.info('已加载持久化配置');
+    } catch (e: any) {
+      this.logger.warn('加载持久化配置失败', { error: e?.message });
+    }
   }
 
   /**
@@ -56,7 +86,7 @@ class Application {
    */
   private setupRoutes(): void {
     // API路由
-    this.app.use('/api', createApiRoutes(this.database, this.websocketService, this.postgresService));
+    this.app.use('/api', createApiRoutes(this.database, this.websocketService));
 
     // 根路径
     this.app.get('/', (req, res) => {

@@ -50,7 +50,10 @@ class ConversationEngine {
       ];
 
       // 调用LLM
-      const llmResponse = await this.llmService.chat(messages);
+      const llmResponse = await this.llmService.chat(messages, {
+        model: context?.model || '',
+        temperature: context?.temperature
+      });
       const responseText = llmResponse.content;
 
       // 解析动作指令

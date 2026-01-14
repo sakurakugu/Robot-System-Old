@@ -1,13 +1,6 @@
-import { v4 as uuidv4 } from 'uuid';
+import { v7 as uuidv7 } from 'uuid';
 
-/**
- * 生成UUID v7 (时间排序的UUID)
- * 注意：当前使用UUID v4作为替代，未来可升级为真正的UUIDv7
- */
-export function generateUUIDv7(): string {
-  // 简化版本，使用UUID v4
-  return uuidv4();
-}
+export { uuidv7 };
 
 /**
  * 解析动作指令

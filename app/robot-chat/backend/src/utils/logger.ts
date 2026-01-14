@@ -18,11 +18,28 @@ class LoggerService {
       level: config.logging.level,
       format: winston.format.combine(
         winston.format.timestamp({
-          format: 'YYYY-MM-DD HH:mm:ss'
+          format: 'YYYY-MM-DDTHH:mm:ss'
         }),
         winston.format.errors({ stack: true }),
         winston.format.splat(),
-        winston.format.json()
+        winston.format.printf((info) => {
+          const { timestamp, level, message, service, ...rest } = info as any;
+          const now = new Date();
+          const offsetMinutes = -now.getTimezoneOffset();
+          const sign = offsetMinutes >= 0 ? '+' : '-';
+          const abs = Math.abs(offsetMinutes);
+          const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+          const mm = String(abs % 60).padStart(2, '0');
+          const ts = `${timestamp}${sign}${hh}:${mm}`;
+          const ordered = {
+            timestamp: ts,
+            level,
+            message,
+            service,
+            ...rest,
+          };
+          return JSON.stringify(ordered);
+        })
       ),
       defaultMeta: { service: 'robot-dog-conversation' },
       transports: [

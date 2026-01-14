@@ -24,6 +24,15 @@ class DatabaseService {
   }
 
   private initTables(): void {
+    // 系统设置表（用于持久化运行时配置）
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // 机器狗注册表
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS robots (
@@ -112,6 +121,30 @@ class DatabaseService {
     console.log('数据库初始化完成');
   }
 
+  // 设置管理
+  setSetting(key: string, value: string): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO settings (key, value, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `);
+    stmt.run(key, value);
+  }
+
+  getSetting(key: string): string | undefined {
+    const stmt = this.db.prepare(`SELECT value FROM settings WHERE key = ?`);
+    const row = stmt.get(key) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  getAllSettings(): Record<string, string> {
+    const stmt = this.db.prepare(`SELECT key, value FROM settings`);
+    const rows = stmt.all() as { key: string; value: string }[];
+    const map: Record<string, string> = {};
+    for (const r of rows) map[r.key] = r.value;
+    return map;
+  }
+
   // 机器狗管理
   registerRobot(robot: Partial<RobotRecord>): void {
     const stmt = this.db.prepare(`
@@ -178,6 +211,42 @@ class DatabaseService {
     `);
 
     return stmt.all(robotId, limit, offset) as ConversationRecord[];
+  }
+
+  updateRobot(uuid: string, data: Partial<RobotRecord>): RobotRecord | undefined {
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (data.name !== undefined) {
+      fields.push('name = ?');
+      values.push(data.name ?? null);
+    }
+    if (data.model !== undefined) {
+      fields.push('model = ?');
+      values.push(data.model ?? null);
+    }
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.last_connected !== undefined) {
+      fields.push('last_connected = ?');
+      values.push(data.last_connected ? data.last_connected.toISOString() : new Date().toISOString());
+    }
+    if (data.metadata !== undefined) {
+      fields.push('metadata = ?');
+      values.push(data.metadata ?? null);
+    }
+    if (fields.length === 0) {
+      return this.getRobot(uuid);
+    }
+    const stmt = this.db.prepare(`UPDATE robots SET ${fields.join(', ')} WHERE uuid = ?`);
+    stmt.run(...values, uuid);
+    return this.getRobot(uuid);
+  }
+
+  deleteRobot(uuid: string): void {
+    const stmt = this.db.prepare('DELETE FROM robots WHERE uuid = ?');
+    stmt.run(uuid);
   }
 
   // 动作日志

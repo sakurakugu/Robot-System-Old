@@ -16,8 +16,13 @@ export interface Config {
 
   // AI服务配置
   llm: {
-    provider: 'openai' | 'anthropic' | 'tongyi' | 'deepseek';
+    provider: 'openai' | 'anthropic' | 'tongyi' | 'deepseek' | 'bigmodel';
     openai?: {
+      apiKey: string;
+      model: string;
+      baseUrl?: string;
+    };
+    bigmodel?: {
       apiKey: string;
       model: string;
       baseUrl?: string;
@@ -46,9 +51,8 @@ export interface Config {
 
   // 数据库配置
   database: {
-    type: 'sqlite' | 'postgresql';
+    type: 'sqlite';
     path?: string;
-    url?: string;
   };
 
   // 日志配置
@@ -82,6 +86,11 @@ const config: Config = {
       apiKey: process.env.OPENAI_API_KEY || '',
       model: process.env.OPENAI_MODEL || 'gpt-4',
       baseUrl: process.env.OPENAI_BASE_URL,
+    },
+    bigmodel: {
+      apiKey: process.env.BIGMODEL_API_KEY || '',
+      model: process.env.BIGMODEL_MODEL || 'glm-4.5-flash',
+      baseUrl: process.env.BIGMODEL_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     },
   },
 

@@ -27,15 +27,23 @@ class Application {
 
   /**
    * 从数据库加载持久化配置并覆盖内存配置
+   * 仅使用数据库配置，不读取 .env 文件
+   * 所有 LLM 相关配置必须通过参数管理页面设置
    */
   private loadPersistedConfig(): void {
     try {
       const s = this.database.getAllSettings();
+      
+      // LLM Provider - 必须从数据库读取
       const provider = s['llm.provider'];
       if (provider && (['openai','bigmodel','anthropic','deepseek'].includes(provider))) {
         (config.llm as any).provider = provider;
+        this.logger.info(`LLM Provider: ${provider} (来自数据库)`);
+      } else {
+        this.logger.warn(`未配置 LLM Provider，使用默认值: ${config.llm.provider}。请通过参数管理页面配置！`);
       }
-      // OpenAI
+      
+      // OpenAI - 仅从数据库读取
       const openaiApiKey = s['openai.apiKey'];
       const openaiModel = s['openai.model'];
       const openaiBaseUrl = s['openai.baseUrl'];
@@ -44,8 +52,10 @@ class Application {
         if (openaiApiKey) config.llm.openai.apiKey = openaiApiKey;
         if (openaiModel) config.llm.openai.model = openaiModel;
         if (openaiBaseUrl) config.llm.openai.baseUrl = openaiBaseUrl;
+        this.logger.info('OpenAI 配置已从数据库加载');
       }
-      // BigModel
+      
+      // BigModel - 仅从数据库读取
       const bigApiKey = s['bigmodel.apiKey'];
       const bigModel = s['bigmodel.model'];
       const bigBaseUrl = s['bigmodel.baseUrl'];
@@ -54,10 +64,22 @@ class Application {
         if (bigApiKey) config.llm.bigmodel.apiKey = bigApiKey;
         if (bigModel) config.llm.bigmodel.model = bigModel;
         if (bigBaseUrl) config.llm.bigmodel.baseUrl = bigBaseUrl;
+        this.logger.info('BigModel 配置已从数据库加载');
       }
-      this.logger.info('已加载持久化配置');
+      
+      this.logger.info('持久化配置加载完成', {
+        provider: config.llm.provider,
+        hasOpenAIKey: !!(config.llm.openai?.apiKey),
+        hasBigModelKey: !!(config.llm.bigmodel?.apiKey)
+      });
+      
+      // 检查是否需要通过参数管理页面配置
+      if (!config.llm.openai?.apiKey && !config.llm.bigmodel?.apiKey) {
+        this.logger.warn('⚠️  未找到任何 LLM API 密钥配置！');
+        this.logger.warn('⚠️  请访问前端参数管理页面进行配置：http://localhost:5174/params');
+      }
     } catch (e: any) {
-      this.logger.warn('加载持久化配置失败', { error: e?.message });
+      this.logger.error('加载持久化配置失败，请通过参数管理页面配置', { error: e?.message });
     }
   }
 

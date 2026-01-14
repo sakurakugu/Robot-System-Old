@@ -144,18 +144,18 @@ main() {
     case $choice in
         1)
             print_info "执行 Ubuntu 22.04 快速安装..."
-            bash "$SCRIPT_DIR/scripts/setup-ubuntu.sh"
+            bash "$SCRIPT_DIR/scripts/setup/setup-ubuntu.sh"
             install_project_dependencies
             ;;
         2)
             print_info "执行 Ubuntu Python 环境配置..."
-            bash "$SCRIPT_DIR/scripts/setup-python.sh"
-            bash "$SCRIPT_DIR/scripts/setup-ubuntu.sh"
+            bash "$SCRIPT_DIR/scripts/setup/setup-python.sh"
+            bash "$SCRIPT_DIR/scripts/setup/setup-ubuntu.sh"
             install_project_dependencies
             ;;
         3)
             print_info "执行 WSL 环境配置..."
-            bash "$SCRIPT_DIR/scripts/setup-wsl.sh"
+            bash "$SCRIPT_DIR/scripts/setup/setup-wsl.sh"
             install_project_dependencies
             ;;
         4)
@@ -164,7 +164,7 @@ main() {
             ;;
         5)
             print_info "检查依赖项..."
-            bash "$SCRIPT_DIR/scripts/check-dependencies.sh"
+            bash "$SCRIPT_DIR/scripts/setup/check-dependencies.sh"
             ;;
         0)
             print_info "退出安装"

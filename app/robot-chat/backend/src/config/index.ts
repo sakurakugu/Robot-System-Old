@@ -81,16 +81,18 @@ const config: Config = {
   },
 
   llm: {
-    provider: (process.env.LLM_PROVIDER as any) || 'openai',
+    // 仅从数据库加载配置，不使用 .env
+    // 以下为初始默认值，会被数据库配置完全覆盖
+    provider: 'bigmodel',
     openai: {
-      apiKey: process.env.OPENAI_API_KEY || '',
-      model: process.env.OPENAI_MODEL || 'gpt-4',
-      baseUrl: process.env.OPENAI_BASE_URL,
+      apiKey: '',
+      model: 'gpt-4',
+      baseUrl: 'https://api.openai.com/v1',
     },
     bigmodel: {
-      apiKey: process.env.BIGMODEL_API_KEY || '',
-      model: process.env.BIGMODEL_MODEL || 'glm-4.5-flash',
-      baseUrl: process.env.BIGMODEL_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      apiKey: '',
+      model: 'glm-4-flash',
+      baseUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     },
   },
 

@@ -4,7 +4,7 @@ import config from '../config';
 import { ConversationRecord, RobotRecord } from '../types';
 
 class DatabaseService {
-  private db: Database.Database;
+  private db!: Database.Database;
 
   constructor() {
     this.init();
@@ -245,8 +245,17 @@ class DatabaseService {
   }
 
   deleteRobot(uuid: string): void {
-    const stmt = this.db.prepare('DELETE FROM robots WHERE uuid = ?');
-    stmt.run(uuid);
+    const deleteConversations = this.db.prepare('DELETE FROM conversations WHERE robot_id = ?');
+    const deleteActionLogs = this.db.prepare('DELETE FROM action_logs WHERE robot_id = ?');
+    const deleteRobot = this.db.prepare('DELETE FROM robots WHERE uuid = ?');
+
+    const runTransaction = this.db.transaction(() => {
+      deleteConversations.run(uuid);
+      deleteActionLogs.run(uuid);
+      deleteRobot.run(uuid);
+    });
+
+    runTransaction();
   }
 
   // 动作日志

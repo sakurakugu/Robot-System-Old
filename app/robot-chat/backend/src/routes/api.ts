@@ -1,13 +1,31 @@
-import { Request, Response, Router } from 'express';
-import os from 'os';
-import DatabaseService from '../database';
-import WebSocketService from '../websocket';
-import { v7 as uuidv7 } from 'uuid';
 import { spawn } from 'child_process';
-import path from 'path';
+import { Request, Response, Router } from 'express';
 import net from 'net';
+import os from 'os';
+import path from 'path';
+import { v7 as uuidv7 } from 'uuid';
 import config from '../config';
 import { LLM_PROVIDERS } from '../config/llm-providers';
+import DatabaseService from '../database';
+import WebSocketService from '../websocket';
+
+/**
+ * 将日期转换为带时区偏移的ISO格式字符串
+ * 例如: 2026-01-14T09:36:18.293+08:00
+ */
+function toISOStringWithTimezone(date = new Date()): string {
+  const offset = -date.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+
+  // 把 UTC 时间转换为本地时间
+  const local = new Date(date.getTime() + offset * 60_000)
+    .toISOString()
+    .slice(0, -1);
+
+  return `${local}${sign}${hh}:${mm}`;
+}
 
 function createApiRoutes(
   database: DatabaseService,
@@ -167,24 +185,20 @@ function createApiRoutes(
       let finalUuid: string | null = null;
       if (robot_ip) {
         // 1) 先测试SSH连通性
-        const sshArgsCheck = [
-          '-o', 'BatchMode=yes',
-          '-o', 'ConnectTimeout=5',
-          '-o', 'StrictHostKeyChecking=no',
-          `firefly@${robot_ip}`,
-          'exit',
-        ];
+        const pythonScript = path.resolve(__dirname, '../utils/ssh_helper.py');
         const canSsh = await new Promise<boolean>((resolve) => {
-          const p = spawn('ssh', sshArgsCheck);
-          let hadError = false;
-          let stderr = '';
-          p.stderr.on('data', (d) => { stderr += d.toString(); });
-          p.on('error', () => { hadError = true; resolve(false); });
+          const p = spawn('python3', [pythonScript, 'test', robot_ip]);
+          let stdout = '';
+          p.stdout.on('data', (d) => { stdout += d.toString(); });
+          p.on('error', () => resolve(false));
           p.on('close', (code) => {
-            if (!hadError && code === 0) {
-              resolve(true);
-            } else if (stderr.includes('Permission denied') || stderr.includes('Authentication failed')) {
-              resolve(true);
+            if (code === 0) {
+              try {
+                const result = JSON.parse(stdout);
+                resolve(result.success && result.connected);
+              } catch {
+                resolve(false);
+              }
             } else {
               resolve(false);
             }
@@ -194,78 +208,135 @@ function createApiRoutes(
           return res.status(400).json({ success: false, error: `无法通过SSH连接到 ${robot_ip}` });
         }
 
-        // 2) 创建数据目录并处理UUID
+        // 2) 创建数据目录并从机器人读取UUID
+        console.log(`[INFO] 创建远程目录并检查UUID...`);
         const remoteInitCmd = [
-          'mkdir -p ~/robot-chat',
-          'if [ -f ~/robot-chat/config.json ]; then cat ~/robot-chat/config.json; else (test -r /etc/machine-id && cat /etc/machine-id) || echo \"\"; fi',
+          'mkdir -p /home/firefly/sparkrobot/robot-chat',
+          'mkdir -p /home/firefly/sparkrobot/config',
+          // 尝试读取config.toml中的uuid
+          'if [ -f /home/firefly/sparkrobot/config/config.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/config.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
         ].join(' && ');
-        const sshArgsInit = [
-          '-o', 'StrictHostKeyChecking=no',
-          `firefly@${robot_ip}`,
-          remoteInitCmd,
-        ];
+        
         const remoteUuidRaw = await new Promise<string>((resolve, reject) => {
-          const p = spawn('ssh', sshArgsInit);
+          const p = spawn('python3', [pythonScript, 'exec', robot_ip, remoteInitCmd]);
           let stdout = '';
-          let stderr = '';
           p.stdout.on('data', (d) => { stdout += d.toString(); });
-          p.stderr.on('data', (d) => { stderr += d.toString(); });
           p.on('error', (e) => reject(e));
           p.on('close', (code) => {
             if (code === 0) {
-              resolve(stdout.trim());
+              try {
+                const result = JSON.parse(stdout);
+                if (result.success) {
+                  resolve(result.output.trim());
+                } else {
+                  reject(new Error(result.error || '远程初始化失败'));
+                }
+              } catch (e) {
+                reject(new Error('解析输出失败'));
+              }
             } else {
-              reject(new Error(stderr || `远程初始化失败 (code=${code})`));
+              reject(new Error('远程初始化失败'));
             }
           });
         }).catch((e: any) => {
           throw new Error(e?.message || '远程初始化失败');
         });
 
-        let parsedUuid: string | null = null;
-        if (remoteUuidRaw && remoteUuidRaw.startsWith('{')) {
-          try {
-            const obj = JSON.parse(remoteUuidRaw);
-            if (obj && typeof obj.uuid === 'string' && obj.uuid.length >= 8) {
-              parsedUuid = obj.uuid;
-            }
-          } catch {}
-        } else if (remoteUuidRaw && remoteUuidRaw.length >= 8) {
-          parsedUuid = remoteUuidRaw;
-        }
-        finalUuid = parsedUuid || uuidv7();
-
-        const needWriteConfig = !parsedUuid;
-        if (needWriteConfig) {
-          const configJson = JSON.stringify({ uuid: finalUuid });
-          const writeCmd = `bash -lc 'cat > ~/robot-chat/config.json << \"EOF\"\n${configJson}\nEOF'`;
-          const sshArgsWrite = ['-o', 'StrictHostKeyChecking=no', `firefly@${robot_ip}`, writeCmd];
-          const wrote = await new Promise<boolean>((resolve) => {
-            const p = spawn('ssh', sshArgsWrite);
-            p.on('error', () => resolve(false));
-            p.on('close', (code) => resolve(code === 0));
-          });
-          if (!wrote) {
-            return res.status(500).json({ success: false, error: '写入远程配置失败' });
+        // 解析机器人内部的UUID
+        let robotUuid: string | null = null;
+        if (remoteUuidRaw && remoteUuidRaw.length > 0) {
+          // 验证UUID格式 (UUIDv7格式: xxxxxxxx-xxxx-7xxx-xxxx-xxxxxxxxxxxx)
+          const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidPattern.test(remoteUuidRaw)) {
+            robotUuid = remoteUuidRaw;
+            console.log(`[INFO] 从机器人读取到UUID: ${robotUuid}`);
           }
         }
 
-        // 3) 复制客户端代码到机器狗的目录
-        // 运行环境通常在 backend 目录，client 位于其上级 ../client
-        const clientPath = path.resolve(process.cwd(), '../client');
-        // 使用bash以支持通配符展开，复制目录内容而不是目录本身
-        const scpCmd = `scp -r -o StrictHostKeyChecking=no ${clientPath}/* firefly@${robot_ip}:~/robot-chat/`;
-        const scpProc = spawn('bash', ['-lc', scpCmd]);
-        const scpOk = await new Promise<boolean>((resolve) => {
-          scpProc.on('error', () => resolve(false));
-          scpProc.on('close', (code) => resolve(code === 0));
-        });
-        if (!scpOk) {
-          return res.status(500).json({ success: false, error: '复制客户端代码到机器狗失败' });
+        // 如果机器人没有UUID，生成新的UUID
+        if (!robotUuid) {
+          robotUuid = uuidv7();
+          console.log(`[INFO] 机器人没有UUID，生成新UUID: ${robotUuid}`);
+          
+          // 将新生成的UUID写入机器人
+          const configToml = `# 火花机器人配置文件\n# 生成于 ${toISOStringWithTimezone()}\n\nuuid = "${robotUuid}"\n`;
+          const wrote = await new Promise<boolean>((resolve) => {
+            const p = spawn('python3', [pythonScript, 'write', robot_ip, '/home/firefly/sparkrobot/config/config.toml', configToml]);
+            let stdout = '';
+            p.stdout.on('data', (d) => { stdout += d.toString(); });
+            p.on('error', () => resolve(false));
+            p.on('close', (code) => {
+              if (code === 0) {
+                try {
+                  const result = JSON.parse(stdout);
+                  resolve(result.success);
+                } catch {
+                  resolve(false);
+                }
+              } else {
+                resolve(false);
+              }
+            });
+          });
+          if (!wrote) {
+            return res.status(500).json({ success: false, error: '写入远程UUID配置失败' });
+          }
+          console.log(`[SUCCESS] 已将UUID写入机器人配置文件`);
+        } else {
+          console.log(`[INFO] 使用机器人现有的UUID`);
         }
+
+        // 设置最终使用的UUID（来自机器人）
+        finalUuid = robotUuid;
+
+        // 3) 复制客户端代码到机器狗的目录
+        // 确定client目录的绝对路径（从backend/src/routes向上三级到robot-chat，再进入client）
+        const clientPath = path.resolve(__dirname, '../../../client');
+        console.log(`[INFO] Client path: ${clientPath}`);
+        
+        const scpResult = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          const p = spawn('python3', [pythonScript, 'copy', robot_ip, clientPath, '/home/firefly/sparkrobot/robot-chat']);
+          let stdout = '';
+          let stderr = '';
+          p.stdout.on('data', (d) => { stdout += d.toString(); });
+          p.stderr.on('data', (d) => { 
+            stderr += d.toString();
+            console.log(`[SSH] ${d.toString().trim()}`);
+          });
+          p.on('error', (err) => {
+            console.error(`[ERROR] spawn error:`, err);
+            resolve({ success: false, error: err.message });
+          });
+          p.on('close', (code) => {
+            console.log(`[INFO] Copy process exit code: ${code}`);
+            if (code === 0) {
+              try {
+                const result = JSON.parse(stdout);
+                resolve(result);
+              } catch (e) {
+                console.error(`[ERROR] JSON parse error:`, e, `stdout:`, stdout);
+                resolve({ success: false, error: '解析输出失败' });
+              }
+            } else {
+              resolve({ success: false, error: stderr || '复制失败' });
+            }
+          });
+        });
+        
+        if (!scpResult.success) {
+          return res.status(500).json({ 
+            success: false, 
+            error: `复制客户端代码到机器狗失败: ${scpResult.error || '未知错误'}` 
+          });
+        }
+        
+        console.log(`[SUCCESS] 机器人 ${robot_ip} 初始化完成，UUID: ${finalUuid}`);
       }
 
+      // 使用机器人的UUID或生成新的UUID（仅当未提供robot_ip时）
       const uuid = finalUuid ?? uuidv7();
+      console.log(`[INFO] 准备写入数据库，UUID: ${uuid}`);
+      
       const metadata = {
         robot_ip: robot_ip || null,
         local_ip: local_ip || null,
@@ -335,6 +406,9 @@ function createApiRoutes(
     }
   });
 
+  /*
+   * 测试机器人连接
+   */
   router.post('/robots/:uuid/test-connection', async (req: Request, res: Response) => {
     try {
       const uuid = normalizeParam((req.params as any).uuid);
@@ -393,6 +467,9 @@ function createApiRoutes(
     }
   });
 
+  /**  
+   * 连接机器人
+   */
   router.post('/robots/:uuid/connect', async (req: Request, res: Response) => {
     try {
       const uuid = normalizeParam((req.params as any).uuid);
@@ -406,16 +483,23 @@ function createApiRoutes(
         robotIp = null;
       }
       if (!robotIp) return res.status(400).json({ success: false, error: '缺少机器人IP' });
-      const args = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=3', '-o', 'StrictHostKeyChecking=no', `firefly@${robotIp}`, 'exit'];
+      const pythonScript = path.resolve(__dirname, '../utils/ssh_helper.py');
       const ok = await new Promise<boolean>((resolve) => {
-        const p = spawn('ssh', args);
-        let hadError = false;
-        p.on('error', () => {
-          hadError = true;
-          resolve(false);
-        });
+        const p = spawn('python3', [pythonScript, 'test', robotIp]);
+        let stdout = '';
+        p.stdout.on('data', (d) => { stdout += d.toString(); });
+        p.on('error', () => resolve(false));
         p.on('close', (code) => {
-          resolve(!hadError && code === 0);
+          if (code === 0) {
+            try {
+              const result = JSON.parse(stdout);
+              resolve(result.success && result.connected);
+            } catch {
+              resolve(false);
+            }
+          } else {
+            resolve(false);
+          }
         });
       });
       if (!ok) {
@@ -428,6 +512,136 @@ function createApiRoutes(
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  /**
+   * 更新机器人固件（复制客户端代码）
+   */
+  router.post('/robots/:uuid/update-firmware', async (req: Request, res: Response) => {
+    try {
+      const uuid = normalizeParam((req.params as any).uuid);
+      const robot = database.getRobot(uuid);
+      if (!robot) {
+        return res.status(404).json({ success: false, error: '机器人不存在' });
+      }
+
+      let robotIp: string | null = null;
+      try {
+        const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
+        robotIp = meta.robot_ip || null;
+      } catch {
+        robotIp = null;
+      }
+
+      if (!robotIp) {
+        return res.status(400).json({ success: false, error: '缺少机器人IP地址' });
+      }
+
+      const pythonScript = path.resolve(__dirname, '../utils/ssh_helper.py');
+      
+      // 1) 测试连接
+      console.log(`[INFO] 测试连接到 ${robotIp}...`);
+      const canConnect = await new Promise<boolean>((resolve) => {
+        const p = spawn('python3', [pythonScript, 'test', robotIp]);
+        let stdout = '';
+        p.stdout.on('data', (d) => { stdout += d.toString(); });
+        p.on('error', () => resolve(false));
+        p.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const result = JSON.parse(stdout);
+              resolve(result.success && result.connected);
+            } catch {
+              resolve(false);
+            }
+          } else {
+            resolve(false);
+          }
+        });
+      });
+
+      if (!canConnect) {
+        return res.status(400).json({ success: false, error: `无法连接到机器人 ${robotIp}` });
+      }
+
+      // 2) 确保远程目录存在
+      console.log(`[INFO] 创建远程目录...`);
+      const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-chat && mkdir -p /home/firefly/sparkrobot/config';
+      const mkdirOk = await new Promise<boolean>((resolve) => {
+        const p = spawn('python3', [pythonScript, 'exec', robotIp, mkdirCmd]);
+        let stdout = '';
+        p.stdout.on('data', (d) => { stdout += d.toString(); });
+        p.on('error', () => resolve(false));
+        p.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const result = JSON.parse(stdout);
+              resolve(result.success);
+            } catch {
+              resolve(false);
+            }
+          } else {
+            resolve(false);
+          }
+        });
+      });
+
+      if (!mkdirOk) {
+        return res.status(500).json({ success: false, error: '创建远程目录失败' });
+      }
+
+      // 3) 复制客户端代码
+      console.log(`[INFO] 开始复制客户端代码...`);
+      const clientPath = path.resolve(__dirname, '../../../client');
+      console.log(`[INFO] Client path: ${clientPath}`);
+
+      const copyResult = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        const p = spawn('python3', [pythonScript, 'copy', robotIp, clientPath, '/home/firefly/sparkrobot/robot-chat']);
+        let stdout = '';
+        let stderr = '';
+        p.stdout.on('data', (d) => { stdout += d.toString(); });
+        p.stderr.on('data', (d) => { 
+          stderr += d.toString();
+          console.log(`[SSH] ${d.toString().trim()}`);
+        });
+        p.on('error', (err) => {
+          console.error(`[ERROR] spawn error:`, err);
+          resolve({ success: false, error: err.message });
+        });
+        p.on('close', (code) => {
+          console.log(`[INFO] Copy process exit code: ${code}`);
+          if (code === 0) {
+            try {
+              const result = JSON.parse(stdout);
+              resolve(result);
+            } catch (e) {
+              console.error(`[ERROR] JSON parse error:`, e, `stdout:`, stdout);
+              resolve({ success: false, error: '解析输出失败' });
+            }
+          } else {
+            resolve({ success: false, error: stderr || '复制失败' });
+          }
+        });
+      });
+
+      if (!copyResult.success) {
+        return res.status(500).json({ 
+          success: false, 
+          error: `复制客户端代码失败: ${copyResult.error || '未知错误'}` 
+        });
+      }
+
+      console.log(`[SUCCESS] 固件更新成功`);
+      return res.json({ 
+        success: true, 
+        message: '客户端代码已成功更新到机器人',
+        data: { robotIp }
+      });
+    } catch (error: any) {
+      console.error(`[ERROR] 更新固件失败:`, error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
 
   /**
    * 获取指定机器狗信息
@@ -494,7 +708,7 @@ function createApiRoutes(
         data: {
           onlineRobots,
           totalRobots: allRobots.length,
-          timestamp: new Date().toISOString(),
+          timestamp: toISOStringWithTimezone(),
         },
       });
     } catch (error: any) {
@@ -513,7 +727,7 @@ function createApiRoutes(
       success: true,
       data: {
         status: 'healthy',
-        timestamp: new Date().toISOString(),
+        timestamp: toISOStringWithTimezone(),
       },
     });
   });

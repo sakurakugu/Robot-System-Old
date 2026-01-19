@@ -28,11 +28,14 @@
         </el-select>
         <el-button
           type="primary"
-          @click="applySelection"
+          @click="handleConnectionClick"
           :disabled="!selectedUuid"
-          style="width: 100%"
+          style="width: 100%; position: relative;"
         >
-          设为当前
+          <span>{{ connectionButtonText }}</span>
+          <el-icon v-if="isRobotConnected" style="position: absolute; right: 12px; color: #67C23A;">
+            <SuccessFilled />
+          </el-icon>
         </el-button>
       </el-card>
 
@@ -63,24 +66,7 @@
           </div>
         </template>
         <el-space direction="vertical" style="width: 100%" :size="10">
-          <el-button
-            type="success"
-            @click="connect"
-            :disabled="isConnected"
-            :icon="isConnected ? SuccessFilled : Link"
-            style="width: 100%"
-          >
-            {{ isConnected ? '已连接' : '连接服务器' }}
-          </el-button>
-          <el-button
-            type="danger"
-            @click="disconnect"
-            :disabled="!isConnected"
-            :icon="Close"
-            style="width: 100%"
-          >
-            断开连接
-          </el-button>
+
           <el-button
             @click="clearHistory"
             :icon="Delete"
@@ -153,35 +139,33 @@
               <el-icon><Clock /></el-icon>
               <span>{{ msg.latency }}ms</span>
             </div>
-            <div v-if="msg.sentToRobot !== undefined" class="robot-status">
-              <el-tag
-                v-if="msg.sendingToRobot"
-                size="small"
-                type="info"
-                effect="plain"
-              >
-                <el-icon class="is-loading"><Loading /></el-icon>
-                发送中...
-              </el-tag>
-              <el-tag
-                v-else-if="msg.sentToRobot"
-                size="small"
-                type="success"
-                effect="plain"
-              >
-                <el-icon><Select /></el-icon>
-                已发送到机器狗
-              </el-tag>
-              <el-tag
-                v-else
-                size="small"
-                type="warning"
-                effect="plain"
-              >
-                <el-icon><WarningFilled /></el-icon>
-                未发送到机器狗
-              </el-tag>
-            </div>
+          </div>
+          <div v-if="msg.sentToRobot !== undefined" class="robot-status">
+            <el-tag
+              v-if="msg.sendingToRobot"
+              size="small"
+              type="info"
+              effect="plain"
+            >
+              <el-icon class="is-loading"><Loading /></el-icon>
+              发送中...
+            </el-tag>
+            <el-tag
+              v-else-if="msg.sentToRobot"
+              size="small"
+              type="success"
+              effect="plain"
+            >
+              <el-icon><Select /></el-icon>
+              已发送到机器狗
+            </el-tag>
+            <el-tooltip
+              v-else
+              content="未发送到机器狗"
+              placement="top"
+            >
+              <el-icon size="18" color="#E6A23C" style="cursor: help;"><WarningFilled /></el-icon>
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -238,7 +222,7 @@ import {
   WarningFilled
 } from '@element-plus/icons-vue'
 import { Bot } from 'lucide-vue-next'
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '../composables/useWebSocket'
 
@@ -277,23 +261,44 @@ type RobotItem = { uuid: string; name?: string }
 const robots = ref<RobotItem[]>([])
 const selectedUuid = ref<string>('')
 
-const connect = async () => {
-  if (selectedUuid.value) {
-    robotId.value = selectedUuid.value
-  }
-  await wsConnect()
-  robotStatus.value = 'online'
-}
+
 
 const disconnect = () => {
   wsDisconnect()
   robotStatus.value = 'offline'
 }
 
-const applySelection = () => {
-  if (selectedUuid.value) {
-    robotId.value = selectedUuid.value
+const isRobotConnected = computed(() => {
+  return robotStatus.value === 'online' && selectedUuid.value === robotId.value
+})
+
+const connectionButtonText = computed(() => {
+  if (robotStatus.value === 'online') {
+    if (selectedUuid.value === robotId.value) {
+      return '断开该连接'
+    }
+    return '断开并连接'
   }
+  return '连接机器狗'
+})
+
+const handleConnectionClick = async () => {
+  if (!selectedUuid.value) return
+
+  if (robotStatus.value === 'online') {
+    // If currently connected to the selected robot, just disconnect
+    if (selectedUuid.value === robotId.value) {
+      disconnect()
+      return
+    }
+    // If connected to another robot, disconnect first then connect to new one
+    disconnect()
+  }
+
+  // Connect to the selected robot
+  robotId.value = selectedUuid.value
+  await wsConnect()
+  robotStatus.value = 'online'
 }
 
 const sendMessage = (target: 'ai' | 'robot') => {
@@ -516,8 +521,26 @@ onUnmounted(() => {
 
 .message-wrapper {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   animation: slideIn 0.3s ease-out;
+}
+
+.message-wrapper .message-avatar {
+  order: 1;
+}
+.message-wrapper .message-bubble {
+  order: 2;
+}
+
+.message-wrapper.align-right .message-avatar {
+  order: 1;
+}
+.message-wrapper.align-right .robot-status {
+  order: 2;
+}
+.message-wrapper.align-right .message-bubble {
+  order: 3;
 }
 
 .message-wrapper.align-right {
@@ -613,10 +636,12 @@ onUnmounted(() => {
 }
 
 .robot-status {
-  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 4px;
+  align-self: flex-end;
+  order: 3;
+  margin-bottom: 4px;
 }
 
 .robot-status .el-tag :deep(.el-tag__content) {

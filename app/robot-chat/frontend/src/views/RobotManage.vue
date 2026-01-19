@@ -115,6 +115,15 @@
             >
               {{ testing[robot.uuid] ? '测试中' : (robot.status === 'online' ? '连接' : '测试连接') }}
             </el-button>
+            <el-button 
+              size="small" 
+              :icon="Upload" 
+              :loading="updating[robot.uuid]"
+              @click="updateFirmware(robot)"
+              title="更新客户端代码到机器人"
+            >
+              {{ updating[robot.uuid] ? '更新中' : '更新固件' }}
+            </el-button>
             <el-button size="small" :icon="ChatLineSquare" @click="openChat(robot)">
               对话
             </el-button>
@@ -170,7 +179,7 @@
             {{ formatTime(row.last_connected) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column label="操作" width="350" fixed="right">
           <template #default="{ row }">
             <el-space>
               <el-button
@@ -181,6 +190,14 @@
                 @click="testConnection(row)"
               >
                 {{ testing[row.uuid] ? '测试中' : (row.status === 'online' ? '连接' : '测试') }}
+              </el-button>
+              <el-button 
+                size="small" 
+                :loading="updating[row.uuid]"
+                @click="updateFirmware(row)"
+                title="更新固件"
+              >
+                {{ updating[row.uuid] ? '更新中' : '更新' }}
               </el-button>
               <el-button size="small" @click="openChat(row)">对话</el-button>
               <el-button size="small" @click="editRobot(row)">编辑</el-button>
@@ -271,15 +288,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { TagProps } from 'element-plus'
 import {
-  Refresh, Download, Plus, Grid, List, ChatLineSquare,
-  Edit, Delete, Warning
+  ChatLineSquare,
+  Delete,
+  Download,
+  Edit,
+  Grid, List,
+  Plus,
+  Refresh,
+  Upload,
+  Warning
 } from '@element-plus/icons-vue'
+import type { TagProps } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 type Robot = {
   uuid: string
@@ -300,6 +324,7 @@ const unifiedLocalIp = ref('')
 const viewMode = ref<'card' | 'list'>('card')
 const showAddDialog = ref(false)
 const testing = ref<Record<string, boolean>>({})
+const updating = ref<Record<string, boolean>>({})
 const connectionErrors = ref<Record<string, string>>({})
 const connectReady = ref<Record<string, boolean>>({})
 const localPortInput = ref<string>('10000')
@@ -520,6 +545,46 @@ function editRobot(robot: Robot) {
   router.push(`/robots/${robot.uuid}`)
 }
 
+async function updateFirmware(robot: Robot) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要更新机器人"${robot.name || robot.uuid}"的客户端代码吗？\n\n这将把最新的客户端代码复制到机器人。`,
+      '更新固件',
+      { 
+        type: 'warning', 
+        confirmButtonText: '确定更新', 
+        cancelButtonText: '取消' 
+      }
+    )
+    
+    updating.value[robot.uuid] = true
+    
+    const res = await fetch(`/api/robots/${robot.uuid}/update-firmware`, {
+      method: 'POST'
+    })
+    
+    const json = await res.json().catch(() => ({}))
+    
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || `HTTP ${res.status}`)
+    }
+    
+    ElMessage.success({
+      message: json.message || '客户端代码更新成功',
+      duration: 3000
+    })
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error({
+        message: e?.message || '更新失败',
+        duration: 5000
+      })
+    }
+  } finally {
+    updating.value[robot.uuid] = false
+  }
+}
+
 function openChat(robot: Robot) {
   router.push(`/chat/${robot.uuid}`)
 }
@@ -579,7 +644,11 @@ async function deleteRobotConfirm(robot: Robot) {
     robots.value = robots.value.filter((r) => r.uuid !== robot.uuid)
     notifyRobotsUpdated()
     ElMessage.success('已删除')
-  } catch {}
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.message || '删除失败')
+    }
+  }
 }
 
 function closeDialog() {

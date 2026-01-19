@@ -31,7 +31,8 @@ export type ClientMessage =
   | AudioChunkMessage
   | TextInputMessage
   | HeartbeatMessage
-  | StatusMessage;
+  | StatusMessage
+  | ClientRegisterMessage;
 
 export interface AudioChunkMessage {
   type: 'audio_chunk';
@@ -65,6 +66,18 @@ export interface StatusMessage {
     battery?: number;
     temperature?: number;
     position?: string;
+  };
+}
+
+export interface ClientRegisterMessage {
+  type: 'client_register';
+  robotId: string;
+  timestamp: number;
+  data: {
+    name?: string;
+    model?: string;
+    version?: string;
+    metadata?: any;
   };
 }
 

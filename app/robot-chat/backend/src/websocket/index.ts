@@ -1,10 +1,10 @@
 import { Server } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 import DatabaseService from '../database';
-import { ClientMessage, RobotConnection, ServerMessage } from '../types';
-import { uuidv7, isValidRobotId } from '../utils/helpers';
-import LoggerService from '../utils/logger';
 import ConversationEngine from '../services/conversation-engine';
+import { ClientMessage, RobotConnection, ServerMessage } from '../types';
+import { isValidRobotId, uuidv7 } from '../utils/helpers';
+import LoggerService from '../utils/logger';
 
 class WebSocketService {
   private wss: WebSocketServer | null = null;
@@ -129,6 +129,10 @@ class WebSocketService {
 
         case 'status':
           this.handleStatus(robotId, message.data);
+          break;
+        // 客户端注册
+        case 'client_register':
+          await this.handleClientRegister(robotId, message.data);
           break;
 
         default:
@@ -259,7 +263,77 @@ class WebSocketService {
    */
   private handleStatus(robotId: string, status: any): void {
     this.logger.debug('收到状态更新', { robotId, status });
-    // TODO: 存储状态信息
+    
+    // 更新机器狗状态到数据库
+    const robot = this.database.getRobot(robotId);
+    if (robot) {
+      try {
+        const metadata = robot.metadata ? JSON.parse(robot.metadata) : {};
+        metadata.lastStatus = status;
+        metadata.lastStatusTime = new Date().toISOString();
+        
+        this.database.registerRobot({
+          uuid: robotId,
+          metadata: metadata,
+        });
+      } catch (error) {
+        this.logger.error('保存状态失败', error as Error, { robotId });
+      }
+    }
+  }
+
+  /**
+   * 处理客户端注册
+   */
+  private async handleClientRegister(robotId: string, data: any): Promise<void> {
+    this.logger.info('收到客户端注册', { robotId, data });
+    
+    try {
+      const { name, model, version, metadata } = data;
+      
+      // 更新机器狗信息
+      const robot = this.database.getRobot(robotId);
+      const existingMetadata = robot?.metadata ? JSON.parse(robot.metadata) : {};
+      
+      this.database.registerRobot({
+        uuid: robotId,
+        name: name || robot?.name,
+        model: model || robot?.model,
+        status: 'online',
+        last_connected: new Date(),
+        metadata: {
+          ...existingMetadata,
+          ...metadata,
+          clientVersion: version,
+          registeredAt: new Date().toISOString(),
+        },
+      });
+      
+      // 更新连接元数据
+      const connection = this.connections.get(robotId);
+      if (connection) {
+        connection.metadata = {
+          name: name || connection.metadata.name,
+          model: model || connection.metadata.model,
+          version: version || connection.metadata.version,
+        };
+      }
+      
+      this.logger.info('客户端注册成功', { robotId, name, model });
+      
+      // 发送注册确认
+      this.sendMessage(robotId, {
+        type: 'text_response',
+        robotId,
+        timestamp: Date.now(),
+        data: {
+          text: `客户端注册成功！欢迎 ${name || '机器狗'}`,
+        },
+      });
+    } catch (error: any) {
+      this.logger.error('处理客户端注册失败', error, { robotId });
+      this.sendError(robotId, 'REGISTER_ERROR', error.message);
+    }
   }
 
   /**

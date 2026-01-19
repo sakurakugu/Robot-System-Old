@@ -79,7 +79,7 @@ class Application {
         this.logger.warn('⚠️  请访问前端参数管理页面进行配置：http://localhost:5174/params');
       }
     } catch (e: any) {
-      this.logger.error('加载持久化配置失败，请通过参数管理页面配置', { error: e?.message });
+      this.logger.error('加载持久化配置失败，请通过参数管理页面配置', e);
     }
   }
 

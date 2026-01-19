@@ -72,7 +72,7 @@ export interface Config {
 }
 
 const config: Config = {
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '3002', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   ws: {
@@ -121,7 +121,7 @@ const config: Config = {
 
   logging: {
     level: process.env.LOG_LEVEL || 'info',
-    dir: process.env.LOG_DIR || path.join(__dirname, '../../logs'),
+    dir: process.env.LOG_DIR || path.join(__dirname, '../../data/logs'),
   },
 
   security: {

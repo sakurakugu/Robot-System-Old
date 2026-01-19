@@ -50,14 +50,14 @@ export function useWebSocket() {
                 try {
                   const u = new URL(savedServer)
                   const wsScheme = u.protocol === 'https:' ? 'wss:' : 'ws:'
-                  wsUrl = `${wsScheme}//${u.host}${savedPath}?robotId=${robotId.value}`
+                  wsUrl = `${wsScheme}//${u.host}${savedPath}?robotId=${robotId.value}&role=ui`
                 } catch {
                   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-                  wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+                  wsUrl = `${protocol}//${window.location.hostname}:3002${savedPath}?robotId=${robotId.value}&role=ui`
                 }
               } else {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-                wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+                wsUrl = `${protocol}//${window.location.hostname}:3002${savedPath}?robotId=${robotId.value}&role=ui`
               }
               ws.value = new WebSocket(wsUrl)
               ws.value.onopen = () => {
@@ -93,14 +93,14 @@ export function useWebSocket() {
           try {
             const u = new URL(savedServer)
             const wsScheme = u.protocol === 'https:' ? 'wss:' : 'ws:'
-            wsUrl = `${wsScheme}//${u.host}${savedPath}?robotId=${robotId.value}`
+            wsUrl = `${wsScheme}//${u.host}${savedPath}?robotId=${robotId.value}&role=ui`
           } catch {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-            wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+            wsUrl = `${protocol}//${window.location.hostname}:3002${savedPath}?robotId=${robotId.value}&role=ui`
           }
         } else {
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-          wsUrl = `${protocol}//${window.location.hostname}:3001${savedPath}?robotId=${robotId.value}`
+          wsUrl = `${protocol}//${window.location.hostname}:3002${savedPath}?robotId=${robotId.value}&role=ui`
         }
         
         ws.value = new WebSocket(wsUrl)

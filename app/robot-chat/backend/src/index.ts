@@ -6,6 +6,7 @@ import DatabaseService from './database';
 import createApiRoutes from './routes/api';
 import LoggerService from './utils/logger';
 import WebSocketService from './websocket';
+import { formatTimestamp } from './utils/datetime';
 
 class Application {
   private app: express.Application;
@@ -119,6 +120,17 @@ class Application {
         endpoints: {
           websocket: config.ws.path,
           api: '/api',
+        },
+      });
+    });
+
+    // 健康检查
+    this.app.get('/health', (req, res) => {
+      res.json({
+        success: true,
+        data: {
+          status: 'healthy',
+          timestamp: formatTimestamp(), 
         },
       });
     });

@@ -8,24 +8,9 @@ import config from '../config';
 import { LLM_PROVIDERS } from '../config/llm-providers';
 import DatabaseService from '../database';
 import WebSocketService from '../websocket';
-
-/**
- * 将日期转换为带时区偏移的ISO格式字符串
- * 例如: 2026-01-14T09:36:18.293+08:00
- */
-function toISOStringWithTimezone(date = new Date()): string {
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? '+' : '-';
-  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
-  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
-
-  // 把 UTC 时间转换为本地时间
-  const local = new Date(date.getTime() + offset * 60_000)
-    .toISOString()
-    .slice(0, -1);
-
-  return `${local}${sign}${hh}:${mm}`;
-}
+import type { RobotRecord } from '../types';
+import type { ServerMessage } from '../types';
+import { formatTimestamp, newDate } from '../utils/datetime';
 
 function createApiRoutes(
   database: DatabaseService,
@@ -35,12 +20,39 @@ function createApiRoutes(
   const normalizeParam = (v: unknown): string =>
     Array.isArray(v) ? String(v[0]) : String(v ?? '');
 
+  const transformRobot = (r: RobotRecord | undefined) => {
+    if (!r) return r;
+    let meta: any = {};
+    try {
+      meta = r.metadata ? JSON.parse(r.metadata) : {};
+    } catch {
+      meta = {};
+    }
+    const {
+      robot_ip = null,
+      local_ip = null,
+      local_port = null,
+      group_name = null,
+      ai_temperature,
+      ai_system_prompt,
+    } = meta || {};
+    return {
+      ...r,
+      robot_ip,
+      local_ip,
+      local_port,
+      group_name,
+      ai_temperature,
+      ai_system_prompt,
+    };
+  };
+
   /**
    * 获取所有机器狗列表
    */
   router.get('/robots', (req: Request, res: Response) => {
     try {
-      const list = database.getAllRobots();
+      const list = database.getAllRobots().map(transformRobot);
       res.json({
         success: true,
         data: {
@@ -259,7 +271,7 @@ function createApiRoutes(
           console.log(`[INFO] 机器人没有UUID，生成新UUID: ${robotUuid}`);
           
           // 将新生成的UUID写入机器人
-          const configToml = `# 火花机器人配置文件\n# 生成于 ${toISOStringWithTimezone()}\n\nuuid = "${robotUuid}"\n`;
+          const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${robotUuid}"\n`;
           const wrote = await new Promise<boolean>((resolve) => {
             const p = spawn('python3', [pythonScript, 'write', robot_ip, '/home/firefly/sparkrobot/config/config.toml', configToml]);
             let stdout = '';
@@ -351,7 +363,7 @@ function createApiRoutes(
         last_connected: new Date(),
         metadata: metadata as any,
       });
-      const created = database.getRobot(uuid);
+      const created = transformRobot(database.getRobot(uuid) as RobotRecord);
       return res.json({ success: true, data: created });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -387,7 +399,7 @@ function createApiRoutes(
         status: status !== undefined ? (status as any) : existing.status,
         metadata: JSON.stringify(meta),
       });
-      return res.json({ success: true, data: updated });
+      return res.json({ success: true, data: transformRobot(updated as RobotRecord) });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -506,7 +518,7 @@ function createApiRoutes(
         return res.status(500).json({ success: false, error: '连接失败' });
       }
       database.updateRobotStatus(uuid, 'online');
-      const updated = database.getRobot(uuid);
+      const updated = transformRobot(database.getRobot(uuid) as RobotRecord);
       return res.json({ success: true, data: updated, message: '连接成功' });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -708,7 +720,7 @@ function createApiRoutes(
         data: {
           onlineRobots,
           totalRobots: allRobots.length,
-          timestamp: toISOStringWithTimezone(),
+          timestamp: formatTimestamp(),
         },
       });
     } catch (error: any) {
@@ -727,7 +739,7 @@ function createApiRoutes(
       success: true,
       data: {
         status: 'healthy',
-        timestamp: toISOStringWithTimezone(),
+        timestamp: formatTimestamp(),
       },
     });
   });
@@ -747,6 +759,43 @@ function createApiRoutes(
       });
       const ip = addresses[0] || '';
       res.json({ success: true, data: { ip, all: addresses } });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * 发送文本到指定机器狗（由前端控制面调用）
+   */
+  router.post('/robot/:robotId/command', (req: Request, res: Response) => {
+    try {
+      const robotId = normalizeParam((req.params as any).robotId);
+      const { text } = req.body || {};
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        return res.status(400).json({ success: false, error: '缺少文本内容' });
+      }
+      const message: ServerMessage = {
+        type: 'text_response',
+        robotId,
+        timestamp: Date.now(),
+        data: { text: String(text) },
+      };
+      const ok = websocketService.sendToRobot(robotId, message);
+      if (!ok) {
+        return res.status(404).json({ success: false, error: '机器人未连接或不存在' });
+      }
+      // 可选：记录到对话历史（标记为控制端直接下发）
+      database.insertConversation({
+        robot_id: robotId,
+        timestamp: new Date(),
+        type: 'text',
+        user_input: `[controller] ${String(text)}`,
+        ai_response: String(text),
+        actions: JSON.stringify([]),
+        processing_time: 0,
+        metadata: JSON.stringify({ from: 'controller' }),
+      });
+      res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }

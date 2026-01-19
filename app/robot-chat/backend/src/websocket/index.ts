@@ -5,10 +5,16 @@ import ConversationEngine from '../services/conversation-engine';
 import { ClientMessage, RobotConnection, ServerMessage } from '../types';
 import { isValidRobotId, uuidv7 } from '../utils/helpers';
 import LoggerService from '../utils/logger';
+import { LLM_PROVIDERS } from '../config/llm-providers';
+import config from '../config';
+
 
 class WebSocketService {
   private wss: WebSocketServer | null = null;
-  private connections: Map<string, RobotConnection> = new Map();
+  // 机器人客户端连接（唯一）
+  private robotConnections: Map<string, RobotConnection> = new Map();
+  // UI 控制端连接（可多）
+  private uiConnections: Map<string, Set<WebSocket>> = new Map();
   private logger: LoggerService;
   private conversationEngine: ConversationEngine;
   private database: DatabaseService;
@@ -39,48 +45,64 @@ class WebSocketService {
    * 处理新连接
    */
   private handleConnection(ws: WebSocket, req: any): void {
-    // 从查询参数获取robotId，如果没有则生成新的
+    // 从查询参数获取 robotId 与角色
     const url = new URL(req.url!, `http://${req.headers.host}`);
     let robotId = url.searchParams.get('robotId');
+    const role = (url.searchParams.get('role') || '').toLowerCase();
 
     if (!robotId || !isValidRobotId(robotId)) {
       robotId = uuidv7();
       this.logger.info('生成新的机器狗ID', { robotId });
     }
 
-    // 创建连接记录
-    const connection: RobotConnection = {
-      robotId,
-      websocket: ws,
-      connectedAt: new Date(),
-      lastActiveAt: new Date(),
-      metadata: {},
-    };
+    // UI 连接：不占用机器人连接槽位，加入 UI 订阅集合
+    if (role === 'ui') {
+      if (!this.uiConnections.has(robotId)) {
+        this.uiConnections.set(robotId, new Set());
+      }
+      this.uiConnections.get(robotId)!.add(ws);
+      this.logger.info('UI连接建立', { robotId, uiCount: this.uiConnections.get(robotId)!.size });
+    } else {
+      // 机器人连接：唯一
+      const connection: RobotConnection = {
+        robotId,
+        websocket: ws,
+        connectedAt: new Date(),
+        lastActiveAt: new Date(),
+        metadata: {},
+      };
+      this.robotConnections.set(robotId, connection);
+    }
 
-    this.connections.set(robotId, connection);
-
-    // 注册机器狗到数据库
-    this.database.registerRobot({
-      uuid: robotId,
-      status: 'online',
-      last_connected: new Date(),
-    });
+    // 更新数据库状态，避免覆盖名称与元数据
+    const existing = this.database.getRobot(robotId);
+    if (existing) {
+      this.database.updateRobotStatus(robotId, 'online');
+    } else {
+      this.database.registerRobot({
+        uuid: robotId,
+        status: 'online',
+        last_connected: new Date(),
+      });
+    }
 
     this.logger.logWebSocket({
       robotId,
       event: 'connected',
-      details: { ip: req.socket.remoteAddress },
+      details: { ip: req.socket.remoteAddress, role: role || 'robot' },
     });
 
-    // 发送连接确认消息
-    this.sendMessage(robotId, {
-      type: 'text_response',
-      robotId,
-      timestamp: Date.now(),
-      data: {
-        text: `连接成功！你的机器狗ID是: ${robotId}`,
-      },
-    });
+    // 仅对机器人客户端发送连接确认消息
+    if (role !== 'ui') {
+      this.sendToRobot(robotId, {
+        type: 'text_response',
+        robotId,
+        timestamp: Date.now(),
+        data: {
+          text: `连接成功！你的机器狗ID是: ${robotId}`,
+        },
+      });
+    }
 
     // 设置消息处理器
     ws.on('message', (data: Buffer) => {
@@ -89,7 +111,18 @@ class WebSocketService {
 
     // 设置关闭处理器
     ws.on('close', () => {
-      this.handleDisconnection(robotId);
+      if (role === 'ui') {
+        const set = this.uiConnections.get(robotId);
+        if (set) {
+          set.delete(ws);
+          if (set.size === 0) {
+            this.uiConnections.delete(robotId);
+          }
+        }
+        this.logger.info('UI连接关闭', { robotId });
+      } else {
+        this.handleDisconnection(robotId);
+      }
     });
 
     // 设置错误处理器
@@ -109,9 +142,9 @@ class WebSocketService {
       const message: ClientMessage = JSON.parse(data.toString());
 
       // 更新最后活跃时间
-      const connection = this.connections.get(robotId);
-      if (connection) {
-        connection.lastActiveAt = new Date();
+      const rconn = this.robotConnections.get(robotId);
+      if (rconn) {
+        rconn.lastActiveAt = new Date();
       }
 
       switch (message.type) {
@@ -159,7 +192,15 @@ class WebSocketService {
       let model: string | undefined = undefined;
       const robot = this.database.getRobot(robotId);
       if (robot) {
-        model = robot.model || undefined;
+        // 仅当机器人模型是有效的LLM模型时才传递，否则使用系统配置的默认模型
+        const provider = config.llm.provider;
+        const allowedModels =
+          LLM_PROVIDERS.find(p => p.value === (provider as any))?.models.map(m => m.value) || [];
+        if (robot.model && allowedModels.includes(robot.model)) {
+          model = robot.model;
+        } else {
+          model = undefined;
+        }
         try {
           const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
           systemPrompt = meta.ai_system_prompt || undefined;
@@ -176,8 +217,8 @@ class WebSocketService {
 
       const processingTime = Date.now() - startTime;
 
-      // 发送文本回复
-      this.sendMessage(robotId, {
+      // 发送文本回复（广播到机器人和所有UI）
+      this.broadcastMessage(robotId, {
         type: 'text_response',
         robotId,
         timestamp: Date.now(),
@@ -188,7 +229,7 @@ class WebSocketService {
 
       // 发送动作指令
       for (const action of response.actions) {
-        this.sendMessage(robotId, {
+        this.sendToRobot(robotId, {
           type: 'action_command',
           robotId,
           timestamp: Date.now(),
@@ -239,8 +280,8 @@ class WebSocketService {
       sampleRate: audioData.sampleRate,
     });
 
-    // 暂时返回提示消息
-    this.sendMessage(robotId, {
+    // 暂时返回提示消息（广播到UI与机器人）
+    this.broadcastMessage(robotId, {
       type: 'text_response',
       robotId,
       timestamp: Date.now(),
@@ -271,11 +312,7 @@ class WebSocketService {
         const metadata = robot.metadata ? JSON.parse(robot.metadata) : {};
         metadata.lastStatus = status;
         metadata.lastStatusTime = new Date().toISOString();
-        
-        this.database.registerRobot({
-          uuid: robotId,
-          metadata: metadata,
-        });
+        this.database.updateRobot(robotId, { metadata: JSON.stringify(metadata) });
       } catch (error) {
         this.logger.error('保存状态失败', error as Error, { robotId });
       }
@@ -295,22 +332,21 @@ class WebSocketService {
       const robot = this.database.getRobot(robotId);
       const existingMetadata = robot?.metadata ? JSON.parse(robot.metadata) : {};
       
-      this.database.registerRobot({
-        uuid: robotId,
-        name: name || robot?.name,
-        model: model || robot?.model,
+      this.database.updateRobot(robotId, {
+        name: name !== undefined ? (name || robot?.name) : robot?.name,
+        model: model !== undefined ? (model || robot?.model) : robot?.model,
         status: 'online',
         last_connected: new Date(),
-        metadata: {
+        metadata: JSON.stringify({
           ...existingMetadata,
           ...metadata,
           clientVersion: version,
           registeredAt: new Date().toISOString(),
-        },
+        }),
       });
       
       // 更新连接元数据
-      const connection = this.connections.get(robotId);
+      const connection = this.robotConnections.get(robotId);
       if (connection) {
         connection.metadata = {
           name: name || connection.metadata.name,
@@ -321,8 +357,8 @@ class WebSocketService {
       
       this.logger.info('客户端注册成功', { robotId, name, model });
       
-      // 发送注册确认
-      this.sendMessage(robotId, {
+      // 发送注册确认（广播到UI与机器人）
+      this.broadcastMessage(robotId, {
         type: 'text_response',
         robotId,
         timestamp: Date.now(),
@@ -340,7 +376,13 @@ class WebSocketService {
    * 处理断开连接
    */
   private handleDisconnection(robotId: string): void {
-    this.connections.delete(robotId);
+    // 从机器人连接中移除
+    this.robotConnections.delete(robotId);
+    // 从UI集合中移除所有该robotId的UI连接（需要清理在close事件里）
+    const uis = this.uiConnections.get(robotId);
+    if (uis && uis.size === 0) {
+      this.uiConnections.delete(robotId);
+    }
     this.database.updateRobotStatus(robotId, 'offline');
     this.logger.logWebSocket({
       robotId,
@@ -349,19 +391,21 @@ class WebSocketService {
   }
 
   /**
-   * 发送消息给客户端
+   * 广播消息到机器人和对应的所有UI
    */
-  private sendMessage(robotId: string, message: ServerMessage): void {
-    const connection = this.connections.get(robotId);
-    if (!connection) {
-      this.logger.warn('连接不存在', { robotId });
-      return;
-    }
-
-    try {
-      connection.websocket.send(JSON.stringify(message));
-    } catch (error: any) {
-      this.logger.error('发送消息失败', error, { robotId });
+  private broadcastMessage(robotId: string, message: ServerMessage): void {
+    // 机器人客户端
+    this.sendToRobot(robotId, message);
+    // 所有UI订阅者
+    const uis = this.uiConnections.get(robotId);
+    if (uis && uis.size > 0) {
+      for (const uiWs of uis.values()) {
+        try {
+          uiWs.send(JSON.stringify(message));
+        } catch (error: any) {
+          this.logger.error('发送消息到UI失败', error, { robotId });
+        }
+      }
     }
   }
 
@@ -369,7 +413,7 @@ class WebSocketService {
    * 发送错误消息
    */
   private sendError(robotId: string, code: string, message: string): void {
-    this.sendMessage(robotId, {
+    this.broadcastMessage(robotId, {
       type: 'error',
       robotId,
       timestamp: Date.now(),
@@ -385,7 +429,7 @@ class WebSocketService {
    */
   private setupHeartbeat(robotId: string): void {
     const interval = setInterval(() => {
-      const connection = this.connections.get(robotId);
+      const connection = this.robotConnections.get(robotId);
       if (!connection) {
         clearInterval(interval);
         return;
@@ -403,17 +447,17 @@ class WebSocketService {
   }
 
   /**
-   * 获取所有连接
+   * 获取机器人连接
    */
   getConnections(): Map<string, RobotConnection> {
-    return this.connections;
+    return this.robotConnections;
   }
 
   /**
    * 获取在线机器狗数量
    */
   getOnlineCount(): number {
-    return this.connections.size;
+    return this.robotConnections.size;
   }
 
   /**
@@ -423,6 +467,24 @@ class WebSocketService {
     if (this.wss) {
       this.wss.close();
       this.logger.info('WebSocket服务已关闭');
+    }
+  }
+
+  /**
+   * 对外暴露：发送消息到机器人客户端
+   */
+  sendToRobot(robotId: string, message: ServerMessage): boolean {
+    const connection = this.robotConnections.get(robotId);
+    if (!connection) {
+      this.logger.warn('机器人未连接，无法发送', { robotId });
+      return false;
+    }
+    try {
+      connection.websocket.send(JSON.stringify(message));
+      return true;
+    } catch (error: any) {
+      this.logger.error('发送到机器人失败', error, { robotId });
+      return false;
     }
   }
 }

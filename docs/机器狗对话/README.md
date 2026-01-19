@@ -51,7 +51,7 @@ cp .env.example .env
 
 最小配置示例：
 ```env
-PORT=3001
+PORT=3000
 OPENAI_API_KEY=sk-your-api-key-here
 OPENAI_MODEL=gpt-4
 ```
@@ -262,7 +262,7 @@ pm2 startup
 
 ```bash
 docker build -t robot-dog-conversation .
-docker run -p 3001:3001 robot-dog-conversation
+docker run -p 3000:3000 robot-dog-conversation
 ```
 
 ## 🔜 待实现功能

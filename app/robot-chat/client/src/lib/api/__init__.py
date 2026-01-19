@@ -28,12 +28,6 @@ so_dir = Path(__file__).parent.parent / "so" / arch
 sys.path.insert(0, str(so_dir))
 
 try:
-    files = list(so_dir.glob("mc_sdk_zsl_1_py*.so"))
-    py_tag = f"cpython-{sys.version_info.major}{sys.version_info.minor}"
-    has_matching = any(re.search(rf"cpython-{sys.version_info.major}{sys.version_info.minor}", f.name) for f in files) or any("cpython-" not in f.name for f in files)
-    if not has_matching and files:
-        available_tags = ", ".join(sorted({m.group(0) for f in files if (m := re.search(r"cpython-\\d+", f.name))}))
-        raise ImportError(f"当前Python版本需要 {py_tag}，但可用文件为: {available_tags}")
     import mc_sdk_zsl_1_py
 except ImportError as e:
     raise ImportError(f"无法导入 mc_sdk_zsl_1_py，请检查 {so_dir} 下是否存在 .so 文件") from e

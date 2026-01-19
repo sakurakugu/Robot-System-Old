@@ -410,17 +410,25 @@ async function loadRobots() {
     }
     if (!json.success) throw new Error(json.error || '加载失败')
     const list: any[] = json.data.robots || []
-    robots.value = list.map((r) => ({
-      uuid: r.uuid,
-      name: r.name || '',
-      model: r.model || '',
-      status: r.status || 'offline',
-      last_connected: r.last_connected || null,
-      robot_ip: r.robot_ip || '',
-      local_ip: r.local_ip || '',
-      local_port: r.local_port || 10000,
-      group_name: r.group_name || ''
-    }))
+    robots.value = list.map((r) => {
+      let meta: any = {}
+      try {
+        meta = r.metadata ? JSON.parse(r.metadata) : {}
+      } catch {
+        meta = {}
+      }
+      return {
+        uuid: r.uuid,
+        name: r.name || '',
+        model: r.model || '',
+        status: r.status || 'offline',
+        last_connected: r.last_connected || null,
+        robot_ip: r.robot_ip ?? meta.robot_ip ?? '',
+        local_ip: r.local_ip ?? meta.local_ip ?? '',
+        local_port: r.local_port ?? meta.local_port ?? 10000,
+        group_name: r.group_name ?? meta.group_name ?? ''
+      }
+    })
   } catch (e: any) {
     error.value = e?.message || '加载失败'
     ElMessage.error(error.value)
@@ -612,16 +620,22 @@ async function saveRobot() {
     const json = await res.json().catch(() => ({}))
     if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
     const saved = json.data
+    let meta: any = {}
+    try {
+      meta = saved.metadata ? JSON.parse(saved.metadata) : {}
+    } catch {
+      meta = {}
+    }
     robots.value.push({
       uuid: saved.uuid,
       name: saved.name || '',
       model: saved.model || '',
       status: saved.status || 'offline',
       last_connected: saved.last_connected || null,
-      robot_ip: saved.robot_ip || '',
-      local_ip: saved.local_ip || '',
-      local_port: saved.local_port || 10000,
-      group_name: saved.group_name || ''
+      robot_ip: saved.robot_ip ?? meta.robot_ip ?? '',
+      local_ip: saved.local_ip ?? meta.local_ip ?? '',
+      local_port: saved.local_port ?? meta.local_port ?? 10000,
+      group_name: saved.group_name ?? meta.group_name ?? ''
     })
     notifyRobotsUpdated()
     closeDialog()

@@ -30,6 +30,7 @@
           type="primary"
           @click="handleConnectionClick"
           :disabled="!selectedUuid"
+          :loading="isConnecting"
           style="width: 100%; position: relative;"
         >
           <span>{{ connectionButtonText }}</span>
@@ -207,13 +208,11 @@
 import {
   ChatDotSquare,
   Clock,
-  Close,
   Connection,
   DataAnalysis,
   Delete,
   InfoFilled,
   Lightning,
-  Link,
   Loading,
   Promotion,
   Select,
@@ -222,9 +221,10 @@ import {
   WarningFilled
 } from '@element-plus/icons-vue'
 import { Bot } from 'lucide-vue-next'
-import { nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWebSocket } from '../composables/useWebSocket'
+import { ElMessage } from 'element-plus'
 
 type Message = {
   id: string
@@ -257,23 +257,23 @@ const avgLatency = ref(0)
 
 let requestTimestamps = new Map<number, number>()
 
-type RobotItem = { uuid: string; name?: string }
+type RobotItem = { uuid: string; name?: string; status?: string }
 const robots = ref<RobotItem[]>([])
 const selectedUuid = ref<string>('')
+const isConnecting = ref(false)
 
 
 
 const disconnect = () => {
   wsDisconnect()
-  robotStatus.value = 'offline'
 }
 
 const isRobotConnected = computed(() => {
-  return robotStatus.value === 'online' && selectedUuid.value === robotId.value
+  return isConnected.value && selectedUuid.value === robotId.value
 })
 
 const connectionButtonText = computed(() => {
-  if (robotStatus.value === 'online') {
+  if (isConnected.value) {
     if (selectedUuid.value === robotId.value) {
       return '断开该连接'
     }
@@ -285,20 +285,29 @@ const connectionButtonText = computed(() => {
 const handleConnectionClick = async () => {
   if (!selectedUuid.value) return
 
-  if (robotStatus.value === 'online') {
-    // If currently connected to the selected robot, just disconnect
-    if (selectedUuid.value === robotId.value) {
+  isConnecting.value = true
+  try {
+    if (isConnected.value) {
+      if (selectedUuid.value === robotId.value) {
+        disconnect()
+        robotStatus.value = 'offline'
+        ElMessage.success('已断开连接')
+        return
+      }
       disconnect()
-      return
+      robotStatus.value = 'offline'
     }
-    // If connected to another robot, disconnect first then connect to new one
-    disconnect()
-  }
 
   // Connect to the selected robot
   robotId.value = selectedUuid.value
-  await wsConnect()
-  robotStatus.value = 'online'
+    await wsConnect()
+    robotStatus.value = 'online'
+    ElMessage.success('连接成功')
+  } catch (e) {
+    ElMessage.error('连接失败，请检查后端服务或网络')
+  } finally {
+    isConnecting.value = false
+  }
 }
 
 const sendMessage = (target: 'ai' | 'robot') => {
@@ -404,11 +413,8 @@ onMessage((data) => {
     messages.value.push(aiMessage)
     scrollToBottom()
 
-    // 自动发送AI响应到机器狗
-    sendToRobot(data.data.text).then(success => {
-      aiMessage.sendingToRobot = false
-      aiMessage.sentToRobot = success
-    })
+    // 不自动转发到机器狗，避免重复
+    aiMessage.sendingToRobot = false
   } else if (data.type === 'error') {
     const timestamp = Date.now()
     const aiMessage: Message = {
@@ -435,12 +441,19 @@ onMounted(() => {
     .then(res => res.json())
     .then(json => {
       const list: any[] = json?.data?.robots || []
-      robots.value = list.map((r) => ({ uuid: r.uuid, name: r.name || '' }))
+      robots.value = list.map((r) => ({ uuid: r.uuid, name: r.name || '', status: r.status || 'offline' }))
+      const cur = robots.value.find(r => r.uuid === (selectedUuid.value || robotId.value))
+      robotStatus.value = cur?.status || 'offline'
     })
     .catch(() => {})
 })
 onUnmounted(() => {
   disconnect()
+})
+
+watch(selectedUuid, (val) => {
+  const cur = robots.value.find(r => r.uuid === val)
+  robotStatus.value = cur?.status || 'offline'
 })
 </script>
 

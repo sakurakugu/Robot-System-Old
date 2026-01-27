@@ -1,4 +1,4 @@
-// 系统相关路由
+// 知识库相关路由
 
 import type { RouteRecordRaw } from 'vue-router'
 

@@ -1,12 +1,6 @@
 <template>
   <div class="robot-manager">
-    <el-page-header @back="() => {}" class="page-header">
-      <template #content>
-        <div class="header-content">
-          <el-icon :size="24"><Bot /></el-icon>
-          <span class="title">机器人管理</span>
-        </div>
-      </template>
+    <PageHeader title="机器人管理" :icon="Bot">
       <template #extra>
         <el-space>
           <el-radio-group v-model="viewMode" size="small">
@@ -22,7 +16,7 @@
           </el-button>
         </el-space>
       </template>
-    </el-page-header>
+    </PageHeader>
 
     <el-alert
       v-if="error"
@@ -259,14 +253,15 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import {
-  ChatLineSquare,
-  Delete,
-  Edit,
-  Grid, List,
-  Plus,
-  Upload,
-  Warning
+    ChatLineSquare,
+    Delete,
+    Edit,
+    Grid, List,
+    Plus,
+    Upload,
+    Warning
 } from '@element-plus/icons-vue'
 import type { TagProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -645,23 +640,6 @@ onUnmounted(() => {
   height: 100%;
   overflow: auto;
   background: var(--el-bg-color-page);
-}
-
-.page-header {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 
 .robot-cards {

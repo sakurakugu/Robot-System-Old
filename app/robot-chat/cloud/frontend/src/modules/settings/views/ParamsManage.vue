@@ -1,13 +1,6 @@
 <template>
   <div class="page">
-    <el-page-header @back="() => {}" class="page-header">
-      <template #content>
-        <div class="header-content">
-          <el-icon :size="24"><Setting /></el-icon>
-          <span class="title">参数管理</span>
-        </div>
-      </template>
-    </el-page-header>
+    <PageHeader title="参数管理" :icon="Setting" />
     <div class="content">
       <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs">
         <!-- LLM配置标签页 -->
@@ -123,6 +116,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { CopyDocument, Edit, Select, Setting, View } from '@element-plus/icons-vue'
 import { onMounted, ref } from 'vue'
 
@@ -343,23 +337,6 @@ const saveConnectionConfig = async () => {
   padding: 20px;
   background: var(--el-bg-color-page);
   overflow: auto;
-}
-
-.page-header {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 
 .content {

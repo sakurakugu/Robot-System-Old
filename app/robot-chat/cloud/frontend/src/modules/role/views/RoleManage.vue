@@ -1,16 +1,10 @@
 <template>
   <div class="role-manage">
-    <el-page-header @back="() => {}" class="page-header">
-      <template #content>
-        <div class="header-content">
-          <el-icon :size="24"><UserFilled /></el-icon>
-          <span class="title">角色管理</span>
-        </div>
-      </template>
+    <PageHeader title="角色管理" :icon="UserFilled">
       <template #extra>
         <el-button type="primary" @click="showCreateDialog">创建角色</el-button>
       </template>
-    </el-page-header>
+    </PageHeader>
 
     <div class="content">
       <el-table :data="roles" v-loading="loading" style="width: 100%">
@@ -142,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
 import { UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -390,23 +385,6 @@ const unbindRobot = async (robot: any) => {
   height: 100%;
   overflow: auto;
   background: var(--el-bg-color-page);
-}
-
-.page-header {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 
 .content {

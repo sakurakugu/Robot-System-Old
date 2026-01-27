@@ -30,4 +30,22 @@ export const robotRoutes: RouteRecordRaw[] = [
       hidden: true,
     },
   },
+  {
+    path: '/operation',
+    name: 'Operation',
+    component: () => import('@/modules/robot/views/RobotOperation.vue'),
+    meta: {
+      title: '机器人操作',
+      icon: 'Operation',
+    },
+  },
+  {
+    path: '/operation/edit',
+    name: 'OperationEdit',
+    component: () => import('@/modules/robot/views/RobotOperationEdit.vue'),
+    meta: {
+      title: '机器人操作编辑',
+      hidden: true,
+    },
+  },
 ]

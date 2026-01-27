@@ -1,18 +1,12 @@
 <template>
   <div class="page">
-    <el-page-header @back="() => {}" class="page-header">
-      <template #content>
-        <div class="header-content">
-          <el-icon :size="24"><Collection /></el-icon>
-          <span class="title">知识库</span>
-        </div>
-      </template>
+    <PageHeader title="知识库" :icon="Collection">
       <template #extra>
         <el-button :icon="Refresh" @click="refresh" :loading="loading">
           刷新
         </el-button>
       </template>
-    </el-page-header>
+    </PageHeader>
 
     <div class="content" v-loading="loading">
       <el-empty
@@ -55,8 +49,9 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
+import { Collection, Document, Refresh } from '@element-plus/icons-vue'
 import { ref } from 'vue'
-import { Collection, Refresh, Document } from '@element-plus/icons-vue'
 
 type Doc = {
   uuid: string
@@ -88,23 +83,6 @@ const formatTime = (val?: string | null) => {
   padding: 20px;
   background: var(--el-bg-color-page);
   overflow: auto;
-}
-
-.page-header {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 
 .content {

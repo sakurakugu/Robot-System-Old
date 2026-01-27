@@ -31,6 +31,20 @@ check_sshpass() {
     fi
 }
 
+ensure_rsync() {
+    if ! command -v rsync &> /dev/null; then
+        print_info "未检测到 rsync，正在尝试安装..."
+        if [ -f /etc/debian_version ]; then
+            sudo apt-get update && sudo apt-get install -y rsync
+        elif [ -f /etc/redhat-release ]; then
+            sudo yum install -y rsync
+        else
+            echo "无法自动安装 rsync，请手动安装: rsync"
+            exit 1
+        fi
+    fi
+}
+
 # 连接机器狗
 export ROBOT_IP=192.168.0.85
 connect_robot() {
@@ -41,6 +55,110 @@ connect_robot() {
     sshpass -p 'firefly' ssh firefly@$ROBOT_IP
 }
 
+iso_now() {
+    timestamp=$(date '+%Y-%m-%dT%H:%M:%S%:z')
+    echo ${timestamp//Z/+00:00}
+}
+
+get_project_root() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$script_dir/.." && pwd
+}
+
+backup_all() {
+    local root="$1"
+    local dest="$2"
+    ensure_rsync
+    rsync -a "$root/" "$dest/"
+}
+
+backup_exclude_common() {
+    local root="$1"
+    local dest="$2"
+    ensure_rsync
+    rsync -a \
+        --exclude 'node_modules/' \
+        --exclude 'build/' \
+        --exclude '__pycache__/' \
+        --exclude 'dist/' \
+        --exclude '.venv/' \
+        --exclude 'venv/' \
+        --exclude '.pytest_cache/' \
+        "$root/" "$dest/"
+}
+
+backup_exclude_gitignore() {
+    local root="$1"
+    local dest="$2"
+    ensure_rsync
+    if [ -d "$root/.git" ] && command -v git &> /dev/null; then
+        local tmp_exclude
+        tmp_exclude="$(mktemp)"
+        git -C "$root" ls-files -i --exclude-standard --directory > "$tmp_exclude"
+        rsync -a --exclude-from="$tmp_exclude" "$root/" "$dest/"
+        rm -f "$tmp_exclude"
+    else
+        print_info ".git 或 git 未检测到，回退为完整备份"
+        rsync -a "$root/" "$dest/"
+    fi
+}
+
+backup_menu() {
+    local root
+    root="$(get_project_root)"
+    local default_name
+    default_name="$(basename "$root")"
+    echo ""
+    echo "------------------------------------------"
+    echo "备份选项:"
+    echo "  1) 备份全部"
+    echo "  2) 排除常见目录"
+    echo "  3) 按 .gitignore 排除"
+    echo "------------------------------------------"
+    read -p "请选择备份类型: " btype
+    case "$btype" in
+        1)
+            read -p "备份目录名(回车使用默认: $default_name): " bname
+            bname="${bname:-$default_name}"
+            local timestamp
+            timestamp="$(iso_now)"
+            local dest_base
+            dest_base="$root/../backups/$bname/$timestamp"
+            mkdir -p "$dest_base"
+            print_info "目标: $dest_base"
+            backup_all "$root" "$dest_base"
+            ;;
+        2)
+            read -p "备份目录名(回车使用默认: $default_name): " bname
+            bname="${bname:-$default_name}"
+            local timestamp
+            timestamp="$(iso_now)"
+            local dest_base
+            dest_base="$root/../backups/$bname/$timestamp"
+            mkdir -p "$dest_base"
+            print_info "目标: $dest_base"
+            backup_exclude_common "$root" "$dest_base"
+            ;;
+        3)
+            read -p "备份目录名(回车使用默认: $default_name): " bname
+            bname="${bname:-$default_name}"
+            local timestamp
+            timestamp="$(iso_now)"
+            local dest_base
+            dest_base="$root/../backups/$bname/$timestamp"
+            mkdir -p "$dest_base"
+            print_info "目标: $dest_base"
+            backup_exclude_gitignore "$root" "$dest_base"
+            ;;
+        *)
+            echo "无效选项"
+            return
+            ;;
+    esac
+    print_success "备份完成"
+}
+
 # 显示菜单
 show_menu() {
     echo ""
@@ -49,6 +167,7 @@ show_menu() {
     echo "=========================================="
     echo ""
     echo "  1) SSH 连接机器狗 (firefly@$ROBOT_IP)"
+    echo "  2) 备份当前项目文件夹"
     echo "  0) 退出"
     echo ""
     echo "=========================================="
@@ -62,6 +181,9 @@ while true; do
     case $choice in
         1)
             connect_robot
+            ;;
+        2)
+            backup_menu
             ;;
         0)
             print_success "退出脚本"

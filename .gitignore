@@ -48,6 +48,7 @@ Desktop.ini
 *.bak
 logs/
 test/
+.cache/
 
 # 模型文件
 # 这种二进制文件，到时候单独开一个git仓库放置

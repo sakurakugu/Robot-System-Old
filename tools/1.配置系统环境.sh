@@ -12,8 +12,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 项目根目录（脚本在 tools/ 目录中，需要返回上一级）
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR=$ROOT_DIR/tools/scripts
 
 # 打印带颜色的信息
 print_info() {
@@ -67,6 +67,7 @@ show_menu() {
     echo "  3) WSL2 (Windows子系统)"
     echo "  4) 仅安装项目依赖 (已有Python 3.10环境)"
     echo "  5) 检查依赖项"
+    echo "  6) 更新项目依赖"
     echo "  0) 退出"
     echo ""
     echo "=========================================="
@@ -77,29 +78,90 @@ install_project_dependencies() {
     print_info "安装项目依赖..."
     
     # 安装Node.js依赖
-    if [ -f "$SCRIPT_DIR/app/dance-choreo/backend/package.json" ]; then
+    if [ -f "$ROOT_DIR/app/dance-choreo/backend/package.json" ]; then
         print_info "安装后端依赖..."
-        cd "$SCRIPT_DIR/app/dance-choreo/backend"
+        cd "$ROOT_DIR/app/dance-choreo/backend"
         npm install
         print_success "后端依赖安装完成"
     fi
     
-    if [ -f "$SCRIPT_DIR/app/dance-choreo/frontend/package.json" ]; then
+    if [ -f "$ROOT_DIR/app/dance-choreo/frontend/package.json" ]; then
         print_info "安装前端依赖..."
-        cd "$SCRIPT_DIR/app/dance-choreo/frontend"
+        cd "$ROOT_DIR/app/dance-choreo/frontend"
+        npm install
+        print_success "前端依赖安装完成"
+    fi
+
+        # 安装Node.js依赖
+    if [ -f "$ROOT_DIR/app/robot-chat/cloud/backend/package.json" ]; then
+        print_info "安装后端依赖..."
+        cd "$ROOT_DIR/app/robot-chat/cloud/backend"
+        npm install
+        print_success "后端依赖安装完成"
+    fi
+    
+    if [ -f "$ROOT_DIR/app/robot-chat/cloud/frontend/package.json" ]; then
+        print_info "安装前端依赖..."
+        cd "$ROOT_DIR/app/robot-chat/cloud/frontend"
         npm install
         print_success "前端依赖安装完成"
     fi
     
     # 安装Python依赖（如果有requirements.txt）
-    if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    if [ -f "$ROOT_DIR/requirements.txt" ]; then
         print_info "安装Python依赖..."
-        cd "$SCRIPT_DIR"
+        cd "$ROOT_DIR"
         pip install -r requirements.txt
         print_success "Python依赖安装完成"
     fi
     
-    cd "$SCRIPT_DIR"
+    cd "$ROOT_DIR"
+}
+
+# 更新项目依赖
+update_project_dependencies() {
+    print_info "更新项目依赖..."
+    
+    # 更新后端依赖
+    if [ -f "$ROOT_DIR/app/dance-choreo/backend/package.json" ]; then
+        print_info "更新后端依赖..."
+        cd "$ROOT_DIR/app/dance-choreo/backend"
+        npx ncu
+        npx ncu -u
+        npm install
+        print_success "后端依赖更新完成"
+    fi
+    
+    # 更新前端依赖
+    if [ -f "$ROOT_DIR/app/dance-choreo/frontend/package.json" ]; then
+        print_info "更新前端依赖..."
+        cd "$ROOT_DIR/app/dance-choreo/frontend"
+        npx ncu
+        npx ncu -u
+        npm install
+        print_success "前端依赖更新完成"
+    fi
+    
+    # 更新 robot-chat 依赖
+    if [ -f "$ROOT_DIR/app/robot-chat/cloud/backend/package.json" ]; then
+        print_info "更新 robot-chat 后端依赖..."
+        cd "$ROOT_DIR/app/robot-chat/cloud/backend"
+        npx ncu
+        npx ncu -u
+        npm install
+        print_success "robot-chat 后端依赖更新完成"
+    fi
+
+    if [ -f "$ROOT_DIR/app/robot-chat/cloud/frontend/package.json" ]; then
+        print_info "更新 robot-chat 前端依赖..."
+        cd "$ROOT_DIR/app/robot-chat/cloud/frontend"
+        npx ncu
+        npx ncu -u
+        npm install
+        print_success "robot-chat 前端依赖更新完成"
+    fi
+    
+    cd "$ROOT_DIR"
 }
 
 # 主函数
@@ -144,18 +206,18 @@ main() {
     case $choice in
         1)
             print_info "执行 Ubuntu 22.04 快速安装..."
-            bash "$SCRIPT_DIR/scripts/setup/setup-ubuntu.sh"
+            bash "$SCRIPT_DIR/setup/setup-ubuntu.sh"
             install_project_dependencies
             ;;
         2)
             print_info "执行 Ubuntu Python 环境配置..."
-            bash "$SCRIPT_DIR/scripts/setup/setup-python.sh"
-            bash "$SCRIPT_DIR/scripts/setup/setup-ubuntu.sh"
+            bash "$SCRIPT_DIR/setup/setup-python.sh"
+            bash "$SCRIPT_DIR/setup/setup-ubuntu.sh"
             install_project_dependencies
             ;;
         3)
             print_info "执行 WSL 环境配置..."
-            bash "$SCRIPT_DIR/scripts/setup/setup-wsl.sh"
+            bash "$SCRIPT_DIR/setup/setup-wsl.sh"
             install_project_dependencies
             ;;
         4)
@@ -164,7 +226,11 @@ main() {
             ;;
         5)
             print_info "检查依赖项..."
-            bash "$SCRIPT_DIR/scripts/setup/check-dependencies.sh"
+            bash "$SCRIPT_DIR/setup/check-dependencies.sh"
+            ;;
+        6)
+            print_info "更新项目依赖..."
+            update_project_dependencies
             ;;
         0)
             print_info "退出安装"

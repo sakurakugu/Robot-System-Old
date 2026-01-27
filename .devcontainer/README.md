@@ -4,7 +4,7 @@
 
 ### 使用方法
 
-1.   打开 VSCode → 安装 Remote - Containers 插件
+1.   打开 VSCode → 安装 Remote - Containers 插件 (一般自带)
 
 2.   打开 robot-dog 文件夹 → 点击左边插件栏的`远程资源管理器` → 开发容器 -> `->`(在当前窗口的容器中打开) 
 

@@ -10,19 +10,7 @@
 
 ## 其他
 
-.so 库文件是目前是单独放到一个git仓库中
-
-```bash
-# 克隆远程仓库到临时目录
-git clone <远程仓库地址> /tmp/so_repo
-
-# 移动需要的 .so 文件到目标目录
-mkdir -p app/robot-control/lib/so
-cp /tmp/so_repo/*.so app/robot-control/lib/so/
-
-# 可选：删除临时仓库
-rm -rf /tmp/so_repo
-```
+lib 库文件是目前是单独放到一个git仓库中
 
 ## GUI 部分
 
@@ -30,42 +18,8 @@ rm -rf /tmp/so_repo
 
 ```bash
 chmod +x start.sh
-./start.sh
+./start.sh # --help 查看教程
 ```
 
-### 常用命令
-
-```bash
-# 停止所有服务
-./stop.sh
-
-# 查看后端日志
-tail -f logs/dance-choreo/backend.log
-
-# 查看前端日志
-tail -f logs/frontend.log
-
-# 重新初始化数据库
-cd app/dance-choreo/backend
-npm run init-db
-
-# 运行示例程序
-cd app/robot-control
-python3 dance_1dog.py
-```
-
-### 数据库重置
-删除主数据库后重新初始化：
-```bash
-rm ~/.local/share/RobotDogControl/main.db
-cd app/dance-choreo/backend
-npm run init-db
-```
-
-## 数据存储位置
-
-- **Linux**: `~/.local/share/RobotDogControl/`
-- **macOS**: `~/Library/Application Support/RobotDogControl/`
-- **Windows**: `%APPDATA%\RobotDogControl\`
-
-工程文件默认保存在：`~/Documents/RobotDogProjects/`
+> docs 中很多文档都是过时的，不推荐看，建议直接看代码和注释
+> 然后代码为了快速迭代，写的比较屎山，已经重构过多次了，剩下的要等有空再整理

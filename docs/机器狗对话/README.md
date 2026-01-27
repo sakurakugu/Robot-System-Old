@@ -5,7 +5,7 @@
 ## 📋 目录结构
 
 ```
-app/robot-chat/backend/
+app/robot-chat/cloud/backend/
 ├── src/                      # 源代码
 │   ├── index.ts              # 应用入口
 │   ├── config/               # 配置管理
@@ -38,7 +38,7 @@ app/robot-chat/backend/
 ### 1. 安装依赖
 
 ```bash
-cd app/robot-chat/backend
+cd app/robot-chat/cloud/backend
 npm install
 ```
 

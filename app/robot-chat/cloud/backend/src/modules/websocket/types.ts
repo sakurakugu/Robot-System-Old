@@ -88,6 +88,7 @@ export interface TextInputMessage {
     text: string;
     context?: string;
     ttsOptions?: TTSOptions;
+    conversationId?: string;
   };
 }
 
@@ -110,7 +111,7 @@ export interface StatusMessage {
 }
 
 export interface ClientRegisterMessage {
-  type: 'client_register';
+  type: 'robot_register';
   robotId: string;
   timestamp: number;
   data: {
@@ -128,6 +129,7 @@ export interface TTSInputMessage {
   data: {
     text: string;
     ttsOptions?: TTSOptions;
+    conversationId?: string;
   };
 }
 
@@ -193,6 +195,7 @@ export interface AudioResponseMessage {
   type: 'audio_response';
   robotId: string;
   timestamp: number;
+  conversationId?: string;
   data: AudioResponse;
 }
 
@@ -200,6 +203,7 @@ export interface ActionCommandMessage {
   type: 'action_command';
   robotId: string;
   timestamp: number;
+  conversationId?: string;
   data: ActionCommand;
 }
 
@@ -221,6 +225,7 @@ export interface TextResponseMessage {
   type: 'text_response';
   robotId: string;
   timestamp: number;
+  conversationId?: string;
   data: {
     text: string;
     noTTS?: boolean; // 标记是否需要生成TTS（动作响应不需要）
@@ -293,4 +298,3 @@ export interface AsrTranscriptMessage {
 
 // 引用conversation模块的类型
 import type { ActionCommand, TTSOptions } from '../conversation/types';
-

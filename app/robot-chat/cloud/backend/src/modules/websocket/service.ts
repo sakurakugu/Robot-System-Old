@@ -5,7 +5,7 @@ import config from '../../config';
 import { LLM_PROVIDERS } from '../../config/llm-providers';
 import DatabaseService from '../../core/database';
 import LoggerService from '../../core/logger';
-import { isValidRobotId, uuidv7 } from '../../core/utils/helpers';
+import { isValidRobotId, RateLimiter, uuidv7 } from '../../core/utils/helpers';
 import { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import ASRService from '../conversation/asr-service';
 import ConversationEngine from '../conversation/conversation-engine';
@@ -40,6 +40,20 @@ class WebSocketService {
   private videoStreamManager: VideoStreamManager;
   private asrService: ASRService;
   private audioSessions: Map<string, AudioSession> = new Map();
+  private inputMergeTimers: Map<string, NodeJS.Timeout> = new Map();
+  private pendingInputs: Map<
+    string,
+    {
+      text: string;
+      ttsOptions?: any;
+      inputType: 'text' | 'audio';
+      audioMeta?: { asrTime: number; durationMs: number; sessionId: string };
+      conversationId: string;
+    }
+  > = new Map();
+  private inputRateLimiter = new RateLimiter(3, 3000);
+  private ttsRateLimiter = new RateLimiter(5, 5000);
+  private inputMergeWindowMs = 900;
 
   constructor(logger: LoggerService, database: DatabaseService) {
     this.logger = logger;
@@ -200,10 +214,20 @@ class WebSocketService {
 
       switch (message.type) {
         case 'text_input':
-          await this.handleTextInput(robotId, message.data.text, (message as any).data?.ttsOptions);
+          await this.handleTextInput(
+            robotId,
+            message.data.text,
+            (message as any).data?.ttsOptions,
+            (message as any).data?.conversationId || (message as any).conversationId
+          );
           break;
         case 'tts_input':
-          await this.handleTTSInput(robotId, (message as any).data?.text, (message as any).data?.ttsOptions);
+          await this.handleTTSInput(
+            robotId,
+            (message as any).data?.text,
+            (message as any).data?.ttsOptions,
+            (message as any).data?.conversationId || (message as any).conversationId
+          );
           break;
 
         case 'audio_control':
@@ -230,9 +254,9 @@ class WebSocketService {
           this.handleStatus(robotId, message);
           break;
         }
-        // 客户端注册
-        case 'client_register':
-          await this.handleClientRegister(robotId, message.data);
+        // 机器人注册
+        case 'robot_register':
+          await this.handleRobotRegister(robotId, message.data);
           break;
 
         case 'video_subscribe':
@@ -268,7 +292,7 @@ class WebSocketService {
         'tts_input',
         'action_input',
         'audio_control',
-        'client_register',
+        'robot_register',
         'video_subscribe',
         'video_unsubscribe',
         'heartbeat',
@@ -282,8 +306,13 @@ class WebSocketService {
   /**
    * 处理文本输入
    */
-  private async handleTextInput(robotId: string, text: string, ttsOptions?: any): Promise<void> {
-    await this.processUserText(robotId, text, ttsOptions, 'text');
+  private async handleTextInput(
+    robotId: string,
+    text: string,
+    ttsOptions?: any,
+    conversationId?: string
+  ): Promise<void> {
+    await this.queueUserText(robotId, text, ttsOptions, 'text', undefined, conversationId);
   }
 
   /**
@@ -305,7 +334,7 @@ class WebSocketService {
         asrTime: meta.asrTime,
       },
     }, 'business');
-    await this.processUserText(robotId, text, undefined, 'audio', meta);
+    await this.queueUserText(robotId, text, undefined, 'audio', meta, meta.sessionId);
   }
 
   /**
@@ -316,9 +345,11 @@ class WebSocketService {
     text: string,
     ttsOptions: any,
     inputType: 'text' | 'audio',
-    audioMeta?: { asrTime: number; durationMs: number; sessionId: string }
+    audioMeta?: { asrTime: number; durationMs: number; sessionId: string },
+    conversationId?: string
   ): Promise<void> {
     const startTime = Date.now();
+    const traceId = conversationId || uuidv7();
 
     try {
       this.logger.info('收到文本输入', { robotId, text, inputType });
@@ -377,6 +408,7 @@ class WebSocketService {
         type: 'text_response',
         robotId,
         timestamp: Date.now(),
+        conversationId: traceId,
         data: {
           text: response.text,
         },
@@ -390,6 +422,7 @@ class WebSocketService {
             type: 'audio_response',
             robotId,
             timestamp: Date.now(),
+            conversationId: traceId,
             data: audio,
           }, 'audio_download');
         } else {
@@ -405,6 +438,7 @@ class WebSocketService {
           type: 'action_command',
           robotId,
           timestamp: Date.now(),
+          conversationId: traceId,
           data: {
             action: action.name,
             parameters: action.parameters,
@@ -427,6 +461,7 @@ class WebSocketService {
         processing_time: processingTime,
         metadata: JSON.stringify({
           ...response.metadata,
+          conversationId: traceId,
           inputType,
           asrTime: audioMeta?.asrTime,
           audioDurationMs: audioMeta?.durationMs,
@@ -447,13 +482,24 @@ class WebSocketService {
     }
   }
 
-  private async handleTTSInput(robotId: string, text: string, ttsOptions?: any): Promise<void> {
+  private async handleTTSInput(
+    robotId: string,
+    text: string,
+    ttsOptions?: any,
+    conversationId?: string
+  ): Promise<void> {
     try {
+      if (!this.ttsRateLimiter.check(robotId)) {
+        this.logger.warn('TTS请求过于频繁', { robotId });
+        this.sendError(robotId, 'RATE_LIMITED', '请求过于频繁，请稍后再试', 'business');
+        return;
+      }
       const audio = await this.ttsService.synthesize(text, ttsOptions);
       this.broadcastMessage(robotId, {
         type: 'audio_response',
         robotId,
         timestamp: Date.now(),
+        conversationId,
         data: audio,
       }, 'audio_download');
     } catch (e: any) {
@@ -724,6 +770,73 @@ class WebSocketService {
     return text.replace(emojiRegex, '').trim();
   }
 
+  private async queueUserText(
+    robotId: string,
+    text: string,
+    ttsOptions: any,
+    inputType: 'text' | 'audio',
+    audioMeta?: { asrTime: number; durationMs: number; sessionId: string },
+    conversationId?: string
+  ): Promise<void> {
+    const cleaned = String(text || '').trim();
+    if (!cleaned) return;
+    const existing = this.pendingInputs.get(robotId);
+    if (existing) {
+      existing.text = `${existing.text} ${cleaned}`.trim();
+      if (ttsOptions !== undefined) {
+        existing.ttsOptions = ttsOptions;
+      }
+      existing.inputType = existing.inputType === 'audio' || inputType === 'audio' ? 'audio' : 'text';
+      if (inputType === 'audio' && audioMeta) {
+        existing.audioMeta = audioMeta;
+      }
+      this.pendingInputs.set(robotId, existing);
+    } else {
+      this.pendingInputs.set(robotId, {
+        text: cleaned,
+        ttsOptions,
+        inputType,
+        audioMeta,
+        conversationId: conversationId || uuidv7(),
+      });
+    }
+
+    const timer = this.inputMergeTimers.get(robotId);
+    if (timer) {
+      clearTimeout(timer);
+    }
+    this.inputMergeTimers.set(
+      robotId,
+      setTimeout(() => {
+        void this.flushUserText(robotId);
+      }, this.inputMergeWindowMs)
+    );
+  }
+
+  private async flushUserText(robotId: string): Promise<void> {
+    const pending = this.pendingInputs.get(robotId);
+    if (!pending) return;
+    this.pendingInputs.delete(robotId);
+    const timer = this.inputMergeTimers.get(robotId);
+    if (timer) {
+      clearTimeout(timer);
+      this.inputMergeTimers.delete(robotId);
+    }
+    if (!this.inputRateLimiter.check(robotId)) {
+      this.logger.warn('输入过于频繁', { robotId });
+      this.sendError(robotId, 'RATE_LIMITED', '请求过于频繁，请稍后再试', 'business');
+      return;
+    }
+    await this.processUserText(
+      robotId,
+      pending.text,
+      pending.ttsOptions,
+      pending.inputType,
+      pending.audioMeta,
+      pending.conversationId
+    );
+  }
+
   /**
    * 处理心跳
    */
@@ -792,10 +905,10 @@ class WebSocketService {
   }
 
   /**
-   * 处理客户端注册
+   * 处理机器人注册
    */
-  private async handleClientRegister(robotId: string, data: any): Promise<void> {
-    this.logger.info('收到客户端注册', { robotId, data });
+  private async handleRobotRegister(robotId: string, data: any): Promise<void> {
+    this.logger.info('收到机器人注册', { robotId, data });
     
     try {
       const { name, model, version, metadata } = data;

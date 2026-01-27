@@ -74,7 +74,7 @@ export class VideoStreamService extends EventEmitter {
     this.isRunning = true;
 
     // JPEG marker detection
-    let currentFrame: Buffer[] = [];
+    let currentFrame: Uint8Array[] = [];
     let inJpeg = false;
 
     this.gstProcess.stdout?.on('data', (chunk: Buffer) => {
@@ -86,12 +86,12 @@ export class VideoStreamService extends EventEmitter {
         }
 
         if (inJpeg) {
-          currentFrame.push(Buffer.from([chunk[i]]));
+          currentFrame.push(Uint8Array.from([chunk[i]]));
         }
 
         // JPEG end marker: 0xFF 0xD9
         if (chunk[i] === 0xff && chunk[i + 1] === 0xd9 && inJpeg) {
-          currentFrame.push(Buffer.from([chunk[i + 1]]));
+          currentFrame.push(Uint8Array.from([chunk[i + 1]]));
           const frame = Buffer.concat(currentFrame);
           this.emit('frame', frame);
           inJpeg = false;

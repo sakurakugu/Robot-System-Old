@@ -136,7 +136,7 @@
         >
           <JoystickPad
             class="joystick-pad"
-            :class="{ 'is-disabled': layoutEditMode || controlMode === 'pose' }"
+            :class="{ 'is-disabled': layoutEditMode || (controlMode === 'pose' && !twoLegStandActive) }"
             @change="onMoveJoystick"
             @end="onMoveJoystickEnd"
           />
@@ -164,7 +164,7 @@
         >
           <JoystickPad
             class="joystick-pad"
-            :class="{ 'is-disabled': layoutEditMode }"
+            :class="{ 'is-disabled': layoutEditMode || rightJoystickDisabled }"
             @change="onLookJoystick"
             @end="onLookJoystickEnd"
           />
@@ -242,6 +242,12 @@ const showChatPanel = ref(false)
 const layoutEditMode = ref(false)
 const floatingLayerRef = ref<HTMLDivElement | null>(null)
 const micEnabled = ref(true)
+const twoLegStandActive = ref(false)
+const rightJoystickDisabled = ref(false)
+
+watch(twoLegStandActive, (val) => {
+  rightJoystickDisabled.value = val
+})
 
 // Robots List (Mock or Fetch)
 type RobotItem = { uuid: string; name?: string; status?: string }
@@ -350,6 +356,18 @@ const sendAction = (action: string) => {
     ElMessage.warning('未连接机器人')
     return
   }
+  if (action === 'two_leg_stand') {
+    const nextAction = twoLegStandActive.value ? 'cancel_two_leg_stand' : 'two_leg_stand'
+    twoLegStandActive.value = !twoLegStandActive.value
+    ElMessage.success(twoLegStandActive.value ? '进入双腿站立' : '退出双腿站立')
+    wsSendMessage({
+      type: 'action_input',
+      robotId: robotId.value,
+      timestamp: Date.now(),
+      data: { action: nextAction },
+    })
+    return
+  }
   ElMessage.success(`发送动作: ${action}`)
   wsSendMessage({
     type: 'action_input',
@@ -364,6 +382,7 @@ type JoystickPayload = { x: number; y: number }
 const sendJoystick = (channel: 'move' | 'look' | 'pose', payload: JoystickPayload) => {
   if (layoutEditMode.value) return
   if (!isControlConnected.value) return
+  const effectiveMode = twoLegStandActive.value ? 'two_leg' : controlMode.value
   wsSendMessage({
     type: 'control_input',
     robotId: robotId.value,
@@ -374,7 +393,7 @@ const sendJoystick = (channel: 'move' | 'look' | 'pose', payload: JoystickPayloa
       x: payload.x,
       y: payload.y,
       speed: speed.value,
-      mode: controlMode.value,
+      mode: effectiveMode,
     },
   })
 }
@@ -382,6 +401,7 @@ const sendJoystick = (channel: 'move' | 'look' | 'pose', payload: JoystickPayloa
 const stopJoystick = (channel: 'move' | 'look' | 'pose', modeOverride?: 'move' | 'pose') => {
   if (layoutEditMode.value) return
   if (!isControlConnected.value) return
+  const effectiveMode = twoLegStandActive.value ? 'two_leg' : (modeOverride || controlMode.value)
   wsSendMessage({
     type: 'control_input',
     robotId: robotId.value,
@@ -389,17 +409,18 @@ const stopJoystick = (channel: 'move' | 'look' | 'pose', modeOverride?: 'move' |
     data: {
       command: 'joystick_stop',
       channel,
-      mode: modeOverride || controlMode.value,
+      mode: effectiveMode,
     },
   })
 }
 
 const onMoveJoystick = (payload: JoystickPayload) => {
-  if (controlMode.value === 'pose') return
+  if (controlMode.value === 'pose' && !twoLegStandActive.value) return
   sendJoystick('move', payload)
 }
 
 const onLookJoystick = (payload: JoystickPayload) => {
+  if (rightJoystickDisabled.value) return
   if (controlMode.value === 'pose') {
     sendJoystick('pose', payload)
     return
@@ -408,11 +429,12 @@ const onLookJoystick = (payload: JoystickPayload) => {
 }
 
 const onMoveJoystickEnd = () => {
-  if (controlMode.value === 'pose') return
+  if (controlMode.value === 'pose' && !twoLegStandActive.value) return
   stopJoystick('move')
 }
 
 const onLookJoystickEnd = () => {
+  if (rightJoystickDisabled.value) return
   if (controlMode.value === 'pose') {
     stopJoystick('pose')
     return
@@ -568,6 +590,7 @@ watch(controlMode, (val) => {
 
 watch(selectedUuid, async (val) => {
   if (val) {
+    twoLegStandActive.value = false
     if (isConnected.value) {
       wsDisconnect()
     }

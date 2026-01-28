@@ -159,6 +159,38 @@ backup_menu() {
     print_success "备份完成"
 }
 
+fix_common_errors() {
+    local root
+    root="$(get_project_root)"
+    echo ""
+    echo "------------------------------------------"
+    echo "修复常见错误:"
+    echo "  1) 修复 Git refs/heads/main:Zone.Identifier"
+    echo "  0) 返回"
+    echo "------------------------------------------"
+    read -p "请选择修复项: " ftype
+    case "$ftype" in
+        1)
+            if [ -d "$root/.git" ]; then
+                rm -f "$root/.git/refs/heads/main:Zone.Identifier"
+                if [ -f "$root/.git/packed-refs" ]; then
+                    sed -i '/refs\/heads\/main:Zone.Identifier/d' "$root/.git/packed-refs"
+                fi
+                git -C "$root" fetch --prune --tags origin
+                print_success "已尝试修复 Git 引用损坏"
+            else
+                echo "未检测到 .git 目录"
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo "无效选项"
+            ;;
+    esac
+}
+
 # 显示菜单
 show_menu() {
     echo ""
@@ -168,6 +200,7 @@ show_menu() {
     echo ""
     echo "  1) SSH 连接机器狗 (firefly@$ROBOT_IP)"
     echo "  2) 备份当前项目文件夹"
+    echo "  3) 修复常见错误"
     echo "  0) 退出"
     echo ""
     echo "=========================================="
@@ -184,6 +217,9 @@ while true; do
             ;;
         2)
             backup_menu
+            ;;
+        3)
+            fix_common_errors
             ;;
         0)
             print_success "退出脚本"

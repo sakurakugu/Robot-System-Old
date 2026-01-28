@@ -6,7 +6,6 @@ import sys
 import json
 import paramiko
 import os
-from pathlib import Path
 
 # 默认SSH配置
 SSH_USER = 'firefly'
@@ -192,7 +191,7 @@ def copy_directory(robot_ip, local_path, remote_path):
         
         upload_recursive(local_path, remote_path)
         
-        print(f"[SUCCESS] 所有文件复制完成", file=sys.stderr)
+        print("[SUCCESS] 所有文件复制完成", file=sys.stderr)
         
         sftp.close()
         client.close()

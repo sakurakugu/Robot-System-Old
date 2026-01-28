@@ -18,7 +18,6 @@ from .utils import (
     http_ok,
     pkill_patterns,
     check_env,
-    is_port_in_use,
     ensure_ports_available,
 )
 

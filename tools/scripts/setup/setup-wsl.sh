@@ -207,6 +207,9 @@ install_dev_tools() {
     
     print_success "Python: $(python --version 2>&1)"
     print_success "pip: $(pip --version | awk '{print $2}')"
+
+    git config --global core.editor vim
+    git config --global core.sshCommand "/mnt/c/Windows/System32/OpenSSH/ssh.exe"
 }
 
 # 创建快捷命令（暂时不创建）

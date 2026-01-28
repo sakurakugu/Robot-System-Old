@@ -53,6 +53,7 @@ RUN apt-get update && apt-get install -y \
 
 # 改成 vim 而不是难用的 nano (i插入; Esc、:wq写入; Esc、:q/:q! 退出/强制退出)
 RUN git config --global core.editor vim
+RUN git config --global core.sshCommand "/mnt/c/Windows/System32/OpenSSH/ssh.exe"
 
 # 设置环境变量
 # 将自定义库路径加入 PYTHONPATH，这样在任何地方都能 import SDK

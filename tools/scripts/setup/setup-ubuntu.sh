@@ -36,6 +36,7 @@ install_basic_tools() {
         curl \
         wget \
         git \
+        tldr \
         build-essential \
         python-is-python3 \
         python3-pip
@@ -133,6 +134,8 @@ configure_git() {
         print_info "用户名: $(git config --global user.name)"
         print_info "邮箱: $(git config --global user.email)"
     fi
+
+    git config --global core.editor vim
 }
 
 # 创建必要的目录

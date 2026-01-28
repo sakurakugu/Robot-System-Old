@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     software-properties-common \
     git \
+    tldr \
     vim \
     x11-apps \
     wget \

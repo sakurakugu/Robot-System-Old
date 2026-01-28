@@ -82,6 +82,7 @@ install_basic_tools() {
         python-is-python3 \
         python3-pip \
         net-tools \
+        tldr \
         iputils-ping
     
     print_success "基础工具安装完成"

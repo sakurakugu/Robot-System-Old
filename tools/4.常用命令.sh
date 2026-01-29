@@ -166,6 +166,7 @@ fix_common_errors() {
     echo "------------------------------------------"
     echo "修复常见错误:"
     echo "  1) 修复 Git refs/heads/main:Zone.Identifier"
+    echo "  2) 修改 Git 上次提交日志"
     echo "  0) 返回"
     echo "------------------------------------------"
     read -p "请选择修复项: " ftype
@@ -182,6 +183,9 @@ fix_common_errors() {
                 echo "未检测到 .git 目录"
             fi
             ;;
+        2)
+            git_amend_commit
+            ;;
         0)
             return
             ;;
@@ -189,6 +193,30 @@ fix_common_errors() {
             echo "无效选项"
             ;;
     esac
+}
+
+# Git 相关功能
+git_amend_commit() {
+    local root
+    root="$(get_project_root)"
+    if [ -d "$root/.git" ]; then
+        print_info "当前分支: $(git -C "$root" branch --show-current)"
+        read -p "按回车开始修改（ “i” 插入，“Esc + :wq” 保存）: "
+        git -C "$root" commit --amend
+        print_success "已更新上次提交日志"
+            
+        read -p "是否需要安全推送 (git push --force-with-lease)? (y/N): " push_choice
+        if [ "$push_choice" = "y" ] || [ "$push_choice" = "Y" ]; then
+            git -C "$root" push --force-with-lease
+            if [ $? -eq 0 ]; then
+                print_success "已安全推送更新"
+            else
+                echo "推送失败，请检查网络连接或权限"
+            fi
+        fi
+    else
+        echo "未检测到 .git 目录，不是 Git 仓库"
+    fi
 }
 
 # 显示菜单

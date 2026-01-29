@@ -80,6 +80,6 @@ if __name__ == '__main__':
     # 确保服务器在正确的目录中运行
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     
-    print(f"Server running at http://0.0.0.0:{PORT}")
+    print(f"服务器运行在 http://0.0.0.0:{PORT}")
     print("请在浏览器中访问 http://<机器狗IP>:8080 来设置WiFi")
     uvicorn.run(app, host="0.0.0.0", port=PORT)

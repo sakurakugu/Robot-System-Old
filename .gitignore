@@ -60,4 +60,5 @@ test/
 *.blend1
 
 other/
+*.db
 

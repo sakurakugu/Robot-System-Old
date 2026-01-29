@@ -24,8 +24,8 @@ from .utils import (
 
 DANCE_BACKEND = ROOT / "app" / "dance-choreo" / "backend"
 DANCE_FRONTEND = ROOT / "app" / "dance-choreo" / "frontend"
-CHAT_BACKEND = ROOT / "app" / "robot-agent" / "cloud" / "backend"
-CHAT_FRONTEND = ROOT / "app" / "robot-agent" / "cloud" / "frontend"
+CHAT_BACKEND = ROOT / "app" / "robot-cloud" / "backend"
+CHAT_FRONTEND = ROOT / "app" / "robot-cloud" / "frontend"
 
 def _read_text(path: Path) -> str:
     try:

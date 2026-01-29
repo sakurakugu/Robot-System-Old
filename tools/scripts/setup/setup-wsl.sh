@@ -90,7 +90,7 @@ install_basic_tools() {
 
 # 配置WSL特定设置
 configure_wsl_settings() {
-#     print_info "配置 WSL 设置..."
+    print_info "配置 WSL 设置..."
 #    
 #     # 创建或更新 .wslconfig (在Windows用户目录下)
 #     print_info "WSL 配置文件位置: /mnt/c/Users/<用户名>/.wslconfig"
@@ -215,7 +215,7 @@ install_dev_tools() {
 
 # 创建快捷命令（暂时不创建）
 create_shortcuts() {
-#     print_info "创建便捷命令..."
+    print_info "创建便捷命令..."
     
 #     PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
     

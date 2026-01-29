@@ -850,7 +850,7 @@ class WebSocketService {
    */
   private handleStatus(robotId: string, msg: any): void {
     const payload = {
-      robot_id: msg?.robot_id ?? robotId,
+      robotId: msg?.robotId ?? robotId,
       seq: msg?.seq,
       timestamp: msg?.timestamp,
       data: msg?.data ?? msg,
@@ -858,7 +858,7 @@ class WebSocketService {
     this.logger.debug('收到状态更新', { robotId, payload });
     
     // 更新机器狗状态到数据库
-    const robot = this.database.getRobot(payload.robot_id || robotId);
+    const robot = this.database.getRobot(payload.robotId || robotId);
     if (robot) {
       try {
         const metadata = robot.metadata ? JSON.parse(robot.metadata) : {};
@@ -867,7 +867,7 @@ class WebSocketService {
         metadata.lastStatusTime = typeof payload.timestamp === 'number'
           ? new Date(Math.floor(payload.timestamp * 1000)).toISOString()
           : new Date().toISOString();
-        this.database.updateRobot(payload.robot_id || robotId, { metadata: JSON.stringify(metadata) });
+        this.database.updateRobot(payload.robotId || robotId, { metadata: JSON.stringify(metadata) });
       } catch (error) {
         this.logger.error('保存状态失败', error as Error, { robotId });
       }
@@ -878,9 +878,9 @@ class WebSocketService {
       const levelRaw = (payload.data && (payload.data.battery ?? payload.data.level)) as any;
       const levelNum = typeof levelRaw === 'number' ? levelRaw : parseFloat(levelRaw);
       if (!Number.isNaN(levelNum)) {
-        this.sendToUI(payload.robot_id || robotId, {
+        this.sendToUI(payload.robotId || robotId, {
           type: 'battery_status',
-          robotId: payload.robot_id || robotId,
+          robotId: payload.robotId || robotId,
           timestamp: Date.now(),
           data: {
             level: Math.round(levelNum),
@@ -893,9 +893,9 @@ class WebSocketService {
 
     // 同步广播完整状态到UI（便于前端冗余处理）
     try {
-      this.sendToUI(payload.robot_id || robotId, {
+      this.sendToUI(payload.robotId || robotId, {
         type: 'status_update',
-        robotId: payload.robot_id || robotId,
+        robotId: payload.robotId || robotId,
         timestamp: Date.now(),
         data: payload.data || {},
       }, 'control');

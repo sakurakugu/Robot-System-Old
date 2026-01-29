@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # 机器狗项目 - 常用命令快捷方式
+export ROBOT_IP=192.168.0.85
 
 # 颜色定义
 GREEN='\033[0;32m'
@@ -45,14 +46,52 @@ ensure_rsync() {
     fi
 }
 
+# 更改机器狗 IP
+change_robot_ip() {
+    echo ""
+    echo "------------------------------------------"
+    echo "当前机器狗 IP: $ROBOT_IP"
+    echo "------------------------------------------"
+    read -p "请输入新的机器狗 IP 地址: " new_ip
+    
+    # 验证 IP 地址格式（简单验证）
+    if [[ $new_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # 更新环境变量
+        export ROBOT_IP=$new_ip
+        print_success "机器狗 IP 已更新为: $ROBOT_IP"
+        
+        # 询问是否要更新脚本文件中的默认 IP
+        read -p "是否要更新脚本文件中的默认 IP？(y/N): " update_file
+        if [ "$update_file" = "y" ] || [ "$update_file" = "Y" ]; then
+            # 使用 sed 命令更新脚本文件中的 IP 地址
+            sed -i "4s/export ROBOT_IP=.*/export ROBOT_IP=$new_ip/" "$0"
+            print_success "脚本文件中的默认 IP 已更新"
+        fi
+    else
+        echo "无效的 IP 地址格式，请重新输入"
+        change_robot_ip
+    fi
+}
+
 # 连接机器狗
-export ROBOT_IP=192.168.0.85
 connect_robot() {
     check_sshpass
     print_info "正在连接机器狗 (firefly@$ROBOT_IP)..."
     # 使用 -o StrictHostKeyChecking=no 可以跳过首次连接的指纹确认，但为了安全起见，这里不强制添加
     # 如果是第一次连接，可能需要手动输入 yes，随后 sshpass 会自动输入密码
     sshpass -p 'firefly' ssh firefly@$ROBOT_IP
+    
+    # 检查连接是否失败
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "连接失败！"
+        read -p "是否要更改机器狗 IP 地址？(y/N): " change_ip
+        if [ "$change_ip" = "y" ] || [ "$change_ip" = "Y" ]; then
+            change_robot_ip
+            # 更改 IP 后再次尝试连接
+            connect_robot
+        fi
+    fi
 }
 
 iso_now() {
@@ -219,6 +258,28 @@ git_amend_commit() {
     fi
 }
 
+# 设置菜单
+settings_menu() {
+    echo ""
+    echo "------------------------------------------"
+    echo "设置选项:"
+    echo "  1) 修改机器狗 IP 地址"
+    echo "  0) 返回"
+    echo "------------------------------------------"
+    read -p "请选择设置项: " stype
+    case "$stype" in
+        1)
+            change_robot_ip
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo "无效选项"
+            ;;
+    esac
+}
+
 # 显示菜单
 show_menu() {
     echo ""
@@ -229,6 +290,7 @@ show_menu() {
     echo "  1) SSH 连接机器狗 (firefly@$ROBOT_IP)"
     echo "  2) 备份当前项目文件夹"
     echo "  3) 修复常见错误"
+    echo "  4) 设置"
     echo "  0) 退出"
     echo ""
     echo "=========================================="
@@ -248,6 +310,9 @@ while true; do
             ;;
         3)
             fix_common_errors
+            ;;
+        4)
+            settings_menu
             ;;
         0)
             print_success "退出脚本"

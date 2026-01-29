@@ -1,7 +1,7 @@
 import time
 from .logger import logger
 from .sdk import mc_sdk_zsl_1_py
-from .utils import get_local_ip
+from .utils import 获取本地IP
 
 class RobotDog:
     """机器狗基础接口封装"""
@@ -12,7 +12,7 @@ class RobotDog:
         self.name = name
         self.app = mc_sdk_zsl_1_py.HighLevel()
         if local_ip is None:
-            local_ip = get_local_ip()
+            local_ip = 获取本地IP()
         self.app.initRobot(local_ip, local_port, robot_ip)
 
     def get_current_ctrl_mode(self) -> int:

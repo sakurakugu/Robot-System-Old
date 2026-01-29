@@ -13,7 +13,7 @@ def execute_concurrently(*actions, _interval: float = 0):
         for future in futures:
             future.result()       # 等待动作完成
 
-def get_local_ip():
+def 获取本地IP():
     """通过UDP连接获取本机对外的IP地址"""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -27,5 +27,5 @@ def get_local_ip():
         s.close()
     return ip
 
-__all__ = ["execute_concurrently", "get_local_ip"]
+__all__ = ["execute_concurrently", "获取本地IP"]
 

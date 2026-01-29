@@ -7,7 +7,7 @@
 
 - 现在这个传输的是base64，之后要改成直接传输二进制数据(到时候先问问推荐将音频上传改成opus二进制数据传输吗)
 ```python
-def build_audio_chunk(
+def 构建音频帧消息(
     robot_uuid: str,        # 机器人 UUID
     session_id: str,        # 会话 ID
     seq: int,               # 音频帧序号

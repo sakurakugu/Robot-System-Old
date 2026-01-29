@@ -1,7 +1,5 @@
 >   该文件夹用于 VS Code Remote 的开发容器配置，方便在容器中进行开发。
 
-
-
 ### 使用方法
 
 1.   打开 VSCode → 安装 Remote - Containers 插件 (一般自带)

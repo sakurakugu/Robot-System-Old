@@ -178,7 +178,7 @@
       size="50%" 
       :with-header="false"
       :append-to-body="false"
-      class="robot-chat-drawer"
+      class="robot-agent-drawer"
     >
       <div class="chat-drawer">
         <div class="chat-drawer__header">

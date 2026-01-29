@@ -93,16 +93,16 @@ install_project_dependencies() {
     fi
 
         # 安装Node.js依赖
-    if [ -f "$ROOT_DIR/app/robot-chat/cloud/backend/package.json" ]; then
+    if [ -f "$ROOT_DIR/app/robot-agent/cloud/backend/package.json" ]; then
         print_info "安装后端依赖..."
-        cd "$ROOT_DIR/app/robot-chat/cloud/backend"
+        cd "$ROOT_DIR/app/robot-agent/cloud/backend"
         npm install
         print_success "后端依赖安装完成"
     fi
     
-    if [ -f "$ROOT_DIR/app/robot-chat/cloud/frontend/package.json" ]; then
+    if [ -f "$ROOT_DIR/app/robot-agent/cloud/frontend/package.json" ]; then
         print_info "安装前端依赖..."
-        cd "$ROOT_DIR/app/robot-chat/cloud/frontend"
+        cd "$ROOT_DIR/app/robot-agent/cloud/frontend"
         npm install
         print_success "前端依赖安装完成"
     fi
@@ -142,23 +142,23 @@ update_project_dependencies() {
         print_success "前端依赖更新完成"
     fi
     
-    # 更新 robot-chat 依赖
-    if [ -f "$ROOT_DIR/app/robot-chat/cloud/backend/package.json" ]; then
-        print_info "更新 robot-chat 后端依赖..."
-        cd "$ROOT_DIR/app/robot-chat/cloud/backend"
+    # 更新 robot-agent 依赖
+    if [ -f "$ROOT_DIR/app/robot-agent/cloud/backend/package.json" ]; then
+        print_info "更新 robot-agent 后端依赖..."
+        cd "$ROOT_DIR/app/robot-agent/cloud/backend"
         npx ncu
         npx ncu -u
         npm install
-        print_success "robot-chat 后端依赖更新完成"
+        print_success "robot-agent 后端依赖更新完成"
     fi
 
-    if [ -f "$ROOT_DIR/app/robot-chat/cloud/frontend/package.json" ]; then
-        print_info "更新 robot-chat 前端依赖..."
-        cd "$ROOT_DIR/app/robot-chat/cloud/frontend"
+    if [ -f "$ROOT_DIR/app/robot-agent/cloud/frontend/package.json" ]; then
+        print_info "更新 robot-agent 前端依赖..."
+        cd "$ROOT_DIR/app/robot-agent/cloud/frontend"
         npx ncu
         npx ncu -u
         npm install
-        print_success "robot-chat 前端依赖更新完成"
+        print_success "robot-agent 前端依赖更新完成"
     fi
     
     cd "$ROOT_DIR"

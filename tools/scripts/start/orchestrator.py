@@ -24,8 +24,8 @@ from .utils import (
 
 DANCE_BACKEND = ROOT / "app" / "dance-choreo" / "backend"
 DANCE_FRONTEND = ROOT / "app" / "dance-choreo" / "frontend"
-CHAT_BACKEND = ROOT / "app" / "robot-chat" / "cloud" / "backend"
-CHAT_FRONTEND = ROOT / "app" / "robot-chat" / "cloud" / "frontend"
+CHAT_BACKEND = ROOT / "app" / "robot-agent" / "cloud" / "backend"
+CHAT_FRONTEND = ROOT / "app" / "robot-agent" / "cloud" / "frontend"
 
 def _read_text(path: Path) -> str:
     try:
@@ -165,13 +165,13 @@ def start_chat() -> List[Tuple[str, int]]:
     procs: List[Tuple[str, int]] = []
 
     print(f"🚀 启动对话系统后端...  (http://localhost:{ports['http']})")
-    backend_log = LOGS_DIR / "robot-chat" / "backend.log"
+    backend_log = LOGS_DIR / "robot-agent" / "backend.log"
     p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=CHAT_BACKEND, log_path=backend_log)
     write_pid("chat-backend", pid_backend)
     procs.append(("chat-backend", pid_backend))
 
     print(f"🚀 启动对话系统前端...  (http://localhost:{_chat_frontend_port()})")
-    frontend_log = LOGS_DIR / "robot-chat" / "frontend.log"
+    frontend_log = LOGS_DIR / "robot-agent" / "frontend.log"
     p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", str(_chat_frontend_port())], cwd=CHAT_FRONTEND, log_path=frontend_log)
     write_pid("chat-frontend", pid_frontend)
     procs.append(("chat-frontend", pid_frontend))

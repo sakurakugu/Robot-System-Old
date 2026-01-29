@@ -229,8 +229,8 @@ check_project_deps() {
     # Node.js项目依赖
     check_npm_packages "$PROJECT_ROOT/app/dance-choreo/backend" "后端 - Dance Chore"
     check_npm_packages "$PROJECT_ROOT/app/dance-choreo/frontend" "前端 - Dance Chore"
-    check_npm_packages "$PROJECT_ROOT/app/robot-chat/cloud/backend" "后端 - Robot Chat"
-    check_npm_packages "$PROJECT_ROOT/app/robot-chat/cloud/frontend" "前端 - Robot Chat"
+    check_npm_packages "$PROJECT_ROOT/app/robot-agent/cloud/backend" "后端 - Robot Chat"
+    check_npm_packages "$PROJECT_ROOT/app/robot-agent/cloud/frontend" "前端 - Robot Chat"
     
     # Python包
     check_python_package "numpy" "NumPy" false
@@ -250,8 +250,8 @@ check_project_files() {
     
     check_path "$PROJECT_ROOT/app/dance-choreo/backend/src/index.ts" "机器人编舞后端入口文件" true
     check_path "$PROJECT_ROOT/app/dance-choreo/frontend/src/main.ts" "机器人编舞前端入口文件" true
-    check_path "$PROJECT_ROOT/app/robot-chat/cloud/backend/src/server.ts" "机器人聊天后端入口文件" true
-    check_path "$PROJECT_ROOT/app/robot-chat/cloud/frontend/src/main.ts" "机器人聊天前端入口文件" true
+    check_path "$PROJECT_ROOT/app/robot-agent/cloud/backend/src/server.ts" "机器人聊天后端入口文件" true
+    check_path "$PROJECT_ROOT/app/robot-agent/cloud/frontend/src/main.ts" "机器人聊天前端入口文件" true
     # check_path "$PROJECT_ROOT/app/robot-control" "机器狗控制目录" true
     check_path "$PROJECT_ROOT/start.sh" "启动脚本" true
     

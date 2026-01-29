@@ -103,7 +103,7 @@ export class RobotService {
       // 2) 创建远程目录并读取UUID
       this.logger.info(`创建远程目录并检查UUID...`);
       const remoteInitCmd = [
-        'mkdir -p /home/firefly/sparkrobot/robot-chat',
+        'mkdir -p /home/firefly/sparkrobot/robot-agent',
         'mkdir -p /home/firefly/sparkrobot/config',
         'if [ -f /home/firefly/sparkrobot/config/config.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/config.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
       ].join(' && ');
@@ -137,7 +137,7 @@ export class RobotService {
       const clientPath = path.resolve(__dirname, '../../../client');
       this.logger.info(`Client path: ${clientPath}`);
       
-      const copyResult = await this.copyToRobot(pythonScript, finalIp, clientPath, '/home/firefly/sparkrobot/robot-chat');
+      const copyResult = await this.copyToRobot(pythonScript, finalIp, clientPath, '/home/firefly/sparkrobot/robot-agent');
       if (!copyResult.success) {
         throw new Error(`复制客户端代码到机器狗失败: ${copyResult.error || '未知错误'}`);
       }
@@ -333,7 +333,7 @@ export class RobotService {
 
     // 创建远程目录
     this.logger.info('创建远程目录...');
-    const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-chat && mkdir -p /home/firefly/sparkrobot/config';
+    const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-agent && mkdir -p /home/firefly/sparkrobot/config';
     try {
       await this.executeSSHCommand(pythonScript, robotIp, mkdirCmd);
     } catch {
@@ -343,7 +343,7 @@ export class RobotService {
     // 复制客户端代码
     this.logger.info('开始复制客户端代码...');
     const clientPath = path.resolve(__dirname, '../../../../../client');
-    const copyResult = await this.copyToRobot(pythonScript, robotIp, clientPath, '/home/firefly/sparkrobot/robot-chat');
+    const copyResult = await this.copyToRobot(pythonScript, robotIp, clientPath, '/home/firefly/sparkrobot/robot-agent');
     
     if (!copyResult.success) {
       throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);

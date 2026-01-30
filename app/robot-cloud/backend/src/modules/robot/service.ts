@@ -134,10 +134,15 @@ export class RobotService {
       finalUuid = robotUuid;
 
       // 3) 复制客户端代码
-      const clientPath = path.resolve(__dirname, '../../../client');
-      this.logger.info(`Client path: ${clientPath}`);
+      // const clientPath = path.resolve(__dirname, '../../../../../robot-agent/client');
+      const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/wifi-server');
+      this.logger.info(`本地客户端路径: ${localClientPath}`);
       
-      const copyResult = await this.copyToRobot(pythonScript, finalIp, clientPath, '/home/firefly/sparkrobot/robot-agent');
+      // 远程客户端路径
+      // const remoteClientPath = '/home/firefly/sparkrobot/robot-agent/client';
+      const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
+      this.logger.info(`远程客户端路径: ${remoteClientPath}`);
+      const copyResult = await this.copyToRobot(pythonScript, finalIp, localClientPath, remoteClientPath);
       if (!copyResult.success) {
         throw new Error(`复制客户端代码到机器狗失败: ${copyResult.error || '未知错误'}`);
       }
@@ -342,8 +347,11 @@ export class RobotService {
 
     // 复制客户端代码
     this.logger.info('开始复制客户端代码...');
-    const clientPath = path.resolve(__dirname, '../../../../../client');
-    const copyResult = await this.copyToRobot(pythonScript, robotIp, clientPath, '/home/firefly/sparkrobot/robot-agent');
+    // const clientPath = path.resolve(__dirname, '../../../../../robot-agent/client');
+    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/wifi-server');
+    // const remoteClientPath = '/home/firefly/sparkrobot/robot-agent';
+    const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
+    const copyResult = await this.copyToRobot(pythonScript, robotIp, localClientPath, remoteClientPath);
     
     if (!copyResult.success) {
       throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
@@ -489,7 +497,7 @@ export class RobotService {
             const result = JSON.parse(stdout);
             resolve(result);
           } catch (e) {
-            console.error(`[ERROR] JSON parse error:`, e, `stdout:`, stdout);
+            console.error(`JSON解析错误:`, e, `stdout:`, stdout);
             resolve({ success: false, error: '解析输出失败' });
           }
         } else {

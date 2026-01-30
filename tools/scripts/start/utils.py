@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import time
+import threading
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
 from urllib import request, error
@@ -54,16 +55,37 @@ def run(cmd: Iterable[str], cwd: Optional[Path] = None, check: bool = True) -> s
     return subprocess.run(list(cmd), cwd=str(cwd) if cwd else None, check=check)
 
 
+def _tee_stream(stream, log_file, label: str) -> None:
+    for line in iter(stream.readline, ""):
+        log_file.write(line)
+        log_file.flush()
+        sys.stdout.write(f"[{label}] {line}")
+        sys.stdout.flush()
+
+
+def _log_label(log_path: Path) -> str:
+    parent = log_path.parent.name
+    name = log_path.stem
+    if parent:
+        return f"{parent}:{name}"
+    return name
+
+
 def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Popen, int]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "a", buffering=1)
     proc = subprocess.Popen(
         list(cmd),
         cwd=str(cwd),
-        stdout=log_file,
+        stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        bufsize=1,
     )
+    if proc.stdout is not None:
+        label = _log_label(log_path)
+        t = threading.Thread(target=_tee_stream, args=(proc.stdout, log_file, label), daemon=True)
+        t.start()
     return proc, proc.pid
 
 
@@ -296,4 +318,3 @@ def ensure_ports_available(ports: dict, interactive: bool = True) -> bool:
                 print(f"✅ 已清理 pid={pid} ({name})" if ok else f"❌ 清理失败 pid={pid} ({name})")
     time.sleep(0.5)
     return True
-

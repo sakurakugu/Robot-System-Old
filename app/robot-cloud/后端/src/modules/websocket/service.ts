@@ -783,6 +783,11 @@ class WebSocketService {
     }
     this.audioSessions.delete(sessionId);
 
+    if (!session.chunks || session.chunks.length === 0) {
+      this.logger.warn('音频会话无有效数据', { robotId, sessionId });
+      return;
+    }
+
     const durationMs = session.frameDurationMs * session.chunks.length;
     const asrStart = Date.now();
     try {
@@ -807,10 +812,14 @@ class WebSocketService {
   }
 
   private decodeOpusChunksToWav(session: AudioSession): Buffer {
-    const frameSize = Math.floor((session.sampleRate * session.frameDurationMs) / 1000);
+    const sr = session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000;
+    const ch = session.channels === 2 ? 2 : 1;
+    const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
+    const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
+    const frameSize = Math.floor((sr * fd) / 1000);
     const decoder = new (OpusScript as any)(
-      session.sampleRate,
-      session.channels,
+      sr,
+      ch,
       (OpusScript as any).Application.VOIP
     );
 
@@ -822,12 +831,20 @@ class WebSocketService {
     };
 
     for (const chunk of session.chunks) {
-      const decoded = decoder.decode(chunk, frameSize);
-      pcmBuffers.push(toUint8Array(decoded));
+      if (!chunk || chunk.length === 0) continue;
+      try {
+        const decoded = decoder.decode(chunk, frameSize);
+        pcmBuffers.push(toUint8Array(decoded));
+      } catch {
+      }
+    }
+
+    if (pcmBuffers.length === 0) {
+      throw new Error('Opus解码失败');
     }
 
     const pcmData = Buffer.concat(pcmBuffers);
-    return this.buildWavBuffer(pcmData, session.sampleRate, session.channels);
+    return this.buildWavBuffer(pcmData, sr, ch);
   }
 
   private buildWavBuffer(pcmData: Buffer, sampleRate: number, channels: number): Buffer {

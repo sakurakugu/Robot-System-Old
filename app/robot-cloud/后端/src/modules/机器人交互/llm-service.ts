@@ -146,9 +146,14 @@ export class LLMService {
         url,
         {
           model: options?.model || tongyi.model || 'qwen-flash',
-          messages: messages.map(m => ({ role: m.role, content: m.content })),
-          temperature: options?.temperature ?? 0.7,
-          max_tokens: options?.maxTokens || 1000,
+          input: {
+            messages: messages.map(m => ({ role: m.role, content: m.content })),
+          },
+          parameters: {
+            temperature: options?.temperature ?? 0.7,
+            max_tokens: options?.maxTokens || 1000,
+            result_format: 'message',
+          },
         },
         {
           headers: {

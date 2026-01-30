@@ -132,11 +132,12 @@
             <h3 class="section-title">网络配置</h3>
             <el-form :model="formData" label-width="100px">
               <el-form-item label="机器人IP">
-                <el-input v-model="formData.ip" disabled>
+                <el-input v-model="formData.ip" placeholder="例如：192.168.1.110" @change="autoSave('ip')">
                   <template #append>
-                    <el-button @click="copyText(formData.ip)">复制</el-button>
+                    <el-button @click="copyText(formData.ip)" :disabled="!formData.ip">复制</el-button>
                   </template>
                 </el-input>
+                <el-text v-if="formData.ip && !isValidIP(formData.ip)" type="danger" size="small">IP格式不正确</el-text>
               </el-form-item>
               <el-form-item label="本地IP">
                 <el-input v-model="formData.local_ip" disabled />
@@ -147,6 +148,9 @@
               <el-form-item>
                 <el-button type="primary" :loading="testingNetwork" @click="testConnection">
                   测试连接
+                </el-button>
+                <el-button type="success" :disabled="!canOpenWifi" @click="openWifiSettings">
+                  修改WiFi
                 </el-button>
                 <span v-if="networkResult" :class="['network-result', networkResult.success ? 'success' : 'error']">
                   {{ networkResult.message }}
@@ -316,6 +320,7 @@ import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { isValidIP } from '@/utils/validator'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string; hideTabs?: boolean; activeTab?: string }>()
 const route = useRoute()
@@ -378,6 +383,7 @@ const availableModels = [
 const appUpdateAvailable = ref(false)
 const firmwareUpdateAvailable = ref(false)
 const hasUpdate = computed(() => appUpdateAvailable.value || firmwareUpdateAvailable.value)
+const canOpenWifi = computed(() => status.connected && isValidIP(formData.ip))
 
 // Methods
 
@@ -396,6 +402,11 @@ const loadData = async () => {
         formData.sn = r.sn || ''
         formData.ip = r.ip || r.robot_ip || ''
         tags.value = Array.isArray(r.tags) ? r.tags : []
+        status.connected = Boolean(
+          r.connected ??
+            r.is_connected ??
+            (typeof r.status === 'string' && ['online', 'connected'].includes(r.status))
+        )
       }
       const lipRes = await fetch('/api/v1/network/local-ip')
       const lipJson = await lipRes.json().catch(() => ({}))
@@ -432,6 +443,14 @@ const autoSave = async (field: string) => {
     if (field === 'group_name') payload.group_name = formData.group_name
     if (field.startsWith('ai_')) payload[field] = (formData as any)[field]
     if (field === 'tags') payload.tags = tags.value
+    if (field === 'ip') {
+      if (!formData.ip || !isValidIP(formData.ip)) {
+        ElMessage.warning('IP格式不正确')
+        return
+      }
+      payload.ip = formData.ip
+      payload.robot_ip = formData.ip
+    }
     const res = await fetch(`/api/v1/robots/${uuid.value}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -485,7 +504,9 @@ const testConnection = async () => {
     const json = await res.json().catch(() => ({}))
     testingNetwork.value = false
     if (res.ok) {
-      networkResult.value = { success: !!json.connected, message: json.message || (json.connected ? '连接成功' : '连接失败') }
+      const connected = !!json.connected
+      status.connected = connected
+      networkResult.value = { success: connected, message: json.message || (connected ? '连接成功' : '连接失败') }
     } else {
       networkResult.value = { success: false, message: json.error || `HTTP ${res.status}` }
     }
@@ -524,6 +545,19 @@ const uploadLogs = () => {
 // AI
 const saveAIConfig = () => {
     ElMessage.success('AI配置已保存')
+}
+
+const openWifiSettings = () => {
+  if (!status.connected) {
+    ElMessage.warning('机器人未连接')
+    return
+  }
+  if (!formData.ip || !isValidIP(formData.ip)) {
+    ElMessage.warning('IP格式不正确')
+    return
+  }
+  const url = `http://${formData.ip}:8080`
+  window.open(url, '_blank')
 }
 
 // Unbind

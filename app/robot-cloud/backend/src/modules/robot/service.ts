@@ -135,7 +135,7 @@ export class RobotService {
 
       // 3) 复制客户端代码
       // const clientPath = path.resolve(__dirname, '../../../../../robot-agent/client');
-      const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/wifi-server');
+      const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-server');
       this.logger.info(`本地客户端路径: ${localClientPath}`);
       
       // 远程客户端路径
@@ -348,7 +348,7 @@ export class RobotService {
     // 复制客户端代码
     this.logger.info('开始复制客户端代码...');
     // const clientPath = path.resolve(__dirname, '../../../../../robot-agent/client');
-    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/wifi-server');
+    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-server');
     // const remoteClientPath = '/home/firefly/sparkrobot/robot-agent';
     const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
     const copyResult = await this.copyToRobot(pythonScript, robotIp, localClientPath, remoteClientPath);

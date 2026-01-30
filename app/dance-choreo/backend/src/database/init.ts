@@ -1,8 +1,8 @@
-import { getMainDatabase, initMainDatabase, ProjectDatabase } from './index';
+import { getMainDatabase, 初始化MainDatabase, ProjectDatabase } from './index';
 import { PATHS, CONFIG } from '../config';
 import fs from 'fs';
 
-async function init() {
+async function 初始化() {
   console.log('初始化数据库中...');
   console.log(`数据目录: ${CONFIG.DATA_DIR}`);
   console.log(`主数据库: ${PATHS.mainDb}`);
@@ -30,7 +30,7 @@ async function init() {
   }
 
   // 初始化主数据库
-  await initMainDatabase();
+  await 初始化MainDatabase();
   console.log('主数据库初始化成功！');
 
   // 测试查询
@@ -44,4 +44,4 @@ async function init() {
   console.log('\n数据库初始化完成！');
 }
 
-init().catch(console.error);
+初始化().catch(console.error);

@@ -263,7 +263,7 @@ def is_managed_process(pid: int, cmdline: str) -> bool:
     if not cmdline:
         return False
     markers = [
-        str(ROOT / "app" / "robot-agent"),
+        str(ROOT / "app" / "robot-cloud"),
         str(ROOT / "app" / "dance-choreo"),
         "ts-node-dev",
         "vite",

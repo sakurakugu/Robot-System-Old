@@ -90,7 +90,7 @@ export async function getMainDatabase(): Promise<Database> {
 }
 
 // 初始化主数据库表结构
-export async function initMainDatabase(): Promise<void> {
+export async function 初始化MainDatabase(): Promise<void> {
   const db = await getMainDatabase();
 
   // 用户表
@@ -139,7 +139,7 @@ export async function initMainDatabase(): Promise<void> {
 
 // 工程数据库管理
 export class ProjectDatabase extends Database {
-  async initTables(): Promise<void> {
+  async 初始化Tables(): Promise<void> {
     // 工程配置表
     await this.run(`
       CREATE TABLE IF NOT EXISTS project_config (

@@ -14,10 +14,10 @@ export class WebSocketService {
 
   constructor(server: Server) {
     this.wss = new WebSocketServer({ server });
-    this.init();
+    this.初始化();
   }
 
-  private init() {
+  private 初始化() {
     this.wss.on('connection', (ws: WebSocket) => {
       const clientId = this.generateId();
       const client: Client = { ws, id: clientId };

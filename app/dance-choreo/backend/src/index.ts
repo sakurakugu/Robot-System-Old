@@ -6,7 +6,7 @@ import http from 'http';
 import path from 'path';
 import util from 'util';
 import { CONFIG } from './config';
-import { initMainDatabase } from './database';
+import { 初始化MainDatabase } from './database';
 import choreoApiRoutes from './routes/choreo-api';
 import sharedApiRoutes from './routes/shared-api';
 import { pythonExecutor } from './services/python-executor';
@@ -41,7 +41,7 @@ async function main() {
   console.log(`项目目录: ${CONFIG.PROJECTS_DIR}`);
 
   // 初始化数据库
-  await initMainDatabase();
+  await 初始化MainDatabase();
   console.log('数据库已初始化');
 
   // 创建 Express 应用

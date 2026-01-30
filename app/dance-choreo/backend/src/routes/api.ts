@@ -190,7 +190,7 @@ router.post('/projects', async (req: Request, res: Response) => {
     // 创建项目数据库
     const projectDb = new ProjectDatabase(path.join(folderPath, 'project.db'));
     await projectDb.open();
-    await projectDb.initTables();
+    await projectDb.初始化表();
 
     // 初始化项目配置 // TODO：这些推荐用json存储吗，还是直接存储字符串
     await projectDb.run(

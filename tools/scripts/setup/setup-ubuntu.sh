@@ -93,6 +93,7 @@ check_python() {
     # 升级pip
     print_info "升级 pip..."
     python3 -m pip install --upgrade pip
+    pip install --upgrade setuptools
     
     print_success "pip 版本: $(pip --version)"
 }

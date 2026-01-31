@@ -205,6 +205,7 @@ install_dev_tools() {
     # 升级 pip
     print_info "升级 pip..."
     python3 -m pip install --upgrade pip
+    pip install --upgrade setuptools
     
     print_success "Python: $(python --version 2>&1)"
     print_success "pip: $(pip --version | awk '{print $2}')"

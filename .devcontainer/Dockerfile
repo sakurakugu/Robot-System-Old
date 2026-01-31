@@ -56,6 +56,10 @@ RUN apt-get update && apt-get install -y \
 RUN git config --global core.editor vim
 RUN git config --global core.sshCommand "/mnt/c/Windows/System32/OpenSSH/ssh.exe"
 
+# 升级 pip 和 setuptools
+RUN pip install --upgrade pip
+RUN pip install --upgrade setuptools
+
 # 设置环境变量
 # 将自定义库路径加入 PYTHONPATH，这样在任何地方都能 import SDK
 # 假设 workspace 映射到 /workspaces/robot-dog (VS Code 默认行为)

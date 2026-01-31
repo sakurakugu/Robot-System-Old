@@ -1,59 +1,53 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import config from '../../config';
-import { SettingsService } from './service';
+import type { SettingsService } from './service';
 
+/**
+ * 设置控制器
+ */
 export class SettingsController {
   constructor(private settingsService: SettingsService) {}
 
-  private normalizeParam = (v: unknown): string =>
-    Array.isArray(v) ? String(v[0]) : String(v ?? '');
-
-  async getLLMConfig(req: Request, res: Response) {
+  /**
+   * 获取 LLM 配置
+   */
+  getLLMConfig = async (_req: Request, res: Response) => {
     try {
       const data = this.settingsService.getLLMConfig();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
-  async getParams(req: Request, res: Response) {
-    try {
-      const data = this.settingsService.getParamsConfig();
-      res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  }
-
-  async getLLMProviders(req: Request, res: Response) {
+  /**
+   * 获取 LLM 供应商列表
+   */
+  getLLMProviders = async (_req: Request, res: Response) => {
     try {
       const data = this.settingsService.getLLMProviders();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
-  async updateLLMConfig(req: Request, res: Response) {
+  /**
+   * 更新 LLM 配置
+   */
+  updateLLMConfig = async (req: Request, res: Response) => {
     try {
       const data = this.settingsService.updateLLMConfig(req.body || {});
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
-  async updateParams(req: Request, res: Response) {
-    try {
-      const data = this.settingsService.updateParams(req.body || {});
-      res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  }
-
-  async getUIConfig(req: Request, res: Response) {
+  /**
+   * 获取 UI 配置
+   */
+  getUIConfig = async (req: Request, res: Response) => {
     try {
       const data = this.settingsService.getUIConfig();
       const host = (req.headers.host || '').trim();
@@ -72,22 +66,10 @@ export class SettingsController {
         }
       };
 
-      const wsControlUrl =
-        data.wsControlUrl && String(data.wsControlUrl).length > 0
-          ? data.wsControlUrl
-          : resolveWsBaseUrl(serverUrl, config.ports.control);
-      const wsBusinessUrl =
-        data.wsBusinessUrl && String(data.wsBusinessUrl).length > 0
-          ? data.wsBusinessUrl
-          : resolveWsBaseUrl(serverUrl, config.ports.business);
-      const wsAudioUploadUrl =
-        data.wsAudioUploadUrl && String(data.wsAudioUploadUrl).length > 0
-          ? data.wsAudioUploadUrl
-          : resolveWsBaseUrl(serverUrl, config.ports.audioUpload);
-      const wsAudioDownloadUrl =
-        data.wsAudioDownloadUrl && String(data.wsAudioDownloadUrl).length > 0
-          ? data.wsAudioDownloadUrl
-          : resolveWsBaseUrl(serverUrl, config.ports.audioDownload);
+      const wsControlUrl = data.wsControlUrl || resolveWsBaseUrl(serverUrl, config.ports.control);
+      const wsBusinessUrl = data.wsBusinessUrl || resolveWsBaseUrl(serverUrl, config.ports.business);
+      const wsAudioUploadUrl = data.wsAudioUploadUrl || resolveWsBaseUrl(serverUrl, config.ports.audioUpload);
+      const wsAudioDownloadUrl = data.wsAudioDownloadUrl || resolveWsBaseUrl(serverUrl, config.ports.audioDownload);
 
       res.json({
         success: true,
@@ -104,32 +86,29 @@ export class SettingsController {
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
-  async updateUIConfig(req: Request, res: Response) {
+  /**
+   * 更新 UI 配置
+   */
+  updateUIConfig = async (req: Request, res: Response) => {
     try {
       this.settingsService.updateUIConfig(req.body || {});
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
-  async checkUpdate(req: Request, res: Response) {
+  /**
+   * 获取当前激活的 LLM 配置
+   */
+  getActiveLLMConfig = async (_req: Request, res: Response) => {
     try {
-      const robotId = this.normalizeParam((req.query as any).robotId);
-      const data = this.settingsService.checkUpdate(robotId || undefined);
+      const data = this.settingsService.getActiveLLMConfig();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
-
-  async upgradeApp(req: Request, res: Response) {
-    try {
-      res.json({ success: true, message: '已触发APP升级（预留接口）' });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  }
+  };
 }

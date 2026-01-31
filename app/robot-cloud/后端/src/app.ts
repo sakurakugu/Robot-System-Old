@@ -1,11 +1,7 @@
 import cors from 'cors';
 import express from 'express';
-import config from './config';
-import 数据库服务 from './core/database';
-import 日志服务 from './core/logger';
-import { ConversationController } from './modules/机器人交互/controller';
-import { createConversationRoutes } from './modules/机器人交互/routes';
-import { ConversationService } from './modules/机器人交互/service';
+import DatabaseService from './core/database';
+import Logger from './core/logger';
 import { RobotController } from './modules/robot/controller';
 import { createRobotRoutes } from './modules/robot/routes';
 import { RobotService } from './modules/robot/service';
@@ -17,11 +13,14 @@ import { createSettingsRoutes } from './modules/settings/routes';
 import { SettingsService } from './modules/settings/service';
 import { createSystemRoutes } from './modules/system/routes';
 import WebSocketService from './modules/websocket/service';
+import { ConversationController } from './modules/机器人交互/controller';
+import { createConversationRoutes } from './modules/机器人交互/routes';
+import { ConversationService } from './modules/机器人交互/service';
 
 export class Application {
   public app: express.Application;
-  public logger: 日志服务;
-  public database: 数据库服务;
+  public logger: Logger;
+  public database: DatabaseService;
   public websocketService: WebSocketService;
 
   // 服务实例
@@ -36,11 +35,10 @@ export class Application {
   private settingsController: SettingsController;
   private roleController: RoleController;
 
-  // 应用初始化
   constructor() {
     this.app = express();
-    this.logger = new 日志服务();
-    this.database = new 数据库服务();
+    this.logger = new Logger();
+    this.database = new DatabaseService();
     this.websocketService = new WebSocketService(this.logger, this.database);
 
     // 初始化服务
@@ -55,76 +53,31 @@ export class Application {
     this.settingsController = new SettingsController(this.settingsService);
     this.roleController = new RoleController(this.roleService);
 
+    // 加载持久化配置
     this.loadPersistedConfig();
     this.setupMiddleware();
     this.setupRoutes();
   }
 
   /**
-   * 从数据库加载持久化配置并覆盖内存配置
+   * 从数据库加载持久化配置
    */
   private loadPersistedConfig(): void {
     try {
-      const s = this.database.get_所有设置();
+      this.settingsService.loadPersistedConfig();
       
-      // LLM Provider
-      const provider = s['llm.provider'];
-      if (provider && (['openai','bigmodel','anthropic','deepseek','tongyi'].includes(provider))) {
-        (config.llm as any).provider = provider;
-        this.logger.info(`LLM Provider: ${provider} (来自数据库)`);
-      } else {
-        this.logger.warn(`未配置 LLM Provider，使用默认值: ${config.llm.provider}。请通过参数管理页面配置！`);
-      }
-      
-      // OpenAI
-      const openaiApiKey = s['openai.apiKey'];
-      const openaiModel = s['openai.model'];
-      const openaiBaseUrl = s['openai.baseUrl'];
-      if (openaiApiKey || openaiModel || openaiBaseUrl) {
-        config.llm.openai = config.llm.openai || { apiKey: '', model: '' };
-        if (openaiApiKey) config.llm.openai.apiKey = openaiApiKey;
-        if (openaiModel) config.llm.openai.model = openaiModel;
-        if (openaiBaseUrl) config.llm.openai.baseUrl = openaiBaseUrl;
-        this.logger.info('OpenAI 配置已从数据库加载');
-      }
-      
-      // BigModel
-      const bigApiKey = s['bigmodel.apiKey'];
-      const bigModel = s['bigmodel.model'];
-      const bigBaseUrl = s['bigmodel.baseUrl'];
-      if (bigApiKey || bigModel || bigBaseUrl) {
-        config.llm.bigmodel = config.llm.bigmodel || { apiKey: '', model: '' };
-        if (bigApiKey) config.llm.bigmodel.apiKey = bigApiKey;
-        if (bigModel) config.llm.bigmodel.model = bigModel;
-        if (bigBaseUrl) config.llm.bigmodel.baseUrl = bigBaseUrl;
-        this.logger.info('BigModel 配置已从数据库加载');
-      }
-
-      // Tongyi
-      const tongyiApiKey = s['tongyi.apiKey'];
-      const tongyiModel = s['tongyi.model'];
-      const tongyiBaseUrl = s['tongyi.baseUrl'];
-      if (tongyiApiKey || tongyiModel || tongyiBaseUrl) {
-        config.llm.tongyi = config.llm.tongyi || { apiKey: '', model: '' };
-        if (tongyiApiKey) config.llm.tongyi.apiKey = tongyiApiKey;
-        if (tongyiModel) config.llm.tongyi.model = tongyiModel;
-        if (tongyiBaseUrl) config.llm.tongyi.baseUrl = tongyiBaseUrl;
-        this.logger.info('Tongyi 配置已从数据库加载');
-      }
-      
-      this.logger.info('持久化配置加载完成', {
-        provider: config.llm.provider,
-        hasOpenAIKey: !!(config.llm.openai?.apiKey),
-        hasBigModelKey: !!(config.llm.bigmodel?.apiKey),
-        hasTongyiKey: !!(config.llm.tongyi?.apiKey)
+      const activeLLM = this.settingsService.getActiveLLMConfig();
+      this.logger.info(`LLM 配置已加载`, {
+        provider: activeLLM.provider,
+        model: activeLLM.model,
+        hasApiKey: !!activeLLM.apiKey,
       });
-      
-      if (!config.llm.openai?.apiKey && !config.llm.bigmodel?.apiKey && !config.llm.tongyi?.apiKey) {
-        this.logger.warn('⚠️  未找到任何 LLM API 密钥配置！');
-        this.logger.warn('⚠️  请访问前端参数管理页面进行配置：http://localhost:5174/params');
+
+      if (!activeLLM.apiKey) {
+        this.logger.warn('⚠️ 当前 LLM 供应商未配置 API Key，请访问前端设置页面进行配置');
       }
     } catch (e: any) {
-      this.logger.error('加载持久化配置失败，请通过参数管理页面配置', e);
+      this.logger.error('加载持久化配置失败', e);
     }
   }
 
@@ -132,10 +85,7 @@ export class Application {
    * 设置中间件
    */
   private setupMiddleware(): void {
-    // CORS
     this.app.use(cors());
-
-    // JSON解析
     this.app.use(express.json());
 
     // 请求日志
@@ -161,7 +111,7 @@ export class Application {
     router.use('/roles', createRoleRoutes(this.roleController));
     router.use('/', createSystemRoutes(this.database, this.websocketService));
 
-    // 兼容旧路由 - 发送命令到机器人
+    // 兼容旧路由
     router.post('/robot/:robotId/command', (req, res) => {
       this.conversationController.sendCommand(req, res);
     });

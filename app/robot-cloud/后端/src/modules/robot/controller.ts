@@ -1,191 +1,156 @@
-import { Request, Response } from 'express';
-import { RobotService } from './service';
+import type { Request, Response } from 'express';
+import type { RobotService } from './service';
 
+/**
+ * 机器人控制器
+ */
 export class RobotController {
   constructor(private robotService: RobotService) {}
 
-  private normalizeParam = (v: unknown): string =>
-    Array.isArray(v) ? String(v[0]) : String(v ?? '');
-
-  /**
-   * 获取所有机器狗列表
-   */
-  async get_所有机器人(req: Request, res: Response) {
-    try {
-      const robots = this.robotService.get_所有机器人();
-      res.json({
-        success: true,
-        data: { robots },
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+  private getParam(req: Request, ...keys: string[]): string {
+    for (const key of keys) {
+      const v = (req.params as Record<string, unknown>)[key];
+      if (v !== undefined) {
+        return Array.isArray(v) ? String(v[0]) : String(v);
+      }
     }
+    return '';
   }
 
   /**
-   * 获取机器狗分组
+   * 获取所有机器人列表
    */
-  async getGroups(req: Request, res: Response) {
+  getAllRobots = async (_req: Request, res: Response) => {
+    try {
+      const robots = this.robotService.getAllRobots();
+      res.json({ success: true, data: { robots } });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 获取机器人分组
+   */
+  getGroups = async (_req: Request, res: Response) => {
     try {
       const groups = this.robotService.getGroups();
       res.json({ success: true, data: { groups } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
-   * 获取指定机器狗信息
+   * 获取指定机器人
    */
-  async get_机器人(req: Request, res: Response) {
+  getRobot = async (req: Request, res: Response) => {
     try {
-      const robotId = this.normalizeParam((req.params as any).robotId || (req.params as any).uuid);
-      const robot = this.robotService.get_机器人(robotId);
+      const uuid = this.getParam(req, 'uuid', 'robotId');
+      const robot = this.robotService.getRobot(uuid);
       if (!robot) {
-        return res.status(404).json({
-          success: false,
-          error: '机器狗不存在',
-        });
+        return res.status(404).json({ success: false, error: '机器人不存在' });
       }
-      res.json({
-        success: true,
-        data: robot,
-      });
+      res.json({ success: true, data: robot });
     } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 创建机器人
    */
-  async createRobot(req: Request, res: Response) {
+  createRobot = async (req: Request, res: Response) => {
     try {
-      const created = await this.robotService.createRobot(req.body || {});
-      res.json({ success: true, data: created });
+      const robot = await this.robotService.createRobot(req.body || {});
+      res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message.includes('无法') ? 400 : 500;
       res.status(status).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 更新机器人
    */
-  async update_机器人(req: Request, res: Response) {
+  updateRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const updated = this.robotService.update_机器人(uuid, req.body || {});
-      res.json({ success: true, data: updated });
+      const uuid = this.getParam(req, 'uuid');
+      const robot = this.robotService.updateRobot(uuid, req.body || {});
+      res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : 500;
       res.status(status).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 删除机器人
    */
-  async delete_机器人(req: Request, res: Response) {
+  deleteRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      this.robotService.delete_机器人(uuid);
+      const uuid = this.getParam(req, 'uuid');
+      this.robotService.deleteRobot(uuid);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 测试机器人连接
    */
-  async testConnection(req: Request, res: Response) {
+  testConnection = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
+      const uuid = this.getParam(req, 'uuid');
       const result = await this.robotService.testConnection(uuid);
       res.json({ 
         success: result.connected, 
         connected: result.connected,
-        message: result.message 
+        message: result.message,
       });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
       res.status(status).json({ success: false, connected: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 连接机器人
    */
-  async connectRobot(req: Request, res: Response) {
+  connectRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const updated = await this.robotService.connectRobot(uuid);
-      res.json({ success: true, data: updated, message: '连接成功' });
+      const uuid = this.getParam(req, 'uuid');
+      const robot = await this.robotService.connectRobot(uuid);
+      res.json({ success: true, data: robot, message: '连接成功' });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
       res.status(status).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 更新机器人固件
    */
-  async updateFirmware(req: Request, res: Response) {
+  updateFirmware = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
+      const uuid = this.getParam(req, 'uuid');
       const result = await this.robotService.updateFirmware(uuid);
       res.json({ 
         success: true, 
         message: '客户端代码已成功更新到机器人',
-        data: result
+        data: result,
       });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
       res.status(status).json({ success: false, error: error.message });
     }
-  }
-
-  /**
-   * 获取日志上传历史
-   */
-  async getLogHistory(req: Request, res: Response) {
-    try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const limit = Math.max(1, Math.min(50, parseInt(req.query.limit as string) || 5));
-      const records = this.robotService.getLogHistory(uuid, limit);
-      res.json({ success: true, data: { records } });
-    } catch (error: any) {
-      const status = error.message === '机器人不存在' ? 404 : 500;
-      res.status(status).json({ success: false, error: error.message });
-    }
-  }
-
-  /**
-   * 上传日志
-   */
-  async uploadLog(req: Request, res: Response) {
-    try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const { from, to, logType } = req.body || {};
-      const record = this.robotService.addLogUploadRecord(uuid, { from, to, logType });
-      res.json({ success: true, data: { record } });
-    } catch (error: any) {
-      const status = error.message === '机器人不存在' ? 404 : 500;
-      res.status(status).json({ success: false, error: error.message });
-    }
-  }
+  };
 
   /**
    * 发现局域网内的机器人（mDNS）
    */
-  async discoverRobots(req: Request, res: Response) {
+  discoverRobots = async (req: Request, res: Response) => {
     try {
       const timeout = Math.max(1, Math.min(10, parseFloat(req.query.timeout as string) || 3));
       const result = await this.robotService.discoverRobots(timeout);
@@ -193,22 +158,13 @@ export class RobotController {
       if (result.success) {
         res.json({
           success: true,
-          data: {
-            robots: result.robots,
-            count: result.robots.length,
-          },
+          data: { robots: result.robots, count: result.robots.length },
         });
       } else {
-        res.status(500).json({
-          success: false,
-          error: result.error || '发现失败',
-        });
+        res.status(500).json({ success: false, error: result.error || '发现失败' });
       }
     } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 }

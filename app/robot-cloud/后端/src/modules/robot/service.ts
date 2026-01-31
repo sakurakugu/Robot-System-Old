@@ -2,415 +2,280 @@ import { spawn } from 'child_process';
 import net from 'net';
 import path from 'path';
 import { v7 as uuidv7 } from 'uuid';
-import 数据库服务 from '../../core/database';
-import 日志服务 from '../../core/logger';
+import type DatabaseService from '../../core/database';
+import type Logger from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
-import { RobotRecord } from '../../types';
+import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from '../../types';
 
+/**
+ * 机器人服务
+ */
 export class RobotService {
   constructor(
-    private database: 数据库服务,
-    private logger: 日志服务
+    private database: DatabaseService,
+    private logger: Logger
   ) {}
 
-  transformRobot(r: RobotRecord | undefined) {
-    if (!r) return r;
-    let meta: any = {};
-    try {
-      meta = r.metadata ? JSON.parse(r.metadata) : {};
-    } catch {
-      meta = {};
-    }
-    const {
-      ai_temperature,
-      ai_system_prompt,
-      ai_voice,
-      ai_intent,
-      ai_role_name,
-      lastStatus,
-      lastStatusTime
-    } = meta || {};
-    const parsedTags = (() => {
-      if (typeof r.tags === 'string') {
-        try {
-          const arr = JSON.parse(r.tags);
-          return Array.isArray(arr) ? arr : [];
-        } catch {
-          return [];
-        }
+  /**
+   * 转换数据库记录为 API 响应格式
+   */
+  private toResponse(record: RobotRecord | undefined): RobotResponse | undefined {
+    if (!record) return undefined;
+
+    // 解析 tags JSON
+    let tags: string[] = [];
+    if (record.tags) {
+      try {
+        const parsed = JSON.parse(record.tags);
+        tags = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        tags = [];
       }
-      return [];
-    })();
+    }
+
+    // 获取关联的角色
+    let role = null;
+    if (record.role_id) {
+      role = this.database.getRole(record.role_id) || null;
+    }
+
     return {
-      ...r,
-      ip: r.ip || null,
-      robot_ip: r.ip || null,
-      group_name: r.group_name ?? null,
-      sn: r.sn ?? null,
-      tags: parsedTags,
-      ai_temperature,
-      ai_system_prompt,
-      ai_voice,
-      ai_intent,
-      ai_role_name,
-      lastStatus,
-      lastStatusTime,
+      ...record,
+      tags,
+      role,
     };
   }
 
-  get_所有机器人() {
-    return this.database.get_所有机器人().map(r => this.transformRobot(r as RobotRecord));
+  /**
+   * 获取所有机器人
+   */
+  getAllRobots(): RobotResponse[] {
+    return this.database.getAllRobots()
+      .map(r => this.toResponse(r))
+      .filter((r): r is RobotResponse => r !== undefined);
   }
 
-  get_机器人(uuid: string) {
-    const robot = this.database.get_机器人(uuid);
-    return this.transformRobot(robot as RobotRecord);
+  /**
+   * 获取机器人详情
+   */
+  getRobot(uuid: string): RobotResponse | undefined {
+    return this.toResponse(this.database.getRobot(uuid));
   }
 
-  getGroups() {
-    const groups = new Set<string>();
-    for (const r of this.database.get_所有机器人()) {
-      if (r.group_name && typeof r.group_name === 'string') {
-        groups.add(r.group_name);
-      }
-    }
-    return Array.from(groups).sort();
+  /**
+   * 获取所有分组
+   */
+  getGroups(): string[] {
+    return this.database.getAllGroups();
   }
 
-  async createRobot(data: {
-    name?: string;
-    ip?: string;
-    robot_ip?: string;
-    group_name?: string;
-    model?: string;
-    status?: string;
-    sn?: string;
-    tags?: string[] | string;
-  }) {
-    const finalIp = data.ip || data.robot_ip || null;
-    let finalUuid: string | null = null;
+  /**
+   * 创建机器人
+   */
+  async createRobot(data: CreateRobotDto): Promise<RobotResponse> {
+    const ip = data.ip || null;
+    let uuid: string | null = null;
 
-    if (finalIp) {
-      // SSH初始化流程
+    // 如果提供了 IP，尝试 SSH 初始化
+    if (ip) {
       const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
       
-      // 1) 测试SSH连通性
-      const canSsh = await this.testSSHConnection(pythonScript, finalIp);
+      const canSsh = await this.testSSHConnection(pythonScript, ip);
       if (!canSsh) {
-        throw new Error(`无法通过SSH连接到 ${finalIp}`);
+        throw new Error(`无法通过SSH连接到 ${ip}`);
       }
 
-      // 2) 创建远程目录并读取UUID
-      this.logger.info(`创建远程目录并检查UUID...`);
+      // 读取或生成 UUID
       const remoteInitCmd = [
         'mkdir -p /home/firefly/sparkrobot/robot-agent',
         'mkdir -p /home/firefly/sparkrobot/config',
         'if [ -f /home/firefly/sparkrobot/config/config.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/config.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
       ].join(' && ');
 
-      const remoteUuidRaw = await this.executeSSHCommand(pythonScript, finalIp, remoteInitCmd);
-      let robotUuid: string | null = null;
-
-      if (remoteUuidRaw && remoteUuidRaw.length > 0) {
+      try {
+        const remoteUuid = await this.executeSSHCommand(pythonScript, ip, remoteInitCmd);
         const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (uuidPattern.test(remoteUuidRaw)) {
-          robotUuid = remoteUuidRaw;
-          this.logger.info(`从机器人读取到UUID: ${robotUuid}`);
+        if (remoteUuid && uuidPattern.test(remoteUuid)) {
+          uuid = remoteUuid;
+          this.logger.info(`从机器人读取到UUID: ${uuid}`);
         }
+      } catch (e) {
+        this.logger.warn('读取远程UUID失败，将生成新的');
       }
 
-      if (!robotUuid) {
-        robotUuid = uuidv7();
-        this.logger.info(`机器人没有UUID，生成新UUID: ${robotUuid}`);
+      if (!uuid) {
+        uuid = uuidv7();
+        this.logger.info(`生成新UUID: ${uuid}`);
         
-        const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${robotUuid}"\n`;
-        const wrote = await this.writeSSHFile(pythonScript, finalIp, '/home/firefly/sparkrobot/config/config.toml', configToml);
-        if (!wrote) {
-          throw new Error('写入远程UUID配置失败');
-        }
-        this.logger.info('已将UUID写入机器人配置文件');
+        const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
+        await this.writeSSHFile(pythonScript, ip, '/home/firefly/sparkrobot/config/config.toml', configToml);
       }
 
-      finalUuid = robotUuid;
-
-      // 3) 复制客户端代码
+      // 复制客户端代码
       const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-agent');
-      // const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-server');
-      this.logger.info(`本地客户端路径: ${localClientPath}`);
-      
-      // 远程客户端路径
       const remoteClientPath = '/home/firefly/sparkrobot/robot-agent/robot-agent';
-      // const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
-      this.logger.info(`远程客户端路径: ${remoteClientPath}`);
-      const copyResult = await this.copyToRobot(pythonScript, finalIp, localClientPath, remoteClientPath);
+      const copyResult = await this.copyToRobot(pythonScript, ip, localClientPath, remoteClientPath);
       if (!copyResult.success) {
-        throw new Error(`复制客户端代码到机器狗失败: ${copyResult.error || '未知错误'}`);
+        throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
       }
 
-      this.logger.info(`机器人 ${finalIp} 初始化完成，UUID: ${finalUuid}`);
+      this.logger.info(`机器人 ${ip} 初始化完成，UUID: ${uuid}`);
     }
 
-    const uuid = finalUuid ?? uuidv7();
-    this.logger.info(`准备写入数据库，UUID: ${uuid}`);
-
-    const metadata = {};
-    this.database.注册机器人({
-      uuid,
-      name: data.name,
-      model: data.model,
-      ip: finalIp ?? undefined,
+    // 创建数据库记录
+    const finalUuid = uuid || uuidv7();
+    this.database.upsertRobot({
+      uuid: finalUuid,
+      name: data.name || null,
+      model: data.model || null,
+      ip: ip,
       group_name: data.group_name || null,
       sn: data.sn || null,
-      tags: Array.isArray(data.tags) ? JSON.stringify(data.tags) : (typeof data.tags === 'string' ? data.tags : null),
-      status: (data.status as any) || 'offline',
-      last_connected: new Date(),
-      registered_at: new Date(),
-      metadata: metadata as any,
+      tags: data.tags ? JSON.stringify(data.tags) : null,
+      status: 'offline',
+      registered_at: new Date().toISOString(),
     });
 
-    return this.get_机器人(uuid);
+    const result = this.getRobot(finalUuid);
+    if (!result) {
+      throw new Error('创建机器人失败');
+    }
+    return result;
   }
 
-  update_机器人(uuid: string, data: any) {
-    const existing = this.database.get_机器人(uuid);
+  /**
+   * 更新机器人
+   */
+  updateRobot(uuid: string, data: UpdateRobotDto): RobotResponse {
+    const existing = this.database.getRobot(uuid);
     if (!existing) {
       throw new Error('机器人不存在');
     }
 
-    let meta: any = {};
-    try {
-      meta = existing.metadata ? JSON.parse(existing.metadata) : {};
-    } catch {
-      meta = {};
-    }
-
-    if (data.ai_temperature !== undefined) meta.ai_temperature = data.ai_temperature;
-    if (data.ai_system_prompt !== undefined) meta.ai_system_prompt = data.ai_system_prompt || '';
-    if (data.ai_voice !== undefined) meta.ai_voice = data.ai_voice || '';
-    if (data.ai_intent !== undefined) meta.ai_intent = data.ai_intent || '';
-    if (data.ai_role_name !== undefined) meta.ai_role_name = data.ai_role_name || '';
-
-    const updated = this.database.update_机器人(uuid, {
-      name: data.name !== undefined ? data.name : existing.name,
-      model: data.model !== undefined ? data.model : existing.model,
-      ip: data.ip !== undefined ? data.ip : existing.ip,
-      group_name: data.group_name !== undefined ? data.group_name : existing.group_name,
-      sn: data.sn !== undefined ? data.sn : existing.sn,
-      tags: data.tags !== undefined ? (Array.isArray(data.tags) ? JSON.stringify(data.tags) : (typeof data.tags === 'string' ? data.tags : existing.tags)) : existing.tags,
-      status: data.status !== undefined ? data.status : existing.status,
-      metadata: JSON.stringify(meta),
+    this.database.updateRobot(uuid, {
+      name: data.name,
+      model: data.model,
+      ip: data.ip,
+      group_name: data.group_name,
+      sn: data.sn,
+      tags: data.tags ? JSON.stringify(data.tags) : undefined,
+      role_id: data.role_id,
     });
 
-    return this.transformRobot(updated as RobotRecord);
+    const result = this.getRobot(uuid);
+    if (!result) {
+      throw new Error('更新机器人失败');
+    }
+    return result;
   }
 
-  delete_机器人(uuid: string) {
-    this.database.delete_机器人(uuid);
+  /**
+   * 删除机器人
+   */
+  deleteRobot(uuid: string): void {
+    this.database.deleteRobot(uuid);
   }
 
+  /**
+   * 测试连接
+   */
   async testConnection(uuid: string): Promise<{ connected: boolean; message: string }> {
-    const robot = this.database.get_机器人(uuid);
+    const robot = this.database.getRobot(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
 
-    let robotIp: string | null = robot.ip || null;
-    if (!robotIp) {
-      try {
-        const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
-        robotIp = meta.robot_ip || null;
-      } catch {
-        robotIp = null;
-      }
-    }
-
-    if (!robotIp) {
+    if (!robot.ip) {
       throw new Error('缺少机器人IP');
     }
 
-    // Ping测试
+    // Ping 测试
     const pingOk = await new Promise<boolean>((resolve) => {
-      const p = spawn('ping', ['-c', '1', '-W', '2', robotIp!]);
-      let hadError = false;
-      p.on('error', () => {
-        hadError = true;
-        resolve(false);
-      });
-      p.on('close', (code) => {
-        resolve(!hadError && code === 0);
-      });
+      const p = spawn('ping', ['-c', '1', '-W', '2', robot.ip!]);
+      p.on('error', () => resolve(false));
+      p.on('close', (code) => resolve(code === 0));
     });
 
     if (!pingOk) {
-      return { connected: false, message: `网络不可达: ${robotIp}` };
+      return { connected: false, message: `网络不可达: ${robot.ip}` };
     }
 
-    // SSH端口测试
+    // SSH 端口测试
     const sshReachable = await new Promise<boolean>((resolve) => {
-      const socket = net.createConnection({ host: robotIp!, port: 22 });
+      const socket = net.createConnection({ host: robot.ip!, port: 22 });
       const timer = setTimeout(() => {
-        try { socket.destroy(); } catch {}
+        socket.destroy();
         resolve(false);
       }, 3000);
       socket.on('connect', () => {
         clearTimeout(timer);
-        try { socket.destroy(); } catch {}
+        socket.destroy();
         resolve(true);
       });
       socket.on('error', () => {
         clearTimeout(timer);
-        try { socket.destroy(); } catch {}
-        resolve(false);
-      });
-      socket.on('timeout', () => {
-        clearTimeout(timer);
-        try { socket.destroy(); } catch {}
+        socket.destroy();
         resolve(false);
       });
     });
 
     if (sshReachable) {
-      return { connected: true, message: `SSH端口可达: ${robotIp}` };
+      return { connected: true, message: `SSH端口可达: ${robot.ip}` };
     }
 
-    return { connected: false, message: `SSH端口不可达: ${robotIp}` };
+    return { connected: false, message: `SSH端口不可达: ${robot.ip}` };
   }
 
-  async connectRobot(uuid: string) {
-    const robot = this.database.get_机器人(uuid);
-    if (!robot) {
-      throw new Error('机器人不存在');
-    }
+  /**
+   * 通过 mDNS 发现机器人
+   */
+  async discoverRobots(timeout = 3): Promise<{
+    success: boolean;
+    robots: Array<{
+      uuid: string;
+      name: string;
+      model: string;
+      version: string;
+      ip: string;
+      port: number;
+    }>;
+    error?: string;
+  }> {
+    const pythonScript = path.resolve(__dirname, '../../core/scripts/mdns_discover.py');
 
-    let robotIp: string | null = robot.ip || null;
-    if (!robotIp) {
-      try {
-        const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
-        robotIp = meta.robot_ip || null;
-      } catch {
-        robotIp = null;
-      }
-    }
+    return new Promise((resolve) => {
+      const p = spawn('python3', [pythonScript, timeout.toString()]);
+      let stdout = '';
+      let stderr = '';
 
-    if (!robotIp) {
-      throw new Error('缺少机器人IP');
-    }
+      const timer = setTimeout(() => {
+        p.kill();
+        resolve({ success: false, robots: [], error: '扫描超时' });
+      }, (timeout + 2) * 1000);
 
-    const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
-    const ok = await this.testSSHConnection(pythonScript, robotIp);
-    
-    if (!ok) {
-      throw new Error('连接失败');
-    }
+      p.stdout.on('data', (d) => { stdout += d.toString(); });
+      p.stderr.on('data', (d) => { stderr += d.toString(); });
 
-    this.database.update_机器人状态(uuid, 'online');
-    return this.get_机器人(uuid);
+      p.on('close', (code) => {
+        clearTimeout(timer);
+        if (code === 0 && stdout) {
+          try {
+            const result = JSON.parse(stdout);
+            resolve({ success: true, robots: result.robots || [] });
+          } catch {
+            resolve({ success: false, robots: [], error: '解析结果失败' });
+          }
+        } else {
+          resolve({ success: false, robots: [], error: stderr || '发现失败' });
+        }
+      });
+    });
   }
 
-  async updateFirmware(uuid: string) {
-    const robot = this.database.get_机器人(uuid);
-    if (!robot) {
-      throw new Error('机器人不存在');
-    }
+  // ==================== SSH 辅助方法 ====================
 
-    let robotIp: string | null = robot.ip || null;
-    if (!robotIp) {
-      try {
-        const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
-        robotIp = meta.robot_ip || null;
-      } catch {
-        robotIp = null;
-      }
-    }
-
-    if (!robotIp) {
-      throw new Error('缺少机器人IP地址');
-    }
-
-    const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
-
-    // 测试连接
-    this.logger.info(`测试连接到 ${robotIp}...`);
-    const canConnect = await this.testSSHConnection(pythonScript, robotIp);
-    if (!canConnect) {
-      throw new Error(`无法连接到机器人 ${robotIp}`);
-    }
-
-    // 创建远程目录
-    this.logger.info('创建远程目录...');
-    const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-agent && mkdir -p /home/firefly/sparkrobot/config';
-    try {
-      await this.executeSSHCommand(pythonScript, robotIp, mkdirCmd);
-    } catch {
-      throw new Error('创建远程目录失败');
-    }
-
-    // 复制客户端代码
-    this.logger.info('开始复制客户端代码...');
-    // const clientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-agent');
-    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-server');
-    // const remoteClientPath = '/home/firefly/sparkrobot/robot-agent';
-    const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
-    const copyResult = await this.copyToRobot(pythonScript, robotIp, localClientPath, remoteClientPath);
-    
-    if (!copyResult.success) {
-      throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
-    }
-
-    this.logger.info('固件更新成功');
-    return { robotIp };
-  }
-
-  getLogHistory(uuid: string, limit: number = 5) {
-    const robot = this.database.get_机器人(uuid);
-    if (!robot) {
-      throw new Error('机器人不存在');
-    }
-
-    let meta: any = {};
-    try {
-      meta = robot.metadata ? JSON.parse(robot.metadata) : {};
-    } catch {
-      meta = {};
-    }
-
-    const list = Array.isArray(meta.logUploadHistory) ? meta.logUploadHistory : [];
-    return list.slice(0, limit);
-  }
-
-  addLogUploadRecord(uuid: string, data: { from?: string; to?: string; logType?: string }) {
-    const robot = this.database.get_机器人(uuid);
-    if (!robot) {
-      throw new Error('机器人不存在');
-    }
-
-    let meta: any = {};
-    try {
-      meta = robot.metadata ? JSON.parse(robot.metadata) : {};
-    } catch {
-      meta = {};
-    }
-
-    const now = new Date();
-    const record = {
-      id: uuidv7(),
-      time: now.toISOString(),
-      logType: ['robot', 'app', 'all'].includes(String(data.logType)) ? String(data.logType) : 'all',
-      size: 0,
-      range: { from: data.from || null, to: data.to || null },
-    };
-
-    const prev = Array.isArray(meta.logUploadHistory) ? meta.logUploadHistory : [];
-    const next = [record, ...prev].slice(0, 20);
-    meta.logUploadHistory = next;
-    
-    this.database.update_机器人(uuid, { metadata: JSON.stringify(meta) });
-    return record;
-  }
-
-  // 私有辅助方法
   private async testSSHConnection(pythonScript: string, ip: string): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    return new Promise((resolve) => {
       const p = spawn('python3', [pythonScript, 'test', ip]);
       let stdout = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
@@ -431,7 +296,7 @@ export class RobotService {
   }
 
   private async executeSSHCommand(pythonScript: string, ip: string, command: string): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const p = spawn('python3', [pythonScript, 'exec', ip, command]);
       let stdout = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
@@ -441,11 +306,11 @@ export class RobotService {
           try {
             const result = JSON.parse(stdout);
             if (result.success) {
-              resolve(result.output.trim());
+              resolve(result.output?.trim() || '');
             } else {
               reject(new Error(result.error || '远程命令执行失败'));
             }
-          } catch (e) {
+          } catch {
             reject(new Error('解析输出失败'));
           }
         } else {
@@ -456,7 +321,7 @@ export class RobotService {
   }
 
   private async writeSSHFile(pythonScript: string, ip: string, remotePath: string, content: string): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    return new Promise((resolve) => {
       const p = spawn('python3', [pythonScript, 'write', ip, remotePath, content]);
       let stdout = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
@@ -464,8 +329,7 @@ export class RobotService {
       p.on('close', (code) => {
         if (code === 0) {
           try {
-            const result = JSON.parse(stdout);
-            resolve(result.success);
+            resolve(JSON.parse(stdout).success);
           } catch {
             resolve(false);
           }
@@ -477,27 +341,18 @@ export class RobotService {
   }
 
   private async copyToRobot(pythonScript: string, ip: string, localPath: string, remotePath: string): Promise<{ success: boolean; error?: string }> {
-    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+    return new Promise((resolve) => {
       const p = spawn('python3', [pythonScript, 'copy', ip, localPath, remotePath]);
       let stdout = '';
       let stderr = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
-      p.stderr.on('data', (d) => { 
-        stderr += d.toString();
-        console.log(`[SSH] ${d.toString().trim()}`);
-      });
-      p.on('error', (err) => {
-        console.error(`[ERROR] spawn error:`, err);
-        resolve({ success: false, error: err.message });
-      });
+      p.stderr.on('data', (d) => { stderr += d.toString(); });
+      p.on('error', (err) => resolve({ success: false, error: err.message }));
       p.on('close', (code) => {
-        console.log(`[INFO] Copy process exit code: ${code}`);
         if (code === 0) {
           try {
-            const result = JSON.parse(stdout);
-            resolve(result);
-          } catch (e) {
-            console.error(`JSON解析错误:`, e, `stdout:`, stdout);
+            resolve(JSON.parse(stdout));
+          } catch {
             resolve({ success: false, error: '解析输出失败' });
           }
         } else {
@@ -508,63 +363,75 @@ export class RobotService {
   }
 
   /**
-   * 通过 mDNS 发现局域网内的机器人
-   * @param timeout 扫描超时时间（秒）
+   * 连接机器人
    */
-  async discoverRobots(timeout: number = 3): Promise<{
-    success: boolean;
-    robots: Array<{
-      uuid: string;
-      name: string;
-      model: string;
-      version: string;
-      ip: string;
-      port: number;
-    }>;
-    error?: string;
-  }> {
-    const pythonScript = path.resolve(__dirname, '../../core/scripts/mdns_discover.py');
+  async connectRobot(uuid: string): Promise<RobotResponse> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
 
-    return new Promise((resolve) => {
-      const p = spawn('python3', [pythonScript, timeout.toString()]);
-      let stdout = '';
-      let stderr = '';
+    if (!robot.ip) {
+      throw new Error('缺少机器人IP');
+    }
 
-      // 设置超时保护
-      const timeoutMs = (timeout + 2) * 1000;
-      const timer = setTimeout(() => {
-        p.kill();
-        resolve({ success: false, robots: [], error: '扫描超时' });
-      }, timeoutMs);
+    const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
+    const ok = await this.testSSHConnection(pythonScript, robot.ip);
+    
+    if (!ok) {
+      throw new Error('连接失败');
+    }
 
-      p.stdout.on('data', (d) => { stdout += d.toString(); });
-      p.stderr.on('data', (d) => { stderr += d.toString(); });
+    this.database.updateRobot(uuid, { status: 'online' });
+    const result = this.getRobot(uuid);
+    if (!result) {
+      throw new Error('更新状态失败');
+    }
+    return result;
+  }
 
-      p.on('error', (err) => {
-        clearTimeout(timer);
-        this.logger.error(`mDNS 发现失败: ${err.message}`);
-        resolve({ success: false, robots: [], error: err.message });
-      });
+  /**
+   * 更新固件
+   */
+  async updateFirmware(uuid: string): Promise<{ robotIp: string }> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
 
-      p.on('close', (code) => {
-        clearTimeout(timer);
-        if (code === 0 && stdout) {
-          try {
-            const result = JSON.parse(stdout);
-            this.logger.info(`mDNS 发现了 ${result.count || 0} 个机器人`);
-            resolve({
-              success: true,
-              robots: result.robots || [],
-            });
-          } catch (e) {
-            this.logger.error(`解析 mDNS 结果失败: ${e}`);
-            resolve({ success: false, robots: [], error: '解析结果失败' });
-          }
-        } else {
-          this.logger.error(`mDNS 发现失败: ${stderr || '未知错误'}`);
-          resolve({ success: false, robots: [], error: stderr || '发现失败' });
-        }
-      });
-    });
+    if (!robot.ip) {
+      throw new Error('缺少机器人IP地址');
+    }
+
+    const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
+
+    // 测试连接
+    this.logger.info(`测试连接到 ${robot.ip}...`);
+    const canConnect = await this.testSSHConnection(pythonScript, robot.ip);
+    if (!canConnect) {
+      throw new Error(`无法连接到机器人 ${robot.ip}`);
+    }
+
+    // 创建远程目录
+    this.logger.info('创建远程目录...');
+    const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-agent && mkdir -p /home/firefly/sparkrobot/config';
+    try {
+      await this.executeSSHCommand(pythonScript, robot.ip, mkdirCmd);
+    } catch {
+      throw new Error('创建远程目录失败');
+    }
+
+    // 复制客户端代码
+    this.logger.info('开始复制客户端代码...');
+    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-server');
+    const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
+    const copyResult = await this.copyToRobot(pythonScript, robot.ip, localClientPath, remoteClientPath);
+    
+    if (!copyResult.success) {
+      throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
+    }
+
+    this.logger.info('固件更新成功');
+    return { robotIp: robot.ip };
   }
 }

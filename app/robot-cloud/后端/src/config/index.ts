@@ -1,7 +1,14 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import type { LLMProvider } from '../types';
 
 dotenv.config();
+
+export interface LLMProviderConfig {
+  apiKey: string;
+  model: string;
+  baseUrl?: string;
+}
 
 export interface Config {
   // 服务配置
@@ -23,27 +30,13 @@ export interface Config {
 
   // AI服务配置
   llm: {
-    provider: 'openai' | 'anthropic' | 'tongyi' | 'deepseek' | 'bigmodel';
-    openai?: {
-      apiKey: string;
-      model: string;
-      baseUrl?: string;
-    };
-    bigmodel?: {
-      apiKey: string;
-      model: string;
-      baseUrl?: string;
-    };
-    tongyi?: {
-      apiKey: string;
-      model: string;
-      baseUrl?: string;
-    };
+    provider: LLMProvider;
+    providers: Record<LLMProvider, LLMProviderConfig>;
   };
 
   // 语音识别配置
   asr: {
-    provider: 'xunfei' | 'aliyun' | 'azure' | 'openai';
+    provider: 'xunfei' | 'openai';
     xunfei?: {
       appId: string;
       apiKey: string;
@@ -60,7 +53,7 @@ export interface Config {
 
   // 语音合成配置
   tts: {
-    provider: 'xunfei' | 'aliyun' | 'azure';
+    provider: 'xunfei' | 'edge';
     xunfei?: {
       appId: string;
       apiKey: string;
@@ -71,7 +64,7 @@ export interface Config {
   // 数据库配置
   database: {
     type: 'sqlite';
-    path?: string;
+    path: string;
   };
 
   // 日志配置
@@ -79,16 +72,38 @@ export interface Config {
     level: string;
     dir: string;
   };
-
-  // 安全配置
-  security: {
-    jwtSecret: string;
-    rateLimit: {
-      max: number;
-      windowMs: number;
-    };
-  };
 }
+
+/**
+ * 默认 LLM 供应商配置
+ */
+const defaultProviders: Record<LLMProvider, LLMProviderConfig> = {
+  openai: {
+    apiKey: '',
+    model: 'gpt-4o-mini',
+    baseUrl: 'https://api.openai.com/v1',
+  },
+  anthropic: {
+    apiKey: '',
+    model: 'claude-3-haiku-20240307',
+    baseUrl: 'https://api.anthropic.com/v1',
+  },
+  tongyi: {
+    apiKey: '',
+    model: 'qwen-plus',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  },
+  deepseek: {
+    apiKey: '',
+    model: 'deepseek-chat',
+    baseUrl: 'https://api.deepseek.com/v1',
+  },
+  bigmodel: {
+    apiKey: '',
+    model: 'glm-4-flash',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+  },
+};
 
 const config: Config = {
   port: parseInt(process.env.PORT || '9004', 10),
@@ -107,24 +122,8 @@ const config: Config = {
   },
 
   llm: {
-    // 仅从数据库加载配置，不使用 .env
-    // 以下为初始默认值，会被数据库配置完全覆盖
-    provider: 'tongyi',
-    openai: {
-      apiKey: '',
-      model: 'gpt-4',
-      baseUrl: 'https://api.openai.com/v1',
-    },
-    bigmodel: {
-      apiKey: '',
-      model: 'glm-4-flash',
-      baseUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    },
-    tongyi: {
-      apiKey: '',
-      model: 'qwen-flash',
-      baseUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-    },
+    provider: (process.env.LLM_PROVIDER as LLMProvider) || 'tongyi',
+    providers: { ...defaultProviders },
   },
 
   asr: {
@@ -144,7 +143,7 @@ const config: Config = {
   },
 
   tts: {
-    provider: (process.env.TTS_PROVIDER as any) || 'xunfei',
+    provider: (process.env.TTS_PROVIDER as any) || 'edge',
     xunfei: {
       appId: process.env.XUNFEI_TTS_APP_ID || '',
       apiKey: process.env.XUNFEI_TTS_API_KEY || '',
@@ -153,21 +152,13 @@ const config: Config = {
   },
 
   database: {
-    type: (process.env.DB_TYPE as any) || 'sqlite',
-    path: process.env.DB_PATH || path.join(__dirname, '../../data/conversations.db'),
+    type: 'sqlite',
+    path: process.env.DB_PATH || path.join(__dirname, '../../data/robot.db'),
   },
 
   logging: {
     level: process.env.LOG_LEVEL || 'info',
     dir: process.env.LOG_DIR || path.join(__dirname, '../../data/logs'),
-  },
-
-  security: {
-    jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
-    rateLimit: {
-      max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
-      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
-    },
   },
 };
 

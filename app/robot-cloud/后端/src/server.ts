@@ -10,15 +10,15 @@ const audioUploadServer = createServer();
 const audioDownloadServer = createServer();
 
 // 初始化WebSocket服务（多端口拆分）
-app.websocketService.初始化(controlServer, { path: config.ws.path, channel: 'control' });
-app.websocketService.初始化(businessServer, { path: config.ws.path, channel: 'business' });
-app.websocketService.初始化(audioUploadServer, { path: config.ws.path, channel: 'audio_upload' });
-app.websocketService.初始化(audioDownloadServer, { path: config.ws.path, channel: 'audio_download' });
+app.websocketService.init(controlServer, { path: config.ws.path, channel: 'control' });
+app.websocketService.init(businessServer, { path: config.ws.path, channel: 'business' });
+app.websocketService.init(audioUploadServer, { path: config.ws.path, channel: 'audio_upload' });
+app.websocketService.init(audioDownloadServer, { path: config.ws.path, channel: 'audio_download' });
 if (config.ws.path !== '/api/v1/interaction/connect') {
-  app.websocketService.初始化(controlServer, { path: '/api/v1/interaction/connect', channel: 'control' });
-  app.websocketService.初始化(businessServer, { path: '/api/v1/interaction/connect', channel: 'business' });
-  app.websocketService.初始化(audioUploadServer, { path: '/api/v1/interaction/connect', channel: 'audio_upload' });
-  app.websocketService.初始化(audioDownloadServer, { path: '/api/v1/interaction/connect', channel: 'audio_download' });
+  app.websocketService.init(controlServer, { path: '/api/v1/interaction/connect', channel: 'control' });
+  app.websocketService.init(businessServer, { path: '/api/v1/interaction/connect', channel: 'business' });
+  app.websocketService.init(audioUploadServer, { path: '/api/v1/interaction/connect', channel: 'audio_upload' });
+  app.websocketService.init(audioDownloadServer, { path: '/api/v1/interaction/connect', channel: 'audio_download' });
 }
 
 // 启动服务器

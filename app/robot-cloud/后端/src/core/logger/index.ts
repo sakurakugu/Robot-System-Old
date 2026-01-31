@@ -3,7 +3,10 @@ import path from 'path';
 import winston from 'winston';
 import config from '../../config';
 
-class 日志服务 {
+/**
+ * 日志服务
+ */
+class Logger {
   private logger: winston.Logger;
 
   constructor() {
@@ -41,16 +44,14 @@ class 日志服务 {
           return JSON.stringify(ordered);
         })
       ),
-      defaultMeta: { service: 'robot-dog-interaction' },
+      defaultMeta: { service: 'robot-cloud' },
       transports: [
-        // 错误日志
         new winston.transports.File({
           filename: path.join(logDir, 'error.log'),
           level: 'error',
-          maxsize: 10 * 1024 * 1024, // 10MB
+          maxsize: 10 * 1024 * 1024,
           maxFiles: 5,
         }),
-        // 所有日志
         new winston.transports.File({
           filename: path.join(logDir, 'combined.log'),
           maxsize: 10 * 1024 * 1024,
@@ -92,8 +93,10 @@ class 日志服务 {
     this.logger.debug(message, meta);
   }
 
-  // 何意味？好像没什么用
-  log对话记录(data: {
+  /**
+   * 记录对话日志
+   */
+  logConversation(data: {
     robotId: string;
     input: string;
     output: string;
@@ -106,7 +109,10 @@ class 日志服务 {
     });
   }
 
-  insert_动作日志(data: {
+  /**
+   * 记录动作日志
+   */
+  logAction(data: {
     robotId: string;
     action: string;
     parameters: any;
@@ -119,4 +125,4 @@ class 日志服务 {
   }
 }
 
-export default 日志服务;
+export default Logger;

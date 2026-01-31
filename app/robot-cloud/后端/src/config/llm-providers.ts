@@ -1,76 +1,99 @@
-// 导出大模型供应商值类型
-export type 大模型供应商值 = 'openai' | 'anthropic' | 'deepseek' | 'bigmodel' | 'tongyi'
+import type { LLMProvider } from '../types';
 
-// 导出大模型模型接口
-export interface 大模型 {
-  value: string
-  label: string
+/**
+ * 模型选项
+ */
+export interface ModelOption {
+  value: string;
+  label: string;
 }
 
-// 导出大模型供应商配置接口
-export interface 大模型供应商配置 {
-  value: 大模型供应商值
-  label: string
-  baseUrl?: string
-  models: 大模型[]
+/**
+ * LLM 供应商配置
+ */
+export interface LLMProviderOption {
+  value: LLMProvider;
+  label: string;
+  baseUrl: string;
+  models: ModelOption[];
 }
 
-// 导出大模型供应商配置数组
-export const 大模型供应商: 大模型供应商配置[] = [
+/**
+ * 所有支持的 LLM 供应商配置
+ */
+export const LLM_PROVIDERS: LLMProviderOption[] = [
   {
     value: 'openai',
-    label: 'OpenAI（开放AI）',
+    label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
     models: [
-      { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
-      { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
-      { value: 'gpt-5.2', label: 'GPT-5.2' }
-    ]
-  },
-  {
-    value: 'bigmodel',
-    label: '智谱 （BigModel）',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    models: [
-      { value: 'glm-4.7-flash', label: 'GLM 4.7 Flash' },
-      { value: 'glm-4.7-flashx', label: 'GLM 4.7' },
-    ]
+      { value: 'gpt-4o', label: 'GPT-4o' },
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+      { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    ],
   },
   {
     value: 'anthropic',
-    label: 'Claude（Anthropic）',
-    baseUrl: 'https://api.anthropic.com/v1/messages',
+    label: 'Anthropic Claude',
+    baseUrl: 'https://api.anthropic.com/v1',
     models: [
-      { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-      { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
-      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' }
-    ]
-  },
-  {
-    value: 'deepseek',
-    label: 'DeepSeek（深度求索）',
-    baseUrl: 'https://api.deepseek.com',
-    models: [
-      { value: 'deepseek-reasoner', label: 'DeepSeek v3.2(深度思考)' },
-      { value: 'deepseek-chat', label: 'DeepSeek v3.2' }
-    ]
+      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+      { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+      { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+    ],
   },
   {
     value: 'tongyi',
     label: '通义千问',
-    baseUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     models: [
-      { value: 'qwen3-0.5b-instruct', label: 'Qwen 3 0.5B' },
-      { value: 'qwen3-1.5b-instruct', label: 'Qwen 3 1.5B' },
-      { value: 'qwen3-3b-instruct', label: 'Qwen 3 3B' },
-      { value: 'qwen3-7b-instruct', label: 'Qwen 3 7B' },
-      { value: 'qwen3-14b-instruct', label: 'Qwen 3 14B' },
-      { value: 'qwen3-32b-instruct', label: 'Qwen 3 32B' },
-      { value: 'qwen3-72b-instruct', label: 'Qwen 3 72B' },
-      { value: 'qwen3-flash', label: 'Qwen 3 Flash' },
-      { value: 'qwen3-flash-1.5b', label: 'Qwen 3 Flash 1.5B' },
-      { value: 'qwen3-flash-7b', label: 'Qwen 3 Flash 7B' },
-      { value: 'qwen3-flash-14b', label: 'Qwen 3 Flash 14B' }
-    ]
-  }
-]
+      { value: 'qwen-plus', label: 'Qwen Plus' },
+      { value: 'qwen-turbo', label: 'Qwen Turbo' },
+      { value: 'qwen-max', label: 'Qwen Max' },
+      { value: 'qwen-long', label: 'Qwen Long' },
+    ],
+  },
+  {
+    value: 'deepseek',
+    label: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    models: [
+      { value: 'deepseek-chat', label: 'DeepSeek Chat' },
+      { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner (R1)' },
+    ],
+  },
+  {
+    value: 'bigmodel',
+    label: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    models: [
+      { value: 'glm-4-flash', label: 'GLM-4 Flash' },
+      { value: 'glm-4-plus', label: 'GLM-4 Plus' },
+      { value: 'glm-4', label: 'GLM-4' },
+    ],
+  },
+];
+
+/**
+ * 获取供应商配置
+ */
+export function getProviderConfig(provider: LLMProvider): LLMProviderOption | undefined {
+  return LLM_PROVIDERS.find((p) => p.value === provider);
+}
+
+/**
+ * 获取供应商的默认模型
+ */
+export function getDefaultModel(provider: LLMProvider): string {
+  const config = getProviderConfig(provider);
+  return config?.models[0]?.value || '';
+}
+
+/**
+ * 验证模型是否属于供应商
+ */
+export function isValidModel(provider: LLMProvider, model: string): boolean {
+  const config = getProviderConfig(provider);
+  return config?.models.some((m) => m.value === model) || false;
+}

@@ -1,6 +1,6 @@
-import 数据库服务 from '../../core/database';
+import type DatabaseService from '../../core/database';
 import { parseActions, removeActionTags } from '../../core/utils/helpers';
-import { AIResponse, ConversationContext, Message } from '../../types';
+import type { AIResponse, ConversationContext, Message } from '../../types';
 import { ActionController } from './action-controller';
 import { LLMService } from './llm-service';
 
@@ -9,7 +9,7 @@ export class ConversationService {
   private actionController: ActionController;
   private conversationHistory: Map<string, Message[]>;
 
-  constructor(private database: 数据库服务) {
+  constructor(private database: DatabaseService) {
     this.llmService = new LLMService();
     this.actionController = new ActionController();
     this.conversationHistory = new Map();
@@ -111,7 +111,7 @@ export class ConversationService {
    * 获取对话历史
    */
   getHistory(robotId: string, limit: number = 50, offset: number = 0) {
-    return this.database.get_会话历史记录(robotId, limit, offset);
+    return this.database.getConversations(robotId, limit, offset);
   }
 
   /**
@@ -119,5 +119,6 @@ export class ConversationService {
    */
   clearHistory(robotId: string) {
     this.conversationHistory.delete(robotId);
+    this.database.clearConversations(robotId);
   }
 }

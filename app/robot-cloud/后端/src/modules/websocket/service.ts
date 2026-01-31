@@ -2,11 +2,11 @@ import { Server } from 'http';
 import OpusScript from 'opusscript';
 import { WebSocket, WebSocketServer } from 'ws';
 import config from '../../config';
-import { 大模型供应商 } from '../../config/llm-providers';
-import 数据库服务 from '../../core/database';
-import 日志服务 from '../../core/logger';
+import { LLM_PROVIDERS } from '../../config/llm-providers';
+import type DatabaseService from '../../core/database';
+import type Logger from '../../core/logger';
 import { isValidRobotId, RateLimiter, uuidv7 } from '../../core/utils/helpers';
-import { ClientMessage, RobotConnection, ServerMessage } from '../../types';
+import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import ASRService from '../机器人交互/asr-service';
 import ConversationEngine from '../机器人交互/conversation-engine';
 import TTSService from '../机器人交互/tts-service';
@@ -33,9 +33,9 @@ class WebSocketService {
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
   // UI 控制端连接（按通道，可多）
   private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
-  private logger: 日志服务;
+  private logger: Logger;
   private conversationEngine: ConversationEngine;
-  private database: 数据库服务;
+  private database: DatabaseService;
   private ttsService: TTSService;
   private videoStreamManager: VideoStreamManager;
   private asrService: ASRService;
@@ -55,7 +55,7 @@ class WebSocketService {
   private ttsRateLimiter = new RateLimiter(5, 5000);
   private inputMergeWindowMs = 900;
 
-  constructor(logger: 日志服务, database: 数据库服务) {
+  constructor(logger: Logger, database: DatabaseService) {
     this.logger = logger;
     this.database = database;
     this.conversationEngine = new ConversationEngine();
@@ -67,7 +67,7 @@ class WebSocketService {
   /**
    * 初始化WebSocket服务器
    */
-  初始化(server: Server, options: { path: string; channel: Channel }): void {
+  init(server: Server, options: { path: string; channel: Channel }): void {
     const { path, channel } = options;
     const wss = new WebSocketServer({
       server,
@@ -127,15 +127,14 @@ class WebSocketService {
       this.robotConnections.get(robotId)!.set(channel, connection);
     }
 
-    // 更新数据库状态，避免覆盖名称与元数据
-    const existing = this.database.get_机器人(robotId);
+    // 更新数据库状态
+    const existing = this.database.getRobot(robotId);
     if (existing) {
-      this.database.update_机器人状态(robotId, 'online');
+      this.database.updateRobot(robotId, { status: 'online' });
     } else {
-      this.database.注册机器人({
+      this.database.upsertRobot({
         uuid: robotId,
         status: 'online',
-        last_connected: new Date(),
       });
     }
 
@@ -360,35 +359,31 @@ class WebSocketService {
       let temperature: number | undefined = undefined;
       let model: string | undefined = undefined;
       let maxHistory: number = 10;
-      const robot = this.database.get_机器人(robotId);
+      const robot = this.database.getRobot(robotId);
       if (robot) {
         // 仅当机器人模型是有效的LLM模型时才传递，否则使用系统配置的默认模型
         const provider = config.llm.provider;
         const allowedModels =
-          大模型供应商.find(p => p.value === (provider as any))?.models.map(m => m.value) || [];
+          LLM_PROVIDERS.find(p => p.value === (provider as any))?.models.map(m => m.value) || [];
         if (robot.model && allowedModels.includes(robot.model)) {
           model = robot.model;
         } else {
           model = undefined;
         }
-        try {
-          const meta = robot.metadata ? JSON.parse(robot.metadata) : {};
-          systemPrompt = meta.ai_system_prompt || undefined;
-          temperature = typeof meta.ai_temperature === 'number' ? meta.ai_temperature : undefined;
-        } catch {}
+        // 新数据库结构中不再使用 metadata，AI 配置从 role 获取
         if (robot.role_id) {
-          const role = this.database.get_角色(robot.role_id);
+          const role = this.database.getRole(robot.role_id);
           if (role) {
             if (typeof role.max_history === 'number') {
               maxHistory = role.max_history || 10;
             }
-            if (!systemPrompt && role.system_prompt) {
+            if (role.system_prompt) {
               systemPrompt = role.system_prompt;
             }
-            if (typeof temperature !== 'number' && typeof role.temperature === 'number') {
+            if (typeof role.temperature === 'number') {
               temperature = role.temperature;
             }
-            if (!model && role.llm_model) {
+            if (role.llm_model) {
               model = role.llm_model;
             }
           }
@@ -493,29 +488,28 @@ class WebSocketService {
         }, 'business');
 
         // 记录动作
-        this.database.insert_动作日志(robotId, action.name, action.parameters, 'success');
+        this.database.insertActionLog(robotId, action.name, action.parameters, 'success');
       }
 
       // 记录对话
-      this.database.insert_对话记录({
+      this.database.insertConversation({
         robot_id: robotId,
-        timestamp: new Date(),
         type: inputType,
         user_input: text,
         ai_response: response.text,
-        actions: JSON.stringify(response.actions),
+        actions: response.actions,
         processing_time: processingTime,
-        metadata: JSON.stringify({
+        metadata: {
           ...response.metadata,
           conversationId: traceId,
           inputType,
           asrTime: audioMeta?.asrTime,
           audioDurationMs: audioMeta?.durationMs,
           audioSessionId: audioMeta?.sessionId,
-        }),
+        },
       });
 
-      this.logger.log对话记录({
+      this.logger.logConversation({
         robotId,
         input: text,
         output: response.text,
@@ -625,7 +619,7 @@ class WebSocketService {
       }, 'business');
 
       // 记录动作
-      this.database.insert_动作日志(robotId, action, parameters || {}, 'success');
+      this.database.insertActionLog(robotId, action, parameters || {}, 'success');
 
       // 通知UI已发送（添加 noTTS 标记，不生成TTS音频）
       this.broadcastMessage(robotId, {
@@ -965,21 +959,8 @@ class WebSocketService {
     };
     this.logger.debug('收到状态更新', { robotId, payload });
     
-    // 更新机器狗状态到数据库
-    const robot = this.database.get_机器人(payload.robotId || robotId);
-    if (robot) {
-      try {
-        const metadata = robot.metadata ? JSON.parse(robot.metadata) : {};
-        metadata.lastStatus = payload.data;
-        metadata.lastStatusSeq = payload.seq;
-        metadata.lastStatusTime = typeof payload.timestamp === 'number'
-          ? new Date(Math.floor(payload.timestamp * 1000)).toISOString()
-          : new Date().toISOString();
-        this.database.update_机器人(payload.robotId || robotId, { metadata: JSON.stringify(metadata) });
-      } catch (error) {
-        this.logger.error('保存状态失败', error as Error, { robotId });
-      }
-    }
+    // 由于新数据库结构不再使用 metadata 存储状态，这里仅广播到 UI
+    // TODO: 如果需要持久化状态，可以添加专门的状态表
 
     // 广播电量状态到UI
     try {
@@ -1019,23 +1000,15 @@ class WebSocketService {
     this.logger.info('收到机器人注册', { robotId, data });
     
     try {
-      const { name, model, version, metadata } = data;
+      const { name, model, version } = data;
       
-      // 更新机器狗信息
-      const robot = this.database.get_机器人(robotId);
-      const existingMetadata = robot?.metadata ? JSON.parse(robot.metadata) : {};
+      // 更新机器人信息
+      const robot = this.database.getRobot(robotId);
       
-      this.database.update_机器人(robotId, {
-        name: name !== undefined ? (name || robot?.name) : robot?.name,
-        model: model !== undefined ? (model || robot?.model) : robot?.model,
-        version: version !== undefined ? (version || robot?.version) : robot?.version,
+      this.database.updateRobot(robotId, {
+        name: name || robot?.name || null,
+        model: model || robot?.model || null,
         status: 'online',
-        last_connected: new Date(),
-        metadata: JSON.stringify({
-          ...existingMetadata,
-          ...metadata,
-          registeredAt: new Date().toISOString(),
-        }),
       });
       
       // 更新连接元数据
@@ -1070,8 +1043,8 @@ class WebSocketService {
    */
   private async handleVideoSubscribe(robotId: string): Promise<void> {
     try {
-      // 从数据库get_机器人IP
-      const robot = this.database.get_机器人(robotId);
+      // 从数据库获取机器人IP
+      const robot = this.database.getRobot(robotId);
       if (!robot || !robot.ip) {
         this.sendError(robotId, 'NO_ROBOT_IP', '机器人IP未配置');
         return;
@@ -1121,7 +1094,7 @@ class WebSocketService {
       connections.delete(channel);
       if (connections.size === 0) {
         this.robotConnections.delete(robotId);
-        this.database.update_机器人状态(robotId, 'offline');
+        this.database.updateRobot(robotId, { status: 'offline' });
         this.logger.info('机器人连接断开', { robotId, channel });
       }
     }
@@ -1202,14 +1175,14 @@ class WebSocketService {
   }
 
   /**
-   * get_机器人连接
+   * 获取机器人连接
    */
   getConnections(): Map<string, Map<Channel, RobotConnection>> {
     return this.robotConnections;
   }
 
   /**
-   * 获取在线机器狗数量
+   * 获取在线机器人数量
    */
   getOnlineCount(): number {
     let count = 0;

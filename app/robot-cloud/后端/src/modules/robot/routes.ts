@@ -1,21 +1,24 @@
 import { Router } from 'express';
-import { RobotController } from './controller';
+import type { RobotController } from './controller';
 
 export function createRobotRoutes(controller: RobotController): Router {
   const router = Router();
 
-  router.get('/', controller.get_所有机器人.bind(controller));
-  router.get('/groups', controller.getGroups.bind(controller));
-  router.get('/discover', controller.discoverRobots.bind(controller));
-  router.get('/:uuid', controller.get_机器人.bind(controller));
-  router.post('/', controller.createRobot.bind(controller));
-  router.put('/:uuid', controller.update_机器人.bind(controller));
-  router.delete('/:uuid', controller.delete_机器人.bind(controller));
-  router.post('/:uuid/test-connection', controller.testConnection.bind(controller));
-  router.post('/:uuid/connect', controller.connectRobot.bind(controller));
-  router.post('/:uuid/update-firmware', controller.updateFirmware.bind(controller));
-  router.get('/:uuid/logs/history', controller.getLogHistory.bind(controller));
-  router.post('/:uuid/logs/upload', controller.uploadLog.bind(controller));
+  // 列表与发现
+  router.get('/', controller.getAllRobots);
+  router.get('/groups', controller.getGroups);
+  router.get('/discover', controller.discoverRobots);
+  
+  // CRUD
+  router.get('/:uuid', controller.getRobot);
+  router.post('/', controller.createRobot);
+  router.put('/:uuid', controller.updateRobot);
+  router.delete('/:uuid', controller.deleteRobot);
+  
+  // 连接管理
+  router.post('/:uuid/test-connection', controller.testConnection);
+  router.post('/:uuid/connect', controller.connectRobot);
+  router.post('/:uuid/update-firmware', controller.updateFirmware);
 
   return router;
 }

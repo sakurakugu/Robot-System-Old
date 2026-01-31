@@ -1,18 +1,18 @@
 import { Router } from 'express';
-import { RoleController } from './controller';
+import type { RoleController } from './controller';
 
 export function createRoleRoutes(controller: RoleController): Router {
   const router = Router();
 
-  // 角色管理
-  router.post('/', controller.create_角色.bind(controller));
-  router.get('/', controller.get_所有角色.bind(controller));
-  router.get('/:uuid', controller.get_角色.bind(controller));
-  router.put('/:uuid', controller.update_角色.bind(controller));
-  router.delete('/:uuid', controller.delete_角色.bind(controller));
+  // CRUD
+  router.get('/', controller.getAllRoles);
+  router.get('/:uuid', controller.getRole);
+  router.post('/', controller.createRole);
+  router.put('/:uuid', controller.updateRole);
+  router.delete('/:uuid', controller.deleteRole);
 
-  // 获取角色绑定的机器人
-  router.get('/:uuid/robots', controller.get_所有使用角色的机器人.bind(controller));
+  // 关联查询
+  router.get('/:uuid/robots', controller.getRobotsByRole);
 
   return router;
 }

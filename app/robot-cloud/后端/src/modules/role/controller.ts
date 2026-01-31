@@ -1,101 +1,102 @@
-import { Request, Response } from 'express';
-import { RoleService } from './service';
+import type { Request, Response } from 'express';
+import type { RoleService } from './service';
 
+/**
+ * 角色控制器
+ */
 export class RoleController {
   constructor(private roleService: RoleService) {}
-  private normalizeParam = (v: unknown): string =>
-    Array.isArray(v) ? String(v[0]) : String(v ?? '');
+
+  private getParam(req: Request, key: string): string {
+    const v = (req.params as Record<string, unknown>)[key];
+    return Array.isArray(v) ? String(v[0]) : String(v ?? '');
+  }
+
+  /**
+   * 获取所有角色
+   */
+  getAllRoles = async (_req: Request, res: Response) => {
+    try {
+      const roles = this.roleService.getAllRoles();
+      res.json({ success: true, data: roles });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 获取角色详情
+   */
+  getRole = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.getParam(req, 'uuid');
+      const role = this.roleService.getRole(uuid);
+      
+      if (!role) {
+        return res.status(404).json({ success: false, error: '角色不存在' });
+      }
+      
+      res.json({ success: true, data: role });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
 
   /**
    * 创建角色
    */
-  async create_角色(req: Request, res: Response) {
+  createRole = async (req: Request, res: Response) => {
     try {
       const data = req.body;
       if (!data.name) {
         return res.status(400).json({ success: false, error: '角色名称不能为空' });
       }
       
-      const role = this.roleService.create_角色(data);
+      const role = this.roleService.createRole(data);
       res.status(201).json({ success: true, data: role });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
-
-  /**
-   * 获取所有角色
-   */
-  async get_所有角色(req: Request, res: Response) {
-    try {
-      const roles = this.roleService.get_所有角色();
-      res.json({ success: true, data: roles });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  }
-
-  /**
-   * 获取角色详情
-   */
-  async get_角色(req: Request, res: Response) {
-    try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const role = this.roleService.get_角色(uuid);
-      
-      if (!role) {
-        return res.status(404).json({ success: false, error: '角色不存在' });
-      }
-      
-      res.json({ success: true, data: role });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  }
+  };
 
   /**
    * 更新角色
    */
-  async update_角色(req: Request, res: Response) {
+  updateRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const data = req.body;
-      
-      const role = this.roleService.update_角色(uuid, data);
-      
-      if (!role) {
-        return res.status(404).json({ success: false, error: '角色不存在' });
-      }
-      
+      const uuid = this.getParam(req, 'uuid');
+      const role = this.roleService.updateRole(uuid, req.body);
       res.json({ success: true, data: role });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      const status = error.message === '角色不存在' ? 404 : 500;
+      res.status(status).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
    * 删除角色
    */
-  async delete_角色(req: Request, res: Response) {
+  deleteRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      this.roleService.delete_角色(uuid);
+      const uuid = this.getParam(req, 'uuid');
+      this.roleService.deleteRole(uuid);
       res.json({ success: true, message: '角色删除成功' });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      const status = error.message.includes('正在使用') ? 400 : 500;
+      res.status(status).json({ success: false, error: error.message });
     }
-  }
+  };
 
   /**
-   * 获取角色绑定的机器人
+   * 获取使用角色的机器人列表
    */
-  async get_所有使用角色的机器人(req: Request, res: Response) {
+  getRobotsByRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.normalizeParam((req.params as any).uuid);
-      const robots = this.roleService.get_所有使用角色的机器人(uuid);
+      const uuid = this.getParam(req, 'uuid');
+      const robots = this.roleService.getRobotsByRole(uuid);
       res.json({ success: true, data: robots });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  }
+  };
 }

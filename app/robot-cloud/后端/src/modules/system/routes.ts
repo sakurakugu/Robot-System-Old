@@ -1,11 +1,12 @@
-import { Request, Response, Router } from 'express';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
 import os from 'os';
-import 数据库服务 from '../../core/database';
+import type DatabaseService from '../../core/database';
 import { formatTimestamp } from '../../core/utils/datetime';
-import WebSocketService from '../websocket/service';
+import type WebSocketService from '../websocket/service';
 
 export function createSystemRoutes(
-  database: 数据库服务,
+  database: DatabaseService,
   websocketService: WebSocketService
 ): Router {
   const router = Router();
@@ -13,10 +14,10 @@ export function createSystemRoutes(
   /**
    * 获取系统状态
    */
-  router.get('/status', (req: Request, res: Response) => {
+  router.get('/status', (_req: Request, res: Response) => {
     try {
       const onlineRobots = websocketService.getOnlineCount();
-      const allRobots = database.get_所有机器人();
+      const allRobots = database.getAllRobots();
 
       res.json({
         success: true,
@@ -37,7 +38,7 @@ export function createSystemRoutes(
   /**
    * 健康检查
    */
-  router.get('/health', (req: Request, res: Response) => {
+  router.get('/health', (_req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
@@ -50,7 +51,7 @@ export function createSystemRoutes(
   /**
    * 获取本机IP
    */
-  router.get('/network/local-ip', (req: Request, res: Response) => {
+  router.get('/network/local-ip', (_req: Request, res: Response) => {
     try {
       const interfaces = os.networkInterfaces();
       const addresses: string[] = [];
@@ -73,13 +74,13 @@ export function createSystemRoutes(
   router.get('/updates/check', (req: Request, res: Response) => {
     try {
       const robotId = req.query.robotId as string;
-      const robot = robotId ? database.get_机器人(robotId) : undefined;
+      const robot = robotId ? database.getRobot(robotId) : undefined;
       res.json({
         success: true,
         data: {
           checkedAt: new Date().toISOString(),
           app: { currentVersion: '', latestVersion: '', hasUpdate: false },
-          firmware: { currentVersion: robot?.version || '', latestVersion: robot?.version || '', hasUpdate: false },
+          firmware: { currentVersion: '', latestVersion: '', hasUpdate: false },
         },
       });
     } catch (error: any) {
@@ -90,7 +91,7 @@ export function createSystemRoutes(
   /**
    * 升级APP
    */
-  router.post('/updates/upgrade/app', async (req: Request, res: Response) => {
+  router.post('/updates/upgrade/app', async (_req: Request, res: Response) => {
     try {
       res.json({ success: true, message: '已触发APP升级（预留接口）' });
     } catch (error: any) {

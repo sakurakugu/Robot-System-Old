@@ -1,16 +1,27 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import config from '../../config';
-import { ConversationRecord, RobotRecord } from '../../types';
+import type {
+  ActionStatus,
+  ConversationRecord,
+  ConversationType,
+  RobotRecord,
+  RobotStatus,
+  RoleRecord
+} from '../../types';
 
-class 数据库服务 {
+/**
+ * 数据库服务
+ * 统一管理所有数据库操作
+ */
+class DatabaseService {
   private db!: Database.Database;
 
   constructor() {
-    this.初始化();
+    this.initialize();
   }
 
-  private 初始化() {
+  private initialize() {
     const dbPath = config.database.path!;
     const dbDir = path.dirname(dbPath);
 
@@ -20,127 +31,14 @@ class 数据库服务 {
     }
 
     this.db = new Database(dbPath);
-    this.初始化表();
-    
-    this.迁移列();
-    this.迁移IP从元数据();
+    this.createTables();
   }
 
-  // migrateColumns
-  private 迁移列(): void {
-    try {
-      // 检查roles表是否存在并添加缺失列
-      const rolesTableExists = this.db.prepare(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='roles'"
-      ).get();
-      if (rolesTableExists) {
-        const roleCols = this.db.prepare(`PRAGMA table_info(roles)`).all() as any[];
-        const hasMaxHistory = roleCols.some((c: any) => c.name === 'max_history');
-        if (!hasMaxHistory) {
-          try {
-            this.db.exec(`ALTER TABLE roles ADD COLUMN max_history INTEGER DEFAULT 10`);
-          } catch (e) {}
-        }
-      }
-
-      // 检查robots表是否存在
-      const tableExists = this.db.prepare(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='robots'"
-      ).get();
-      
-      if (!tableExists) {
-        console.log('robots表尚未创建，跳过列迁移');
-        return;
-      }
-
-      // 检查robots表列
-      const cols = this.db.prepare(`PRAGMA table_info(robots)`).all() as any[];
-      const hasIP = cols.some((c: any) => c.name === 'ip');
-      const hasGroupName = cols.some((c: any) => c.name === 'group_name');
-      const hasTags = cols.some((c: any) => c.name === 'tags');
-      const hasSn = cols.some((c: any) => c.name === 'sn');
-      const hasRegisteredAt = cols.some((c: any) => c.name === 'registered_at');
-      const hasUpdatedAt = cols.some((c: any) => c.name === 'updated_at');
-      const hasRoleId = cols.some((c: any) => c.name === 'role_id');
-      
-      if (!hasIP) {
-        console.log('添加ip列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN ip TEXT`);
-          console.log('ip列添加成功');
-        } catch (e) {
-          console.error('ip列添加失败:', e);
-        }
-      }
-      if (!hasGroupName) {
-        console.log('添加group_name列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN group_name TEXT`);
-          console.log('group_name列添加成功');
-        } catch (e) {
-          console.error('group_name列添加失败:', e);
-        }
-      }
-      if (!hasTags) {
-        console.log('添加tags列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN tags TEXT`);
-          console.log('tags列添加成功');
-        } catch (e) {
-          console.error('tags列添加失败:', e);
-        }
-      }
-      if (!hasSn) {
-        console.log('添加sn列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN sn TEXT`);
-          console.log('sn列添加成功');
-        } catch (e) {
-          console.error('sn列添加失败:', e);
-        }
-      }
-      if (!hasRegisteredAt) {
-        console.log('添加registered_at列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN registered_at DATETIME`);
-          console.log('registered_at列添加成功');
-        } catch (e) {
-          console.error('registered_at列添加失败:', e);
-        }
-      }
-      if (!hasUpdatedAt) {
-        console.log('添加updated_at列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`);
-          console.log('updated_at列添加成功');
-        } catch (e) {
-          console.error('updated_at列添加失败:', e);
-        }
-      }
-      if (!hasRoleId) {
-        console.log('添加role_id列到robots表...');
-        try {
-          this.db.exec(`ALTER TABLE robots ADD COLUMN role_id TEXT`);
-          console.log('role_id列添加成功');
-        } catch (e) {
-          console.error('role_id列添加失败:', e);
-        }
-      }
-    } catch (error) {
-      console.error('列迁移失败:', error);
-    }
-  }
-
-  // 初始化Tables
-  private 初始化表(): void {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS params (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    // 系统设置表（用于持久化运行时配置）
+  /**
+   * 创建所有表（全新设计，无需迁移）
+   */
+  private createTables(): void {
+    // 系统设置表（统一存储所有配置，替代原来的 settings 和 params 表）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -184,17 +82,9 @@ class 数据库服务 {
         registered_at DATETIME,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        metadata TEXT,
-        FOREIGN KEY (role_id) REFERENCES roles(uuid)
+        FOREIGN KEY (role_id) REFERENCES roles(uuid) ON DELETE SET NULL
       )
     `);
-    // // 迁移：若旧表无version列则添加
-    // try {
-    //   const cols = this.db.prepare(`PRAGMA table_info(robots)`).all() as any[];
-    //   if (!cols.some((c: any) => c.name === 'version')) {
-    //     this.db.exec(`ALTER TABLE robots ADD COLUMN version TEXT`);
-    //   }
-    // } catch {}
 
     // 对话历史表
     this.db.exec(`
@@ -208,42 +98,7 @@ class 数据库服务 {
         actions TEXT,
         processing_time INTEGER,
         metadata TEXT,
-        FOREIGN KEY (robot_id) REFERENCES robots(uuid)
-      )
-    `);
-
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_conversations_robot_id 
-      ON conversations(robot_id);
-      
-      CREATE INDEX IF NOT EXISTS idx_conversations_timestamp 
-      ON conversations(timestamp);
-    `);
-
-    // 知识库文档表
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS knowledge_documents (
-        uuid TEXT PRIMARY KEY,
-        title TEXT,
-        content TEXT NOT NULL,
-        category TEXT,
-        tags TEXT,
-        embedding_vector BLOB,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // 系统日志表
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS system_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        level TEXT NOT NULL,
-        robot_id TEXT,
-        message TEXT NOT NULL,
-        stack_trace TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        metadata TEXT
+        FOREIGN KEY (robot_id) REFERENCES robots(uuid) ON DELETE CASCADE
       )
     `);
 
@@ -255,13 +110,15 @@ class 数据库服务 {
         action_name TEXT NOT NULL,
         parameters TEXT,
         status TEXT CHECK(status IN ('success', 'failed', 'rejected')) DEFAULT 'success',
-        executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        executed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (robot_id) REFERENCES robots(uuid) ON DELETE CASCADE
       )
     `);
 
     // 创建索引
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_robots_status ON robots(status);
+      CREATE INDEX IF NOT EXISTS idx_robots_group ON robots(group_name);
       CREATE INDEX IF NOT EXISTS idx_conversations_robot_id ON conversations(robot_id);
       CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
       CREATE INDEX IF NOT EXISTS idx_action_logs_robot_id ON action_logs(robot_id);
@@ -271,8 +128,12 @@ class 数据库服务 {
     console.log('数据库初始化完成');
   }
 
-  // 设置管理
-  set_设置(key: string, value: string): void {
+  // ==================== 设置管理 ====================
+
+  /**
+   * 设置配置项
+   */
+  setSetting(key: string, value: string): void {
     const stmt = this.db.prepare(`
       INSERT INTO settings (key, value, updated_at)
       VALUES (?, ?, datetime('now'))
@@ -281,28 +142,19 @@ class 数据库服务 {
     stmt.run(key, value);
   }
 
-  set_参数(key: string, value: string): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO params (key, value, updated_at)
-      VALUES (?, ?, datetime('now'))
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-    `);
-    stmt.run(key, value);
-  }
-
-  get_设置(key: string): string | undefined {
+  /**
+   * 获取配置项
+   */
+  getSetting(key: string): string | undefined {
     const stmt = this.db.prepare(`SELECT value FROM settings WHERE key = ?`);
     const row = stmt.get(key) as { value: string } | undefined;
     return row?.value;
   }
 
-  get_参数(key: string): string | undefined {
-    const stmt = this.db.prepare(`SELECT value FROM params WHERE key = ?`);
-    const row = stmt.get(key) as { value: string } | undefined;
-    return row?.value;
-  }
-
-  get_所有设置(): Record<string, string> {
+  /**
+   * 获取所有配置
+   */
+  getAllSettings(): Record<string, string> {
     const stmt = this.db.prepare(`SELECT key, value FROM settings`);
     const rows = stmt.all() as { key: string; value: string }[];
     const map: Record<string, string> = {};
@@ -310,231 +162,135 @@ class 数据库服务 {
     return map;
   }
 
-  get_所有参数(): Record<string, string> {
-    const stmt = this.db.prepare(`SELECT key, value FROM params`);
-    const rows = stmt.all() as { key: string; value: string }[];
-    const map: Record<string, string> = {};
-    for (const r of rows) map[r.key] = r.value;
-    return map;
+  /**
+   * 删除配置项
+   */
+  deleteSetting(key: string): void {
+    const stmt = this.db.prepare(`DELETE FROM settings WHERE key = ?`);
+    stmt.run(key);
   }
 
-  // 机器狗管理
-  注册机器人(robot: Partial<RobotRecord>): void {
+  // ==================== 机器人管理 ====================
+
+  /**
+   * 注册/更新机器人
+   */
+  upsertRobot(robot: Partial<RobotRecord> & { uuid: string }): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO robots (uuid, name, model, version, ip, group_name, tags, sn, status, last_connected, registered_at, updated_at, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+      INSERT INTO robots (uuid, name, model, version, ip, group_name, tags, sn, role_id, status, last_connected, registered_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(uuid) DO UPDATE SET
+        name = COALESCE(excluded.name, robots.name),
+        model = COALESCE(excluded.model, robots.model),
+        version = COALESCE(excluded.version, robots.version),
+        ip = COALESCE(excluded.ip, robots.ip),
+        group_name = COALESCE(excluded.group_name, robots.group_name),
+        tags = COALESCE(excluded.tags, robots.tags),
+        sn = COALESCE(excluded.sn, robots.sn),
+        role_id = COALESCE(excluded.role_id, robots.role_id),
+        status = COALESCE(excluded.status, robots.status),
+        last_connected = COALESCE(excluded.last_connected, robots.last_connected),
+        updated_at = CURRENT_TIMESTAMP
     `);
 
     stmt.run(
       robot.uuid,
-      robot.name || null,
-      robot.model || null,
-      robot.version || null,
-      robot.ip || null,
-      (robot as any).group_name || null,
-      (robot as any).tags || null,
-      (robot as any).sn || null,
-      robot.status || 'offline',
-      robot.last_connected?.toISOString() || new Date().toISOString(),
-      (robot as any).registered_at?.toISOString?.() || null,
-      robot.metadata ? JSON.stringify(robot.metadata) : null
+      robot.name ?? null,
+      robot.model ?? null,
+      robot.version ?? null,
+      robot.ip ?? null,
+      robot.group_name ?? null,
+      Array.isArray(robot.tags) ? JSON.stringify(robot.tags) : robot.tags ?? null,
+      robot.sn ?? null,
+      robot.role_id ?? null,
+      robot.status ?? 'offline',
+      robot.last_connected ?? null,
+      robot.registered_at ?? null
     );
   }
 
-  update_机器人状态(robotId: string, status: 'online' | 'offline' | 'error'): void {
+  /**
+   * 更新机器人状态
+   */
+  updateRobotStatus(robotId: string, status: RobotStatus): void {
     const stmt = this.db.prepare(`
       UPDATE robots 
-      SET status = ?, last_connected = CURRENT_TIMESTAMP 
+      SET status = ?, last_connected = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
       WHERE uuid = ?
     `);
     stmt.run(status, robotId);
   }
 
-  update_机器人IP(robotId: string, ip: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE robots 
-      SET ip = ? 
-      WHERE uuid = ?
-    `);
-    stmt.run(ip, robotId);
-  }
-
-  get_机器人(robotId: string): RobotRecord | undefined {
+  /**
+   * 获取机器人
+   */
+  getRobot(robotId: string): RobotRecord | undefined {
     const stmt = this.db.prepare('SELECT * FROM robots WHERE uuid = ?');
-    const robot = stmt.get(robotId) as RobotRecord | undefined;
-    
-    // 如果没有IP但metadata中有ip，则迁移
-    if (robot && !robot.ip && robot.metadata) {
-      try {
-        const metadata = typeof robot.metadata === 'string' ? JSON.parse(robot.metadata) : robot.metadata;
-        if (metadata && metadata.ip) {
-          this.update_机器人IP(robotId, metadata.ip);
-          robot.ip = metadata.ip;
-          // 从 metadata 中删除 ip
-          delete metadata.ip;
-          const updateStmt = this.db.prepare('UPDATE robots SET metadata = ? WHERE uuid = ?');
-          updateStmt.run(JSON.stringify(metadata), robotId);
-        }
-      } catch (e) {
-        console.error('迁移IP失败:', e);
-      }
-    }
-    
-    return robot;
+    return stmt.get(robotId) as RobotRecord | undefined;
   }
 
-  get_所有机器人(): RobotRecord[] {
+  /**
+   * 获取所有机器人
+   */
+  getAllRobots(): RobotRecord[] {
     const stmt = this.db.prepare('SELECT * FROM robots ORDER BY last_connected DESC');
     return stmt.all() as RobotRecord[];
   }
 
-  // 从metadata迁移IP到ip字段
-  迁移IP从元数据(): void {
-    const stmt = this.db.prepare('SELECT * FROM robots ORDER BY last_connected DESC');
-    const robots = stmt.all() as RobotRecord[];
-    let migratedCount = 0;
-    
-    for (const robot of robots) {
-      if (!robot.ip && robot.metadata) {
-        try {
-          const metadata = typeof robot.metadata === 'string' ? JSON.parse(robot.metadata) : robot.metadata;
-          if (metadata && metadata.ip) {
-            this.update_机器人IP(robot.uuid, metadata.ip);
-            // 从 metadata 中删除 ip
-            delete metadata.ip;
-            const updateStmt = this.db.prepare('UPDATE robots SET metadata = ? WHERE uuid = ?');
-            updateStmt.run(JSON.stringify(metadata), robot.uuid);
-            migratedCount++;
-            console.log(`迁移机器人 ${robot.uuid} 的IP: ${metadata.ip}`);
-          }
-        } catch (e) {
-          console.error(`迁移机器人 ${robot.uuid} 的IP失败:`, e);
-        }
-      }
-    }
-    
-    if (migratedCount > 0) {
-      console.log(`成功迁移 ${migratedCount} 个机器人的IP地址`);
-    }
-  }
-
-  // 对话记录
-  insert_对话记录(data: Omit<ConversationRecord, 'uuid'>): number {
-    const stmt = this.db.prepare(`
-      INSERT INTO conversations (robot_id, timestamp, type, user_input, ai_response, actions, processing_time, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const result = stmt.run(
-      data.robot_id,
-      data.timestamp.toISOString(),
-      data.type,
-      data.user_input,
-      data.ai_response,
-      data.actions ? JSON.stringify(data.actions) : null,
-      data.processing_time,
-      data.metadata ? JSON.stringify(data.metadata) : null
-    );
-
-    return result.lastInsertRowid as number;
-  }
-
-  get_会话历史记录(robotId: string, limit = 50, offset = 0): ConversationRecord[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM conversations
-      WHERE robot_id = ?
-      ORDER BY timestamp DESC
-      LIMIT ? OFFSET ?
-    `);
-
-    return stmt.all(robotId, limit, offset) as ConversationRecord[];
-  }
-
-  update_机器人(uuid: string, data: Partial<RobotRecord>): RobotRecord | undefined {
+  /**
+   * 更新机器人
+   */
+  updateRobot(uuid: string, data: Partial<RobotRecord>): RobotRecord | undefined {
     const fields: string[] = [];
     const values: any[] = [];
-    if (data.name !== undefined) {
-      fields.push('name = ?');
-      values.push(data.name ?? null);
+
+    const allowedFields = ['name', 'model', 'version', 'ip', 'group_name', 'tags', 'sn', 'role_id', 'status', 'last_connected'];
+    
+    for (const field of allowedFields) {
+      if ((data as any)[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        let value = (data as any)[field];
+        // 特殊处理 tags 数组
+        if (field === 'tags' && Array.isArray(value)) {
+          value = JSON.stringify(value);
+        }
+        values.push(value ?? null);
+      }
     }
-    if (data.model !== undefined) {
-      fields.push('model = ?');
-      values.push(data.model ?? null);
-    }
-    if (data.version !== undefined) {
-      fields.push('version = ?');
-      values.push(data.version ?? null);
-    }
-    if (data.ip !== undefined) {
-      fields.push('ip = ?');
-      values.push(data.ip ?? null);
-    }
-    if ((data as any).group_name !== undefined) {
-      fields.push('group_name = ?');
-      values.push((data as any).group_name ?? null);
-    }
-    if ((data as any).tags !== undefined) {
-      fields.push('tags = ?');
-      const t = (data as any).tags;
-      values.push(Array.isArray(t) ? JSON.stringify(t) : (typeof t === 'string' ? t : null));
-    }
-    if ((data as any).sn !== undefined) {
-      fields.push('sn = ?');
-      values.push((data as any).sn ?? null);
-    }
-    if ((data as any).role_id !== undefined) {
-      fields.push('role_id = ?');
-      values.push((data as any).role_id ?? null);
-    }
-    if (data.status !== undefined) {
-      fields.push('status = ?');
-      values.push(data.status);
-    }
-    if (data.last_connected !== undefined) {
-      fields.push('last_connected = ?');
-      values.push(data.last_connected ? data.last_connected.toISOString() : new Date().toISOString());
-    }
-    if (data.metadata !== undefined) {
-      fields.push('metadata = ?');
-      values.push(data.metadata ?? null);
-    }
-    // 始终更新更新时间
-    fields.push('updated_at = CURRENT_TIMESTAMP');
+
     if (fields.length === 0) {
-      return this.get_机器人(uuid);
+      return this.getRobot(uuid);
     }
+
+    fields.push('updated_at = CURRENT_TIMESTAMP');
     const stmt = this.db.prepare(`UPDATE robots SET ${fields.join(', ')} WHERE uuid = ?`);
     stmt.run(...values, uuid);
-    return this.get_机器人(uuid);
+    return this.getRobot(uuid);
   }
 
-  delete_机器人(uuid: string): void {
-    const deleteConversations = this.db.prepare('DELETE FROM conversations WHERE robot_id = ?');
-    const deleteActionLogs = this.db.prepare('DELETE FROM action_logs WHERE robot_id = ?');
-    const delete_机器人 = this.db.prepare('DELETE FROM robots WHERE uuid = ?');
-
-    const runTransaction = this.db.transaction(() => {
-      deleteConversations.run(uuid);
-      deleteActionLogs.run(uuid);
-      delete_机器人.run(uuid);
-    });
-
-    runTransaction();
+  /**
+   * 删除机器人（级联删除对话和动作日志）
+   */
+  deleteRobot(uuid: string): void {
+    const stmt = this.db.prepare('DELETE FROM robots WHERE uuid = ?');
+    stmt.run(uuid);
   }
 
-  // 动作日志
-  insert_动作日志(robotId: string, actionName: string, parameters: any, status: string): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO action_logs (robot_id, action_name, parameters, status, executed_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-    `);
-
-    stmt.run(robotId, actionName, JSON.stringify(parameters), status);
+  /**
+   * 获取所有分组
+   */
+  getAllGroups(): string[] {
+    const stmt = this.db.prepare('SELECT DISTINCT group_name FROM robots WHERE group_name IS NOT NULL ORDER BY group_name');
+    const rows = stmt.all() as { group_name: string }[];
+    return rows.map(r => r.group_name);
   }
 
-  // ===== 角色管理 =====
-  
-  create_角色(data: {
+  // ==================== 角色管理 ====================
+
+  /**
+   * 创建角色
+   */
+  createRole(data: {
     uuid: string;
     name: string;
     description?: string;
@@ -545,7 +301,7 @@ class 数据库服务 {
     voice?: string;
     intent_strategy?: string;
     max_history?: number;
-  }) {
+  }): RoleRecord | undefined {
     const stmt = this.db.prepare(`
       INSERT INTO roles (uuid, name, description, llm_provider, llm_model, temperature, system_prompt, voice, intent_strategy, max_history)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -553,91 +309,64 @@ class 数据库服务 {
     stmt.run(
       data.uuid,
       data.name,
-      data.description || null,
-      data.llm_provider || null,
-      data.llm_model || null,
-      data.temperature !== undefined ? data.temperature : 0.7,
-      data.system_prompt || null,
-      data.voice || null,
-      data.intent_strategy || null,
-      typeof data.max_history === 'number' ? data.max_history : 10
+      data.description ?? null,
+      data.llm_provider ?? null,
+      data.llm_model ?? null,
+      data.temperature ?? 0.7,
+      data.system_prompt ?? null,
+      data.voice ?? null,
+      data.intent_strategy ?? null,
+      data.max_history ?? 10
     );
-    return this.get_角色(data.uuid);
+    return this.getRole(data.uuid);
   }
 
-  get_角色(uuid: string) {
+  /**
+   * 获取角色
+   */
+  getRole(uuid: string): RoleRecord | undefined {
     const stmt = this.db.prepare('SELECT * FROM roles WHERE uuid = ?');
-    return stmt.get(uuid) as any;
+    return stmt.get(uuid) as RoleRecord | undefined;
   }
 
-  get_所有角色() {
+  /**
+   * 获取所有角色
+   */
+  getAllRoles(): RoleRecord[] {
     const stmt = this.db.prepare('SELECT * FROM roles ORDER BY created_at DESC');
-    return stmt.all() as any[];
+    return stmt.all() as RoleRecord[];
   }
 
-  update_角色(uuid: string, data: Partial<{
-    name: string;
-    description: string;
-    llm_provider: string;
-    llm_model: string;
-    temperature: number;
-    system_prompt: string;
-    voice: string;
-    intent_strategy: string;
-    max_history: number;
-  }>) {
+  /**
+   * 更新角色
+   */
+  updateRole(uuid: string, data: Partial<Omit<RoleRecord, 'uuid' | 'created_at' | 'updated_at'>>): RoleRecord | undefined {
     const fields: string[] = [];
     const values: any[] = [];
 
-    if (data.name !== undefined) {
-      fields.push('name = ?');
-      values.push(data.name);
+    const allowedFields = ['name', 'description', 'llm_provider', 'llm_model', 'temperature', 'system_prompt', 'voice', 'intent_strategy', 'max_history'];
+    
+    for (const field of allowedFields) {
+      if ((data as any)[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push((data as any)[field] ?? null);
+      }
     }
-    if (data.description !== undefined) {
-      fields.push('description = ?');
-      values.push(data.description || null);
-    }
-    if (data.llm_provider !== undefined) {
-      fields.push('llm_provider = ?');
-      values.push(data.llm_provider || null);
-    }
-    if (data.llm_model !== undefined) {
-      fields.push('llm_model = ?');
-      values.push(data.llm_model || null);
-    }
-    if (data.temperature !== undefined) {
-      fields.push('temperature = ?');
-      values.push(data.temperature);
-    }
-    if (data.system_prompt !== undefined) {
-      fields.push('system_prompt = ?');
-      values.push(data.system_prompt || null);
-    }
-    if (data.voice !== undefined) {
-      fields.push('voice = ?');
-      values.push(data.voice || null);
-    }
-    if (data.intent_strategy !== undefined) {
-      fields.push('intent_strategy = ?');
-      values.push(data.intent_strategy || null);
-    }
-    if ((data as any).max_history !== undefined) {
-      fields.push('max_history = ?');
-      values.push((data as any).max_history);
+
+    if (fields.length === 0) {
+      return this.getRole(uuid);
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
-
-    if (fields.length === 1) {
-      return this.get_角色(uuid);
-    }
-
     const stmt = this.db.prepare(`UPDATE roles SET ${fields.join(', ')} WHERE uuid = ?`);
     stmt.run(...values, uuid);
-    return this.get_角色(uuid);
+    return this.getRole(uuid);
   }
 
-  delete_角色(uuid: string) {
+  /**
+   * 删除角色（自动解绑关联的机器人）
+   */
+  deleteRole(uuid: string): void {
     // 解绑所有使用该角色的机器人
     const unbindStmt = this.db.prepare('UPDATE robots SET role_id = NULL WHERE role_id = ?');
     unbindStmt.run(uuid);
@@ -647,15 +376,108 @@ class 数据库服务 {
     stmt.run(uuid);
   }
 
-  get_所有使用角色的机器人(roleId: string) {
+  /**
+   * 获取使用该角色的所有机器人
+   */
+  getRobotsByRole(roleId: string): RobotRecord[] {
     const stmt = this.db.prepare('SELECT * FROM robots WHERE role_id = ?');
     return stmt.all(roleId) as RobotRecord[];
   }
 
-  // 关闭数据库连接
+  // ==================== 对话记录管理 ====================
+
+  /**
+   * 插入对话记录
+   */
+  insertConversation(data: {
+    robot_id: string;
+    type: ConversationType;
+    user_input: string;
+    ai_response: string;
+    actions?: any;
+    processing_time?: number;
+    metadata?: any;
+  }): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO conversations (robot_id, timestamp, type, user_input, ai_response, actions, processing_time, metadata)
+      VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      data.robot_id,
+      data.type,
+      data.user_input,
+      data.ai_response,
+      data.actions ? JSON.stringify(data.actions) : null,
+      data.processing_time ?? null,
+      data.metadata ? JSON.stringify(data.metadata) : null
+    );
+
+    return result.lastInsertRowid as number;
+  }
+
+  /**
+   * 获取对话历史
+   */
+  getConversations(robotId: string, limit = 50, offset = 0): ConversationRecord[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM conversations
+      WHERE robot_id = ?
+      ORDER BY timestamp DESC
+      LIMIT ? OFFSET ?
+    `);
+    return stmt.all(robotId, limit, offset) as ConversationRecord[];
+  }
+
+  /**
+   * 清空对话历史
+   */
+  clearConversations(robotId: string): void {
+    const stmt = this.db.prepare('DELETE FROM conversations WHERE robot_id = ?');
+    stmt.run(robotId);
+  }
+
+  // ==================== 动作日志管理 ====================
+
+  /**
+   * 插入动作日志
+   */
+  insertActionLog(robotId: string, actionName: string, parameters: any, status: ActionStatus): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO action_logs (robot_id, action_name, parameters, status, executed_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `);
+    stmt.run(robotId, actionName, JSON.stringify(parameters), status);
+  }
+
+  /**
+   * 获取动作日志
+   */
+  getActionLogs(robotId: string, limit = 50, offset = 0) {
+    const stmt = this.db.prepare(`
+      SELECT * FROM action_logs
+      WHERE robot_id = ?
+      ORDER BY executed_at DESC
+      LIMIT ? OFFSET ?
+    `);
+    return stmt.all(robotId, limit, offset);
+  }
+
+  // ==================== 工具方法 ====================
+
+  /**
+   * 关闭数据库连接
+   */
   close(): void {
     this.db.close();
   }
+
+  /**
+   * 获取原始数据库实例（用于高级操作）
+   */
+  getDb(): Database.Database {
+    return this.db;
+  }
 }
 
-export default 数据库服务;
+export default DatabaseService;

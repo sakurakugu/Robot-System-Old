@@ -506,4 +506,65 @@ export class RobotService {
       });
     });
   }
+
+  /**
+   * 通过 mDNS 发现局域网内的机器人
+   * @param timeout 扫描超时时间（秒）
+   */
+  async discoverRobots(timeout: number = 3): Promise<{
+    success: boolean;
+    robots: Array<{
+      uuid: string;
+      name: string;
+      model: string;
+      version: string;
+      ip: string;
+      port: number;
+    }>;
+    error?: string;
+  }> {
+    const pythonScript = path.resolve(__dirname, '../../core/scripts/mdns_discover.py');
+
+    return new Promise((resolve) => {
+      const p = spawn('python3', [pythonScript, timeout.toString()]);
+      let stdout = '';
+      let stderr = '';
+
+      // 设置超时保护
+      const timeoutMs = (timeout + 2) * 1000;
+      const timer = setTimeout(() => {
+        p.kill();
+        resolve({ success: false, robots: [], error: '扫描超时' });
+      }, timeoutMs);
+
+      p.stdout.on('data', (d) => { stdout += d.toString(); });
+      p.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      p.on('error', (err) => {
+        clearTimeout(timer);
+        this.logger.error(`mDNS 发现失败: ${err.message}`);
+        resolve({ success: false, robots: [], error: err.message });
+      });
+
+      p.on('close', (code) => {
+        clearTimeout(timer);
+        if (code === 0 && stdout) {
+          try {
+            const result = JSON.parse(stdout);
+            this.logger.info(`mDNS 发现了 ${result.count || 0} 个机器人`);
+            resolve({
+              success: true,
+              robots: result.robots || [],
+            });
+          } catch (e) {
+            this.logger.error(`解析 mDNS 结果失败: ${e}`);
+            resolve({ success: false, robots: [], error: '解析结果失败' });
+          }
+        } else {
+          this.logger.error(`mDNS 发现失败: ${stderr || '未知错误'}`);
+          resolve({ success: false, robots: [], error: stderr || '发现失败' });
+        }
+      });
+    });
+  }
 }

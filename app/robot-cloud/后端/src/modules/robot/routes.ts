@@ -6,6 +6,7 @@ export function createRobotRoutes(controller: RobotController): Router {
 
   router.get('/', controller.get_所有机器人.bind(controller));
   router.get('/groups', controller.getGroups.bind(controller));
+  router.get('/discover', controller.discoverRobots.bind(controller));
   router.get('/:uuid', controller.get_机器人.bind(controller));
   router.post('/', controller.createRobot.bind(controller));
   router.put('/:uuid', controller.update_机器人.bind(controller));

@@ -2,6 +2,9 @@ import cors from 'cors';
 import express from 'express';
 import DatabaseService from './core/database';
 import Logger from './core/logger';
+import { ChoreoController } from './modules/choreo/controller';
+import { createChoreoRoutes } from './modules/choreo/routes';
+import { ChoreoService } from './modules/choreo/service';
 import { RobotController } from './modules/robot/controller';
 import { createRobotRoutes } from './modules/robot/routes';
 import { RobotService } from './modules/robot/service';
@@ -28,12 +31,14 @@ export class Application {
   private conversationService: ConversationService;
   private settingsService: SettingsService;
   private roleService: RoleService;
+  private choreoService: ChoreoService;
 
   // 控制器实例
   private robotController: RobotController;
   private conversationController: ConversationController;
   private settingsController: SettingsController;
   private roleController: RoleController;
+  private choreoController: ChoreoController;
 
   constructor() {
     this.app = express();
@@ -46,17 +51,22 @@ export class Application {
     this.conversationService = new ConversationService(this.database);
     this.settingsService = new SettingsService(this.database);
     this.roleService = new RoleService(this.database, this.logger);
+    this.choreoService = new ChoreoService(this.database, this.logger);
 
     // 初始化控制器
     this.robotController = new RobotController(this.robotService);
     this.conversationController = new ConversationController(this.conversationService, this.database);
     this.settingsController = new SettingsController(this.settingsService);
     this.roleController = new RoleController(this.roleService);
+    this.choreoController = new ChoreoController(this.choreoService);
 
     // 加载持久化配置
     this.loadPersistedConfig();
     this.setupMiddleware();
     this.setupRoutes();
+
+    // 延迟注入 WebSocket 服务到编舞服务
+    this.choreoService.setWebSocketService(this.websocketService);
   }
 
   /**
@@ -109,6 +119,7 @@ export class Application {
     router.use('/conversations', createConversationRoutes(this.conversationController));
     router.use('/config', createSettingsRoutes(this.settingsController));
     router.use('/roles', createRoleRoutes(this.roleController));
+    router.use('/choreo', createChoreoRoutes(this.choreoController));
     router.use('/', createSystemRoutes(this.database, this.websocketService));
 
     // 兼容旧路由

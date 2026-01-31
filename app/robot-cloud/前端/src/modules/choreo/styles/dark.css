@@ -1,0 +1,25 @@
+/**
+ * 编舞系统深色主题变量
+ */
+:root.dark {
+  --el-bg-color-page: #1e1e1e;
+  --el-bg-color: #252526;
+  --el-border-color: #3c3c3c;
+  --el-color-primary: #0e639c;
+  --el-text-color-primary: #cccccc;
+  --el-text-color-regular: #d0d0d0;
+  --el-text-color-secondary: #a0a0a0;
+  --el-text-color-placeholder: #666666;
+  --el-fill-color: #2d2d30;
+  --el-fill-color-light: #2a2d2e;
+
+  /* 自定义编舞系统变量 */
+  --choreo-track-bg: #1e1e1e;
+  --choreo-track-border: #3c3c3c;
+  --choreo-block-bg: #264f78;
+  --choreo-block-selected: #094771;
+  --choreo-playhead: #f48771;
+  --choreo-grid-line: rgba(255, 255, 255, 0.05);
+  --choreo-ruler-bg: #252526;
+  --choreo-timeline-bg: #1e1e1e;
+}

@@ -27,6 +27,10 @@
             <el-icon><VideoPlay /></el-icon>
             <template #title>机器人操作</template>
           </el-menu-item>
+          <el-menu-item index="/choreo">
+            <el-icon><Film /></el-icon>
+            <template #title>编舞系统</template>
+          </el-menu-item>
           <el-menu-item index="/params">
             <el-icon><Setting /></el-icon>
             <template #title>参数管理</template>
@@ -52,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { Collection, DArrowLeft, DArrowRight, List, Setting, Tools, UserFilled, VideoPlay } from '@element-plus/icons-vue'
+import { Collection, DArrowLeft, DArrowRight, Film, List, Setting, Tools, UserFilled, VideoPlay } from '@element-plus/icons-vue'
 import { Bot } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -67,6 +71,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/robots')) return '/robots'
   if (path.startsWith('/roles')) return '/roles'
   if (path.startsWith('/operation')) return '/operation'
+  if (path.startsWith('/choreo')) return '/choreo'
   if (path.startsWith('/params')) return '/params'
   if (path.startsWith('/kb')) return '/kb'
   if (path.startsWith('/settings')) return '/settings'

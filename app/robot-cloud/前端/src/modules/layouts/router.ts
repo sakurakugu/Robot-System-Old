@@ -1,5 +1,6 @@
 // 路由配置
 
+import { choreoRoutes } from '@/modules/choreo/router'
 import { conversationRoutes } from '@/modules/conversation/router'
 import { knowledgeBase } from '@/modules/knowledge/router'
 import MainLayout from '@/modules/layouts/views/MainLayout.vue'
@@ -19,6 +20,7 @@ const routes: RouteRecordRaw[] = [
       ...conversationRoutes,
       ...systemRoutes,
       ...knowledgeBase,
+      ...choreoRoutes,
     ],
   },
   {

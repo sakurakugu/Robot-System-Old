@@ -1222,6 +1222,24 @@ class WebSocketService {
       return false;
     }
   }
+
+  /**
+   * 对外暴露：广播消息到所有 UI 客户端
+   */
+  broadcast(message: ServerMessage, channel: Channel = 'business'): void {
+    for (const [robotId, channelMap] of this.uiConnections) {
+      const uiSet = channelMap.get(channel);
+      if (uiSet && uiSet.size > 0) {
+        for (const uiWs of uiSet) {
+          try {
+            uiWs.send(JSON.stringify(message));
+          } catch (error: any) {
+            this.logger.error('广播消息到UI失败', error, { robotId });
+          }
+        }
+      }
+    }
+  }
 }
 
 export default WebSocketService;

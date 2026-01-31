@@ -14,52 +14,35 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--restart", "-r", action="store_true")
     group.add_argument("--test", "-t", action="store_true")
     group.add_argument("--help", "-h", action="store_true")
-    parser.add_argument("--all", "-a", dest="app_all", action="store_true")
-    parser.add_argument("--dance", "-d", dest="app_dance", action="store_true")
-    parser.add_argument("--chat", "-c", dest="app_chat", action="store_true")
     return parser.parse_args()
 
 
-def resolve_action_and_app(ns: argparse.Namespace) -> Tuple[str, str]:
-    action = "restart"
+def resolve_action(ns: argparse.Namespace) -> str:
     if ns.start:
-        action = "start"
+        return "start"
     elif ns.stop:
-        action = "stop"
+        return "stop"
     elif ns.restart:
-        action = "restart"
+        return "restart"
     elif ns.test:
-        action = "test"
+        return "test"
     elif ns.help:
-        action = "help"
-
-    app = "all"
-    if ns.app_dance:
-        app = "dance"
-    elif ns.app_chat:
-        app = "chat"
-    elif ns.app_all:
-        app = "all"
-    return action, app
+        return "help"
+    return "restart"
 
 
 def show_help() -> None:
     print("机器狗控制系统 - 统一启动脚本 (Python)")
     print("")
     print("用法：")
-    print("  python3 tools/3.启动前后端.py [ACTION] [APP]")
+    print("  python3 tools/3.启动前后端.py [ACTION]")
     print("")
     print("操作参数 (ACTION):")
-    print("  --start, -s       启动服务（默认重启）")
+    print("  --start, -s       启动服务")
     print("  --stop, -x        停止服务")
-    print("  --restart, -r     重启服务")
+    print("  --restart, -r     重启服务（默认）")
     print("  --test, -t        运行系统自检")
     print("  --help, -h        显示帮助")
-    print("")
-    print("应用参数 (可选):")
-    print("  --all, -a         启动所有系统 (默认)")
-    print("  --dance, -d       只启动编舞系统 (端口: 3000/5173)")
-    print("  --chat, -c        只启动对话系统 (端口: 3001/5174)")
     print("")
 
 
@@ -80,32 +63,32 @@ def monitor(pids: List[Tuple[str, int]]) -> int:
 
 def main() -> int:
     ns = parse_args()
-    action, app = resolve_action_and_app(ns)
+    action = resolve_action(ns)
 
     if action == "help":
         show_help()
         return 0
 
     if action == "stop":
-        stop_all(app)
+        stop_all()
         return 0
 
     if action == "test":
-        ok = test_all(app)
+        ok = test_all()
         return 0 if ok else 1
 
     if action == "restart":
-        stop_all(app)
+        stop_all()
         time.sleep(2)
-        pids = start_all(app)
+        pids = start_all()
         rc = monitor(pids)
-        stop_all(app)
+        stop_all()
         return rc
 
     if action == "start":
-        pids = start_all(app)
+        pids = start_all()
         rc = monitor(pids)
-        stop_all(app)
+        stop_all()
         return rc
 
     show_help()

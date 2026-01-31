@@ -22,8 +22,6 @@ from .utils import (
 )
 
 
-DANCE_BACKEND = ROOT / "app" / "dance-choreo" / "backend"
-DANCE_FRONTEND = ROOT / "app" / "dance-choreo" / "frontend"
 CHAT_BACKEND = ROOT / "app" / "robot-cloud" / "后端"
 CHAT_FRONTEND = ROOT / "app" / "robot-cloud" / "前端"
 
@@ -66,24 +64,6 @@ def _parse_env_value(env_path: Path, key: str, default_port: int) -> int:
             pass
     return default_port
 
-def _parse_ts_default_port(ts_config_path: Path, default_port: int) -> int:
-    text = _read_text(ts_config_path)
-    import re
-    m = re.search(r"parseInt\(\s*process\.env\.PORT\s*\|\|\s*'(\d+)'\s*,\s*10\s*\)", text)
-    if m:
-        try:
-            return int(m.group(1))
-        except Exception:
-            pass
-    return default_port
-
-def _dance_backend_port() -> int:
-    ts_path = DANCE_BACKEND / "src" / "config" / "index.ts"
-    return _parse_ts_default_port(ts_path, 3000)
-
-def _dance_frontend_port() -> int:
-    vite_path = DANCE_FRONTEND / "vite.config.ts"
-    return _parse_vite_port(vite_path, 5173)
 
 def _chat_backend_port() -> int:
     env_path = CHAT_BACKEND / ".env"
@@ -121,34 +101,6 @@ def _chat_frontend_port() -> int:
     return _parse_vite_port(vite_path, 5174)
 
 
-def start_dance() -> List[Tuple[str, int]]:
-    ensure_dirs()
-    ensure_node_modules(DANCE_BACKEND)
-    ensure_node_modules(DANCE_FRONTEND)
-
-    dist_init = DANCE_BACKEND / "dist" / "database" / "init.js"
-    if not dist_init.exists():
-        print("🗄️  编译 TypeScript...")
-        run(["npm", "run", "build"], cwd=DANCE_BACKEND, check=True)
-    run(["npm", "run", "init-db"], cwd=DANCE_BACKEND, check=True)
-
-    procs: List[Tuple[str, int]] = []
-
-    print(f"🚀 启动编舞系统后端...  (http://localhost:{_dance_backend_port()})")
-    backend_log = LOGS_DIR / "dance-choreo" / "backend.log"
-    p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=DANCE_BACKEND, log_path=backend_log)
-    write_pid("dance-backend", pid_backend)
-    procs.append(("dance-backend", pid_backend))
-
-    print(f"🚀 启动编舞系统前端...  (http://localhost:{_dance_frontend_port()})")
-    frontend_log = LOGS_DIR / "dance-choreo" / "frontend.log"
-    p_frontend, pid_frontend = spawn(["npm", "run", "dev"], cwd=DANCE_FRONTEND, log_path=frontend_log)
-    write_pid("dance-frontend", pid_frontend)
-    procs.append(("dance-frontend", pid_frontend))
-
-    return procs
-
-
 def start_chat() -> List[Tuple[str, int]]:
     ensure_dirs()
     if copy_env_example_if_missing(CHAT_BACKEND):
@@ -179,13 +131,6 @@ def start_chat() -> List[Tuple[str, int]]:
     return procs
 
 
-def stop_dance() -> bool:
-    any_stopped = False
-    any_stopped |= kill_pid_file("dance-backend")
-    any_stopped |= kill_pid_file("dance-frontend")
-    return any_stopped
-
-
 def stop_chat() -> bool:
     any_stopped = False
     any_stopped |= kill_pid_file("chat-backend")
@@ -193,12 +138,8 @@ def stop_chat() -> bool:
     return any_stopped
 
 
-def stop_all(app: str) -> None:
-    stopped_any = False
-    if app in ("all", "dance"):
-        stopped_any |= stop_dance()
-    if app in ("all", "chat"):
-        stopped_any |= stop_chat()
+def stop_all() -> None:
+    stopped_any = stop_chat()
 
     pkill_patterns(["vite", "ts-node-dev"])
     if stopped_any:
@@ -207,50 +148,28 @@ def stop_all(app: str) -> None:
         print("ℹ️  没有运行中的服务")
 
 
-def start_all(app: str) -> List[Tuple[str, int]]:
+def start_all() -> List[Tuple[str, int]]:
     check_env()
     print("========================================")
-    print(f"  机器狗控制系统 - 启动: {app}")
+    print("  机器狗控制系统 - 启动")
     print("========================================")
 
-    procs: List[Tuple[str, int]] = []
-    if app in ("all", "dance"):
-        print("\n----------------------------------------")
-        print("  📦 准备编舞系统 (Dance Choreo)")
-        print("----------------------------------------")
-        procs += start_dance()
-    if app in ("all", "chat"):
-        print("\n----------------------------------------")
-        print("  📦 准备对话系统 (Robot Chat)")
-        print("----------------------------------------")
-        started = start_chat()
-        # 如果返回空，可能是 .env 刚创建
-        if not started and (CHAT_BACKEND / ".env").exists():
-            pass
-        procs += started
+    print("\n----------------------------------------")
+    print("  📦 准备对话系统 (Robot Cloud)")
+    print("----------------------------------------")
+    procs = start_chat()
     return procs
 
 
-def test_all(app: str) -> bool:
+def test_all() -> bool:
     print("========================================")
-    print(f"  机器狗控制系统 - 自检: {app}")
+    print("  机器狗控制系统 - 自检")
     print("========================================")
-    ok_all = True
 
-    if app in ("all", "dance"):
-        print("🧪 测试编舞系统 (Dance Choreo)...")
-        dbp = _dance_backend_port()
-        dfp = _dance_frontend_port()
-        ok_all &= http_ok(f"http://localhost:{dbp}/health")
-        ok_all &= http_ok(f"http://localhost:{dbp}/api/projects")
-        ok_all &= http_ok(f"http://localhost:{dfp}")
-        print("✅ 编舞系统通过" if ok_all else "❌ 编舞系统异常")
-    if app in ("all", "chat"):
-        print("🧪 测试对话系统 (Robot Chat)...")
-        cbp = _chat_backend_port()
-        cfp = _chat_frontend_port()
-        ok_chat = http_ok(f"http://localhost:{cbp}/health")
-        ok_chat &= http_ok(f"http://localhost:{cfp}")
-        print("✅ 对话系统通过" if ok_chat else "❌ 对话系统异常")
-        ok_all &= ok_chat
-    return ok_all
+    print("🧪 测试对话系统 (Robot Cloud)...")
+    ports = _chat_backend_ports()
+    cfp = _chat_frontend_port()
+    ok = http_ok(f"http://localhost:{ports['http']}/health")
+    ok &= http_ok(f"http://localhost:{cfp}")
+    print("✅ 对话系统通过" if ok else "❌ 对话系统异常")
+    return ok

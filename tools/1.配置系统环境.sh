@@ -77,42 +77,27 @@ show_menu() {
 install_project_dependencies() {
     print_info "安装项目依赖..."
     
-    # 安装Node.js依赖
-    if [ -f "$ROOT_DIR/app/dance-choreo/backend/package.json" ]; then
-        print_info "安装后端依赖..."
-        cd "$ROOT_DIR/app/dance-choreo/backend"
+    # 安装 robot-cloud Node.js 依赖
+    if [ -f "$ROOT_DIR/app/robot-cloud/后端/package.json" ]; then
+        print_info "安装对话系统后端依赖..."
+        cd "$ROOT_DIR/app/robot-cloud/后端"
         npm install
-        print_success "后端依赖安装完成"
+        print_success "对话系统后端依赖安装完成"
     fi
     
-    if [ -f "$ROOT_DIR/app/dance-choreo/frontend/package.json" ]; then
-        print_info "安装前端依赖..."
-        cd "$ROOT_DIR/app/dance-choreo/frontend"
+    if [ -f "$ROOT_DIR/app/robot-cloud/前端/package.json" ]; then
+        print_info "安装对话系统前端依赖..."
+        cd "$ROOT_DIR/app/robot-cloud/前端"
         npm install
-        print_success "前端依赖安装完成"
-    fi
-
-        # 安装Node.js依赖
-    if [ -f "$ROOT_DIR/app/robot-agent/cloud/backend/package.json" ]; then
-        print_info "安装后端依赖..."
-        cd "$ROOT_DIR/app/robot-agent/cloud/backend"
-        npm install
-        print_success "后端依赖安装完成"
+        print_success "对话系统前端依赖安装完成"
     fi
     
-    if [ -f "$ROOT_DIR/app/robot-agent/cloud/frontend/package.json" ]; then
-        print_info "安装前端依赖..."
-        cd "$ROOT_DIR/app/robot-agent/cloud/frontend"
-        npm install
-        print_success "前端依赖安装完成"
-    fi
-    
-    # 安装Python依赖（如果有requirements.txt）
+    # 安装 Python 依赖（如果有 requirements.txt）
     if [ -f "$ROOT_DIR/requirements.txt" ]; then
-        print_info "安装Python依赖..."
+        print_info "安装 Python 依赖..."
         cd "$ROOT_DIR"
         pip install -r requirements.txt
-        print_success "Python依赖安装完成"
+        print_success "Python 依赖安装完成"
     fi
     
     cd "$ROOT_DIR"
@@ -122,43 +107,24 @@ install_project_dependencies() {
 update_project_dependencies() {
     print_info "更新项目依赖..."
     
-    # 更新后端依赖
-    if [ -f "$ROOT_DIR/app/dance-choreo/backend/package.json" ]; then
-        print_info "更新后端依赖..."
-        cd "$ROOT_DIR/app/dance-choreo/backend"
+    # 更新 robot-cloud 后端依赖
+    if [ -f "$ROOT_DIR/app/robot-cloud/后端/package.json" ]; then
+        print_info "更新对话系统后端依赖..."
+        cd "$ROOT_DIR/app/robot-cloud/后端"
         npx ncu
         npx ncu -u
         npm install
-        print_success "后端依赖更新完成"
-    fi
-    
-    # 更新前端依赖
-    if [ -f "$ROOT_DIR/app/dance-choreo/frontend/package.json" ]; then
-        print_info "更新前端依赖..."
-        cd "$ROOT_DIR/app/dance-choreo/frontend"
-        npx ncu
-        npx ncu -u
-        npm install
-        print_success "前端依赖更新完成"
-    fi
-    
-    # 更新 robot-agent 依赖
-    if [ -f "$ROOT_DIR/app/robot-agent/cloud/backend/package.json" ]; then
-        print_info "更新 robot-agent 后端依赖..."
-        cd "$ROOT_DIR/app/robot-agent/cloud/backend"
-        npx ncu
-        npx ncu -u
-        npm install
-        print_success "robot-agent 后端依赖更新完成"
+        print_success "对话系统后端依赖更新完成"
     fi
 
-    if [ -f "$ROOT_DIR/app/robot-agent/cloud/frontend/package.json" ]; then
-        print_info "更新 robot-agent 前端依赖..."
-        cd "$ROOT_DIR/app/robot-agent/cloud/frontend"
+    # 更新 robot-cloud 前端依赖
+    if [ -f "$ROOT_DIR/app/robot-cloud/前端/package.json" ]; then
+        print_info "更新对话系统前端依赖..."
+        cd "$ROOT_DIR/app/robot-cloud/前端"
         npx ncu
         npx ncu -u
         npm install
-        print_success "robot-agent 前端依赖更新完成"
+        print_success "对话系统前端依赖更新完成"
     fi
     
     cd "$ROOT_DIR"

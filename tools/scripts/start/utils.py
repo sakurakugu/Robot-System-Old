@@ -22,8 +22,7 @@ PID_DIR: Path = ROOT / ".cache" /"pid"
 
 def ensure_dirs() -> None:
     """确保日志目录和 PID 目录存在"""
-    (LOGS_DIR / "dance-choreo").mkdir(parents=True, exist_ok=True)
-    (LOGS_DIR / "robot-agent").mkdir(parents=True, exist_ok=True)
+    (LOGS_DIR / "robot-cloud").mkdir(parents=True, exist_ok=True)
     PID_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -264,7 +263,6 @@ def is_managed_process(pid: int, cmdline: str) -> bool:
         return False
     markers = [
         str(ROOT / "app" / "robot-cloud"),
-        str(ROOT / "app" / "dance-choreo"),
         "ts-node-dev",
         "vite",
     ]

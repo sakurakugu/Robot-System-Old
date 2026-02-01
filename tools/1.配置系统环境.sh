@@ -217,5 +217,9 @@ main() {
     echo ""
 }
 
+# 管理员权限（windows）
+# cmd /c "assoc .py=Python.File"
+# cmd /c "ftype Python.File=""C:\Software\Deps\Python\Python313\python.exe"" ""%1"" %*"
+
 # 执行主函数
 main

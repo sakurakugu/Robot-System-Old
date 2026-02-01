@@ -169,7 +169,7 @@ def test_all() -> bool:
     print("🧪 测试对话系统 (Robot Cloud)...")
     ports = _chat_backend_ports()
     cfp = _chat_frontend_port()
-    ok = http_ok(f"http://localhost:{ports['http']}/health")
+    ok = http_ok(f"http://localhost:{ports['http']}/api/v1/health")
     ok &= http_ok(f"http://localhost:{cfp}")
     print("✅ 对话系统通过" if ok else "❌ 对话系统异常")
     return ok

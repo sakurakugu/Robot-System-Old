@@ -34,24 +34,36 @@ def check_env() -> None:
     if which("node") is None:
         print("❌ 未检测到 Node.js，请先安装 Node.js 24+", file=sys.stderr)
         sys.exit(1)
-    if which("npm") is None:
+    if which("npm") is None and which("npm.cmd") is None:
         print("❌ 未检测到 npm，请安装 Node.js(自带 npm)", file=sys.stderr)
         sys.exit(1)
-    if which("python3") is None:
-        print("❌ 未检测到 Python3，请先安装 Python 3.10+", file=sys.stderr)
+    py_cmd = "python3" if which("python3") is not None else ("python" if which("python") is not None else None)
+    if py_cmd is None:
+        print("❌ 未检测到 Python，请先安装 Python 3.10+", file=sys.stderr)
         sys.exit(1)
 
     try:
         node_v = subprocess.check_output(["node", "--version"], text=True).strip()
-        py_v = subprocess.check_output(["python3", "--version"], text=True).strip()
+        py_v = subprocess.check_output([py_cmd, "--version"], text=True).strip()
         print(f"✅ Node.js 版本: {node_v}")
         print(f"✅ Python 版本: {py_v}")
     except Exception:
         pass
 
+def 根据平台调整命令(列表: list) -> list:
+    # 如果是windows，添加后缀
+    if os.name == "nt" and 列表:
+        exe = 列表[0]
+        for cand in (exe, f"{exe}.cmd", f"{exe}.bat", f"{exe}.exe"):
+            p = which(cand)
+            if p:
+                列表[0] = p
+                break
+    return 列表
 
 def run(cmd: Iterable[str], cwd: Optional[Path] = None, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(list(cmd), cwd=str(cwd) if cwd else None, check=check)
+    列表 = 根据平台调整命令(list(cmd))
+    return subprocess.run(列表, cwd=str(cwd) if cwd else None, check=check)
 
 
 def _tee_stream(stream, log_file, label: str) -> None:
@@ -73,8 +85,9 @@ def _log_label(log_path: Path) -> str:
 def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Popen, int]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "a", buffering=1)
+    列表 = 根据平台调整命令(list(cmd))
     proc = subprocess.Popen(
-        list(cmd),
+        列表,
         cwd=str(cwd),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -153,11 +166,26 @@ def http_ok(url: str, timeout: float = 3.0) -> bool:
 
 
 def pkill_patterns(patterns: Iterable[str]) -> None:
+    if os.name != "nt":
+        for p in patterns:
+            try:
+                subprocess.run(["pkill", "-f", p], check=False)
+            except Exception:
+                pass
+        return
     for p in patterns:
         try:
-            subprocess.run(["pkill", "-f", p], check=False)
+            subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    f"Get-CimInstance Win32_Process | Where-Object {{$_.CommandLine -like '*{p}*'}} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}",
+                ],
+                check=False,
+            )
         except Exception:
-            pass
+            continue
 
 
 def is_port_in_use(port: int) -> bool:
@@ -178,6 +206,21 @@ def _read_cmdline(pid: int) -> str:
         with open(f"/proc/{pid}/cmdline", "rb") as f:
             raw = f.read().replace(b"\x00", b" ")
             return raw.decode("utf-8", errors="ignore").strip()
+    except Exception:
+        return ""
+
+def _win_cmdline(pid: int) -> str:
+    try:
+        out = subprocess.check_output(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"(Get-CimInstance Win32_Process -Filter \"ProcessId={pid}\").CommandLine",
+            ],
+            text=True,
+        )
+        return out.strip()
     except Exception:
         return ""
 
@@ -221,8 +264,32 @@ def _listeners_from_lsof(port: int) -> list:
         listeners.append((pid, cmdline))
     return listeners
 
+def _listeners_from_netstat(port: int) -> list:
+    try:
+        out = subprocess.check_output(["netstat", "-ano"], text=True)
+    except Exception:
+        return []
+    listeners = []
+    for line in out.splitlines():
+        if "LISTEN" not in line.upper():
+            continue
+        if f":{port}" not in line:
+            continue
+        cols = [c for c in line.split() if c]
+        if not cols:
+            continue
+        try:
+            pid = int(cols[-1])
+        except Exception:
+            continue
+        cmdline = _win_cmdline(pid)
+        listeners.append((pid, cmdline))
+    return listeners
+
 
 def find_listeners(port: int) -> list:
+    if os.name == "nt":
+        return _listeners_from_netstat(port)
     listeners = _listeners_from_ss(port)
     if listeners:
         return listeners

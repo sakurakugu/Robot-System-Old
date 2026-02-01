@@ -209,13 +209,14 @@ onMounted(async () => {
 
   // 加载参数配置
   try {
-    const cfgRes = await fetch('/api/v1/config/params').then(r => r.json())
+    const cfgRes = await fetch('/api/v1/config/llm').then(r => r.json())
     console.log('参数配置响应:', cfgRes)
-    if (cfgRes?.success && cfgRes.data) {
+    if (cfgRes?.success && cfgRes.data && cfgRes.data.providers) {
+      const providers = cfgRes.data.providers
       // OpenAI
-      if (cfgRes.data.openai) {
-        openaiConfig.value.hasKey = !!cfgRes.data.openai.hasApiKey
-        openaiConfig.value.keyLength = cfgRes.data.openai.apiKeyLength || 0
+      if (providers.openai) {
+        openaiConfig.value.hasKey = !!providers.openai.hasApiKey
+        openaiConfig.value.keyLength = providers.openai.apiKeyLength || 0
         openaiConfig.value.readonly = openaiConfig.value.hasKey
         if (openaiConfig.value.hasKey) {
           openaiConfig.value.apiKey = getMaskedText(openaiConfig.value.keyLength)
@@ -224,9 +225,9 @@ onMounted(async () => {
       }
 
       // BigModel
-      if (cfgRes.data.bigmodel) {
-        bigmodelConfig.value.hasKey = !!cfgRes.data.bigmodel.hasApiKey
-        bigmodelConfig.value.keyLength = cfgRes.data.bigmodel.apiKeyLength || 0
+      if (providers.bigmodel) {
+        bigmodelConfig.value.hasKey = !!providers.bigmodel.hasApiKey
+        bigmodelConfig.value.keyLength = providers.bigmodel.apiKeyLength || 0
         bigmodelConfig.value.readonly = bigmodelConfig.value.hasKey
         if (bigmodelConfig.value.hasKey) {
           bigmodelConfig.value.apiKey = getMaskedText(bigmodelConfig.value.keyLength)
@@ -235,9 +236,9 @@ onMounted(async () => {
       }
 
       // Anthropic
-      if (cfgRes.data.anthropic) {
-        anthropicConfig.value.hasKey = !!cfgRes.data.anthropic.hasApiKey
-        anthropicConfig.value.keyLength = cfgRes.data.anthropic.apiKeyLength || 0
+      if (providers.anthropic) {
+        anthropicConfig.value.hasKey = !!providers.anthropic.hasApiKey
+        anthropicConfig.value.keyLength = providers.anthropic.apiKeyLength || 0
         anthropicConfig.value.readonly = anthropicConfig.value.hasKey
         if (anthropicConfig.value.hasKey) {
           anthropicConfig.value.apiKey = getMaskedText(anthropicConfig.value.keyLength)
@@ -246,9 +247,9 @@ onMounted(async () => {
       }
 
       // DeepSeek
-      if (cfgRes.data.deepseek) {
-        deepseekConfig.value.hasKey = !!cfgRes.data.deepseek.hasApiKey
-        deepseekConfig.value.keyLength = cfgRes.data.deepseek.apiKeyLength || 0
+      if (providers.deepseek) {
+        deepseekConfig.value.hasKey = !!providers.deepseek.hasApiKey
+        deepseekConfig.value.keyLength = providers.deepseek.apiKeyLength || 0
         deepseekConfig.value.readonly = deepseekConfig.value.hasKey
         if (deepseekConfig.value.hasKey) {
           deepseekConfig.value.apiKey = getMaskedText(deepseekConfig.value.keyLength)
@@ -257,9 +258,9 @@ onMounted(async () => {
       }
 
       // 通义千问
-      if (cfgRes.data.tongyi) {
-        tongyiConfig.value.hasKey = !!cfgRes.data.tongyi.hasApiKey
-        tongyiConfig.value.keyLength = cfgRes.data.tongyi.apiKeyLength || 0
+      if (providers.tongyi) {
+        tongyiConfig.value.hasKey = !!providers.tongyi.hasApiKey
+        tongyiConfig.value.keyLength = providers.tongyi.apiKeyLength || 0
         tongyiConfig.value.readonly = tongyiConfig.value.hasKey
         if (tongyiConfig.value.hasKey) {
           tongyiConfig.value.apiKey = getMaskedText(tongyiConfig.value.keyLength)
@@ -347,7 +348,7 @@ const saveLLMConfig = async () => {
   }
 
   try {
-    const res = await fetch('/api/v1/config/params', {
+    const res = await fetch('/api/v1/config/llm', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

@@ -17,6 +17,7 @@ node_modules/
 
 # 构建与打包产物
 dist/
+cache/
 build/
 *.egg-info/
 .eggs/

@@ -906,8 +906,15 @@ class WebSocketService {
 
   private sanitizeTtsText(text: string): string {
     if (!text) return '';
+    
+    // 移除表情符号
     const emojiRegex = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu;
-    return text.replace(emojiRegex, '').trim();
+    let result = text.replace(emojiRegex, '');
+    
+    // 移除括号内的注意/提示信息（如"（注意：动作"xxx"因安全原因无法执行）"）
+    result = result.replace(/[（(][^）)]*(?:注意|提示|警告|说明)[^）)]*[）)]/g, '');
+    
+    return result.trim();
   }
 
   private async queueUserText(

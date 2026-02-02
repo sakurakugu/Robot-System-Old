@@ -249,7 +249,9 @@ export class RobotService {
     const pythonScript = path.resolve(__dirname, '../../core/scripts/mdns_discover.py');
 
     return new Promise((resolve) => {
-      const p = spawn(this.pythonCommand, [pythonScript, timeout.toString()]);
+      const p = spawn(this.pythonCommand, [pythonScript, timeout.toString()], {
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      });
       let stdout = '';
       let stderr = '';
 

@@ -63,8 +63,9 @@ class TTSService {
       return;
     }
     const scriptPath = path.join(__dirname, '../../core/scripts/edge_tts_runner.py');
-    const proc = spawn(this.pythonCommand, [scriptPath], {
+    const proc = spawn(this.pythonCommand, ['-u', scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
     this.proc = proc;
 
@@ -81,7 +82,12 @@ class TTSService {
   }
 
   private handleStdout(data: Buffer): void {
-    this.stdoutBuffer += data.toString();
+    try {
+      this.stdoutBuffer += data.toString('utf8');
+    } catch (error) {
+      console.error('[TTS] UTF-8 解码错误:', error);
+      return;
+    }
     let index = this.stdoutBuffer.indexOf('\n');
     while (index !== -1) {
       const line = this.stdoutBuffer.slice(0, index).trim();

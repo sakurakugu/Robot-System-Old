@@ -3,6 +3,13 @@ import json
 import asyncio
 import base64
 import edge_tts
+import io
+
+# 强制使用 UTF-8 编码
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
 
 
 def 输出(payload):

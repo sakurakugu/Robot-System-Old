@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { Moon, Sunny, Tools } from '@element-plus/icons-vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useThemeStore } from '../store'
+import { useThemeStore } from '@/stores/theme'
 
 const isDev = import.meta.env.DEV === true
 
@@ -129,7 +129,6 @@ const onPointerUp = (e: PointerEvent) => {
     try {
       rootEl.value.releasePointerCapture(e.pointerId)
     } catch {
-      // ignore
     }
   }
 }
@@ -141,7 +140,6 @@ const onPointerCancel = (e: PointerEvent) => {
     try {
       rootEl.value.releasePointerCapture(e.pointerId)
     } catch {
-      // ignore
     }
   }
 }

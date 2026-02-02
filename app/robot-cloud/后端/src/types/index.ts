@@ -45,6 +45,7 @@ export interface RoleRecord {
   voice: string | null;
   intent_strategy: string | null;
   max_history: number;
+  is_default: number;
   created_at: string;
   updated_at: string;
 }

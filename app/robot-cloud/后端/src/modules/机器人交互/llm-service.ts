@@ -149,7 +149,7 @@ export class LLMService {
       const response = await axios.post(
         url,
         {
-          model: options?.model || cfg.model || 'qwen-plus',
+          model: options?.model || cfg.model || 'qwen-flash',
           messages: messages.map(m => ({ role: m.role, content: m.content })),
           temperature: options?.temperature ?? 0.7,
           max_tokens: options?.maxTokens || 1000,

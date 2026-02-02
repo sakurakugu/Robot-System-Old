@@ -8,7 +8,12 @@
 
     <div class="content">
       <el-table :data="roles" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="角色名称" width="180" />
+        <el-table-column prop="name" label="角色名称" width="180">
+          <template #default="scope">
+            {{ scope.row.name }}
+            <el-tag v-if="scope.row.is_default === 1" type="info" size="small" style="margin-left: 8px">默认</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="llm_provider" label="服务商" width="150">
           <template #default="scope">
@@ -25,8 +30,17 @@
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
-            <el-button type="primary" link @click="editRole(scope.row)">编辑</el-button>
-            <el-button type="danger" link @click="deleteRole(scope.row)">删除</el-button>
+            <el-button 
+              type="primary" 
+              link 
+              @click="editRole(scope.row)"
+            >编辑</el-button>
+            <el-button 
+              type="danger" 
+              link 
+              @click="deleteRole(scope.row)"
+              :disabled="scope.row.is_default === 1"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -152,6 +166,7 @@ interface Role {
   voice?: string
   intent_strategy?: string
   max_history?: number
+  is_default?: number
   robot_count?: number
 }
 
@@ -304,6 +319,10 @@ const saveRole = async () => {
 }
 
 const deleteRole = async (role: Role) => {
+  if (role.is_default === 1) {
+    ElMessage.warning('默认角色无法删除')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `确定要删除角色 "${role.name}" 吗？删除后，绑定该角色的机器人将解除绑定。`,

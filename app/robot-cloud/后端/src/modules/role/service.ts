@@ -86,6 +86,15 @@ export class RoleService {
    * 删除角色
    */
   deleteRole(uuid: string): void {
+    // 检查是否为默认角色
+    const role = this.database.getRole(uuid);
+    if (!role) {
+      throw new Error('角色不存在');
+    }
+    if (role.is_default === 1) {
+      throw new Error('默认角色无法删除');
+    }
+
     // 检查是否有机器人正在使用该角色
     const robots = this.database.getRobotsByRole(uuid);
     if (robots.length > 0) {

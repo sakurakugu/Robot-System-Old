@@ -1,8 +1,3 @@
-/**
- * 主题 Store
- * 管理应用的主题设置，支持跟随系统主题
- */
-
 import { defineStore } from 'pinia'
 
 export type Theme = 'light' | 'dark'
@@ -44,7 +39,6 @@ export const useThemeStore = defineStore('theme', {
             }
           }
         } catch {
-          // ignore
         }
       }
       this.setupSystemListener()

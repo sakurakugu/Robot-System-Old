@@ -112,7 +112,18 @@ class WebSocketService {
         uiCount: byChannel.get(channel)!.size,
       });
     } else {
-      // 机器人连接：唯一
+      // 机器人连接：唯一，先关闭旧连接
+      const existingConnections = this.robotConnections.get(robotId);
+      const existingConnection = existingConnections?.get(channel);
+      if (existingConnection && existingConnection.websocket !== ws) {
+        this.logger.info('关闭旧的机器人连接', { robotId, channel });
+        try {
+          existingConnection.websocket.close(1000, '新连接已建立');
+        } catch (e) {
+          // 忽略关闭错误
+        }
+      }
+      
       const connection: RobotConnection = {
         robotId,
         websocket: ws,
@@ -145,8 +156,9 @@ class WebSocketService {
       role: role || 'robot',
     });
 
-    // 仅对机器人客户端发送连接确认消息
-    if (role !== 'ui') {
+    // 仅对机器人客户端的 business 通道发送连接确认消息
+    // 其他通道（control, audio_upload, audio_download）不发送消息
+    if (role !== 'ui' && channel === 'business') {
       this.sendToRobot(robotId, {
         type: 'text_response',
         robotId,
@@ -354,12 +366,38 @@ class WebSocketService {
     try {
       this.logger.info('收到文本输入', { robotId, text, inputType });
 
+      // 检查机器人是否存在
+      const robot = this.database.getRobot(robotId);
+      if (!robot) {
+        throw new Error('机器人不存在');
+      }
+
+      // 检查机器人是否配置了角色
+      if (!robot.role_id) {
+        const errorMsg = '该机器人未配置角色，无法进行对话。请在管理界面为机器人分配一个角色。';
+        this.logger.warn('机器人未配置角色', { robotId });
+        
+        // 发送错误消息到UI
+        this.sendToUI(robotId, {
+          type: 'error',
+          robotId,
+          timestamp: Date.now(),
+          conversationId: traceId,
+          data: {
+            message: errorMsg,
+            code: 'NO_ROLE_CONFIGURED'
+          },
+        }, 'business');
+        
+        return;
+      }
+
       // 使用对话引擎处理
       let systemPrompt: string | undefined = undefined;
       let temperature: number | undefined = undefined;
       let model: string | undefined = undefined;
       let maxHistory: number = 10;
-      const robot = this.database.getRobot(robotId);
+      
       if (robot) {
         // 仅当机器人模型是有效的LLM模型时才传递，否则使用系统配置的默认模型
         const provider = config.llm.provider;
@@ -1023,8 +1061,18 @@ class WebSocketService {
       
       this.logger.info('客户端注册成功', { robotId, name, model });
       
-      // 发送注册确认（广播到UI与机器人）
-      this.broadcastMessage(robotId, {
+      // 发送注册确认 - 仅发送到 business 通道，不要广播到其他通道
+      this.sendToRobot(robotId, {
+        type: 'text_response',
+        robotId,
+        timestamp: Date.now(),
+        data: {
+          text: `客户端注册成功！欢迎 ${name || '机器狗'}`,
+        },
+      }, 'business');
+      
+      // 单独通知 UI
+      this.sendToUI(robotId, {
         type: 'text_response',
         robotId,
         timestamp: Date.now(),

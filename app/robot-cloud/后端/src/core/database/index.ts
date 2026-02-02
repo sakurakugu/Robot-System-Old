@@ -60,6 +60,7 @@ class DatabaseService {
         voice TEXT,
         intent_strategy TEXT,
         max_history INTEGER DEFAULT 10,
+        is_default INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -125,7 +126,80 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_action_logs_executed_at ON action_logs(executed_at);
     `);
 
+    // 数据库迁移：添加 is_default 列（如果不存在）
+    this.migrateDatabase();
+
+    // 初始化默认角色
+    this.initializeDefaultRole();
+
     console.log('数据库初始化完成');
+  }
+
+  /**
+   * 数据库迁移
+   */
+  private migrateDatabase(): void {
+    // 检查 roles 表是否有 is_default 列
+    const tableInfo = this.db.prepare("PRAGMA table_info(roles)").all() as Array<{ name: string }>;
+    const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
+    
+    if (!hasIsDefault) {
+      console.log('正在迁移数据库：添加 is_default 列...');
+      this.db.exec('ALTER TABLE roles ADD COLUMN is_default INTEGER DEFAULT 0');
+      console.log('数据库迁移完成');
+    }
+  }
+
+  /**
+   * 初始化默认角色（如果不存在）
+   */
+  private initializeDefaultRole(): void {
+    const existingDefault = this.db.prepare('SELECT * FROM roles WHERE is_default = 1').get() as RoleRecord | undefined;
+    
+    if (!existingDefault) {
+      const defaultRoleId = 'default-role';
+      const systemPrompt = `你是一只可爱的机器狗AI助手。你可以：
+1. 与用户进行自然对话
+2. 执行一些基本动作来配合对话
+
+可用动作列表：
+- stand_up: 站起来
+- sit_down: 坐下、蹲下、趴下
+- turn_left/turn_right: 转向
+- shake_hand: 握手
+- wave: 挥手
+- nod: 点头
+- dance: 跳舞
+- walk_forward: 前进，最多3步
+- walk_backward: 后退，最多3步
+
+当用户要求你做动作时，请在回复中使用{{action=动作名称}}或{{action=动作名称,参数名=值}}格式，例如：
+- 用户："坐下" -> 回复："好的主人{{action=sit_down}}"
+- 用户："向前走两步" -> 回复："好的，我来走两步{{action=walk_forward,steps=2}}"
+- 用户："转个圈" -> 回复："好的，我来转一圈{{action=turn_left,angle=360}}"
+
+注意事项：
+1. 保持友好、可爱的语气，说话简短一点
+2. 动作要安全，不要让我走太多步
+3. 如果用户要求危险动作，要委婉拒绝
+4. 一次回复中可以包含多个动作标记`;
+
+      const stmt = this.db.prepare(`
+        INSERT INTO roles (uuid, name, description, temperature, system_prompt, max_history, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+      `);
+      
+      stmt.run(
+        defaultRoleId,
+        '默认角色',
+        '系统默认的机器狗AI助手角色，无法删除和修改',
+        0.7,
+        systemPrompt,
+        10
+      );
+      
+      console.log('已创建默认角色');
+    }
   }
 
   // ==================== 设置管理 ====================
@@ -301,10 +375,11 @@ class DatabaseService {
     voice?: string;
     intent_strategy?: string;
     max_history?: number;
+    is_default?: number;
   }): RoleRecord | undefined {
     const stmt = this.db.prepare(`
-      INSERT INTO roles (uuid, name, description, llm_provider, llm_model, temperature, system_prompt, voice, intent_strategy, max_history)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO roles (uuid, name, description, llm_provider, llm_model, temperature, system_prompt, voice, intent_strategy, max_history, is_default)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       data.uuid,
@@ -316,7 +391,8 @@ class DatabaseService {
       data.system_prompt ?? null,
       data.voice ?? null,
       data.intent_strategy ?? null,
-      data.max_history ?? 10
+      data.max_history ?? 10,
+      data.is_default ?? 0
     );
     return this.getRole(data.uuid);
   }

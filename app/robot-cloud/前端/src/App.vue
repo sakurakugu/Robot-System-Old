@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { DevTopFab } from '@/modules/choreo/components';
+import DevTopFab from '@/components/DevTopFab.vue'
 </script>
 
 <style>

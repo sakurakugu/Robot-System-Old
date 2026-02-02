@@ -82,7 +82,10 @@ export class RoleController {
       this.roleService.deleteRole(uuid);
       res.json({ success: true, message: '角色删除成功' });
     } catch (error: any) {
-      const status = error.message.includes('正在使用') ? 400 : 500;
+      let status = 500;
+      if (error.message.includes('正在使用')) status = 400;
+      if (error.message === '默认角色无法删除') status = 403;
+      if (error.message === '角色不存在') status = 404;
       res.status(status).json({ success: false, error: error.message });
     }
   };

@@ -52,6 +52,7 @@ export const LLM_PROVIDERS: LLMProviderOption[] = [
       { value: 'qwen-turbo', label: 'Qwen Turbo' },
       { value: 'qwen-max', label: 'Qwen Max' },
       { value: 'qwen-long', label: 'Qwen Long' },
+      { value: 'qwen-flash', label: 'Qwen Flash' },
     ],
   },
   {

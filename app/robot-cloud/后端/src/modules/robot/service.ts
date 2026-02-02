@@ -11,10 +11,15 @@ import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from 
  * 机器人服务
  */
 export class RobotService {
+  private pythonCommand: string = 'python'; // 默认使用 python
+
   constructor(
     private database: DatabaseService,
     private logger: Logger
-  ) {}
+  ) {
+    // Windows 上通常是 python，Linux/Mac 上通常是 python3
+    this.pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+  }
 
   /**
    * 转换数据库记录为 API 响应格式
@@ -244,7 +249,7 @@ export class RobotService {
     const pythonScript = path.resolve(__dirname, '../../core/scripts/mdns_discover.py');
 
     return new Promise((resolve) => {
-      const p = spawn('python3', [pythonScript, timeout.toString()]);
+      const p = spawn(this.pythonCommand, [pythonScript, timeout.toString()]);
       let stdout = '';
       let stderr = '';
 
@@ -276,7 +281,7 @@ export class RobotService {
 
   private async testSSHConnection(pythonScript: string, ip: string): Promise<boolean> {
     return new Promise((resolve) => {
-      const p = spawn('python3', [pythonScript, 'test', ip]);
+      const p = spawn(this.pythonCommand, [pythonScript, 'test', ip]);
       let stdout = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
       p.on('error', () => resolve(false));
@@ -297,7 +302,7 @@ export class RobotService {
 
   private async executeSSHCommand(pythonScript: string, ip: string, command: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const p = spawn('python3', [pythonScript, 'exec', ip, command]);
+      const p = spawn(this.pythonCommand, [pythonScript, 'exec', ip, command]);
       let stdout = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
       p.on('error', (e) => reject(e));
@@ -322,7 +327,7 @@ export class RobotService {
 
   private async writeSSHFile(pythonScript: string, ip: string, remotePath: string, content: string): Promise<boolean> {
     return new Promise((resolve) => {
-      const p = spawn('python3', [pythonScript, 'write', ip, remotePath, content]);
+      const p = spawn(this.pythonCommand, [pythonScript, 'write', ip, remotePath, content]);
       let stdout = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
       p.on('error', () => resolve(false));
@@ -342,7 +347,7 @@ export class RobotService {
 
   private async copyToRobot(pythonScript: string, ip: string, localPath: string, remotePath: string): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
-      const p = spawn('python3', [pythonScript, 'copy', ip, localPath, remotePath]);
+      const p = spawn(this.pythonCommand, [pythonScript, 'copy', ip, localPath, remotePath]);
       let stdout = '';
       let stderr = '';
       p.stdout.on('data', (d) => { stdout += d.toString(); });
@@ -423,8 +428,8 @@ export class RobotService {
 
     // 复制客户端代码
     this.logger.info('开始复制客户端代码...');
-    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-server');
-    const remoteClientPath = '/home/firefly/sparkrobot/robot-server';
+    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent');
+    const remoteClientPath = '/home/firefly/sparkrobot';
     const copyResult = await this.copyToRobot(pythonScript, robot.ip, localClientPath, remoteClientPath);
     
     if (!copyResult.success) {

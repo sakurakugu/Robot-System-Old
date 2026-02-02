@@ -15,6 +15,7 @@ class TTSService {
   private proc?: ChildProcessWithoutNullStreams;
   private stdoutBuffer = '';
   private pending = new Map<string, PendingRequest>();
+  private pythonCommand: string = process.platform === 'win32' ? 'python' : 'python3';
 
   constructor() {
     this.ensureProcess();
@@ -62,7 +63,7 @@ class TTSService {
       return;
     }
     const scriptPath = path.join(__dirname, '../../core/scripts/edge_tts_runner.py');
-    const proc = spawn('python3', [scriptPath], {
+    const proc = spawn(this.pythonCommand, [scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.proc = proc;

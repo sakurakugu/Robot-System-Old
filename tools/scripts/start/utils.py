@@ -84,7 +84,7 @@ def _log_label(log_path: Path) -> str:
 
 def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Popen, int]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_file = open(log_path, "a", buffering=1)
+    log_file = open(log_path, "a", buffering=1, encoding="utf-8")
     列表 = 根据平台调整命令(list(cmd))
     proc = subprocess.Popen(
         列表,
@@ -92,6 +92,7 @@ def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Pop
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
         bufsize=1,
     )
     if proc.stdout is not None:
@@ -127,7 +128,10 @@ def kill_pid_file(name: str) -> bool:
                 os.kill(pid, 0)
             except ProcessLookupError:
                 break
-            time.sleep(0.1)
+            try:
+                time.sleep(0.1)
+            except KeyboardInterrupt:
+                break
         (PID_DIR / f"{name}.pid").unlink(missing_ok=True)
         return True
     except ProcessLookupError:

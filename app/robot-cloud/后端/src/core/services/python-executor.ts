@@ -39,7 +39,7 @@ export class PythonExecutor extends EventEmitter {
 
   constructor(robotControlPath?: string) {
     super();
-    this.pythonPath = 'python3';
+    this.pythonPath = process.platform === 'win32' ? 'python' : 'python3';
     // 默认使用 dance-choreo 的 robot-control 目录
     this.robotControlPath = robotControlPath || path.join(
       __dirname,

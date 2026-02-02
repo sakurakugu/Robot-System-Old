@@ -82,13 +82,19 @@ def main() -> int:
         time.sleep(2)
         pids = start_all()
         rc = monitor(pids)
-        stop_all()
+        try:
+            stop_all()
+        except KeyboardInterrupt:
+            pass
         return rc
 
     if action == "start":
         pids = start_all()
         rc = monitor(pids)
-        stop_all()
+        try:
+            stop_all()
+        except KeyboardInterrupt:
+            pass
         return rc
 
     show_help()

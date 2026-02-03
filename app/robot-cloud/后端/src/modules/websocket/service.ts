@@ -352,6 +352,7 @@ class WebSocketService {
   /**
    * 统一处理文本（来源: text/audio）
    */
+  // 用户语音 → ASR转文字 → AI模型处理 → 生成回复 → processUserText 函数 → sanitizeTtsText 过滤 → TTS服务
   private async processUserText(
     robotId: string,
     text: string,
@@ -436,6 +437,8 @@ class WebSocketService {
       });
 
       const processingTime = Date.now() - startTime;
+      const ttsText = this.sanitizeTtsText(response.text);
+      const ttsDone = Boolean(ttsText);
 
       // 发送文本回复（广播到机器人和所有UI）
       this.broadcastMessage(robotId, {
@@ -445,11 +448,12 @@ class WebSocketService {
         conversationId: traceId,
         data: {
           text: response.text,
+          ttsDone,
+          noTTS: ttsDone ? undefined : true,
         },
       }, 'business');
 
       try {
-        const ttsText = this.sanitizeTtsText(response.text);
         if (ttsText) {
           const streamEnabled = ttsOptions?.stream !== false;
           if (streamEnabled) {
@@ -560,6 +564,7 @@ class WebSocketService {
     }
   }
 
+  // 直接发送文本 → handleTTSInput 函数 → sanitizeTtsText 过滤 → TTS服务
   private async handleTTSInput(
     robotId: string,
     text: string,
@@ -572,6 +577,14 @@ class WebSocketService {
         this.sendError(robotId, 'RATE_LIMITED', '请求过于频繁，请稍后再试', 'business');
         return;
       }
+      
+      // 对TTS文本进行清理，移除不应该被朗读的标记
+      const sanitizedText = this.sanitizeTtsText(text);
+      if (!sanitizedText) {
+        this.logger.info('TTS跳过：清理后文本为空', { robotId });
+        return;
+      }
+      
       const streamEnabled = ttsOptions?.stream !== false;
       const sessionId = conversationId || uuidv7();
       if (streamEnabled) {
@@ -585,7 +598,7 @@ class WebSocketService {
             format: 'mp3',
           },
         }, 'audio_download');
-        const audio = await this.ttsService.synthesizeStream(text, ttsOptions, (chunk) => {
+        const audio = await this.ttsService.synthesizeStream(sanitizedText, ttsOptions, (chunk) => {
           this.broadcastMessage(robotId, {
             type: 'audio_stream_chunk',
             robotId,
@@ -616,7 +629,7 @@ class WebSocketService {
           data: audio,
         }, 'audio_download');
       } else {
-        const audio = await this.ttsService.synthesize(text, ttsOptions);
+        const audio = await this.ttsService.synthesize(sanitizedText, ttsOptions);
         this.broadcastMessage(robotId, {
           type: 'audio_response',
           robotId,
@@ -916,6 +929,9 @@ class WebSocketService {
     const emojiRegex = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu;
     let result = removeActionTags(text).replace(emojiRegex, '');
     result = result.replace(/[（(][^）)]*(?:注意|提示|警告|说明)[^）)]*[）)]/g, '');
+    
+    // 移除特殊标记如 {{meaning=false}}，这些标记用于控制AI行为但不应被朗读
+    result = result.replace(/\{\{\s*meaning\s*=\s*false\s*\}\}/g, '');
     
     return result.trim();
   }

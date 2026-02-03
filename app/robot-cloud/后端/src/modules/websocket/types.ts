@@ -265,7 +265,8 @@ export interface TextResponseMessage {
   conversationId?: string;
   data: {
     text: string;
-    noTTS?: boolean; // 标记是否需要生成TTS（动作响应不需要）
+    noTTS?: boolean;
+    ttsDone?: boolean;
     actions?: string[];
   };
 }

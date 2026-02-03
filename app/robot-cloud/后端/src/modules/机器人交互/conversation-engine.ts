@@ -59,7 +59,7 @@ class ConversationEngine {
       // 解析动作指令
       const actions = parseActions(responseText);
 
-      // 移除动作标记，得到纯文本回复
+      // 移除动作标记，得到纯文本回复 (测试中，这个先注释掉)
       // const cleanText = removeActionTags(responseText);
       const cleanText = responseText;
 

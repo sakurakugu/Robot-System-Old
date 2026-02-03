@@ -399,23 +399,19 @@ onMessage((data) => {
     messages.value.push(aiMessage)
     scrollToBottom()
 
-    // 不自动转发到机器狗，避免重复
     aiMessage.sendingToRobot = false
     
-    // 检查是否需要生成TTS（动作响应不需要）
-    if (!data.data.noTTS) {
-      setTimeout(() => {
-        const m = messages.value.find(mm => mm.id === aiMessage.id)
-        if (m && !m.audioUrl) {
-          pendingTTS.value.push(m.id)
-          sendTTS(m.text, {
-            voice: ttsVoice.value,
-            speed: ttsSpeed.value,
-            pitch: ttsPitch.value,
-            volume: ttsVolume.value,
-          })
-        }
-      }, 2000)
+    if (!data.data?.noTTS && !data.data?.ttsDone) {
+      const m = messages.value.find(mm => mm.id === aiMessage.id)
+      if (m && !m.audioUrl) {
+        pendingTTS.value.push(m.id)
+        sendTTS(m.text, {
+          voice: ttsVoice.value,
+          speed: ttsSpeed.value,
+          pitch: ttsPitch.value,
+          volume: ttsVolume.value,
+        })
+      }
     }
   } else if (data.type === 'audio_response') {
     try {

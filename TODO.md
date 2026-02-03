@@ -38,12 +38,16 @@ def 构建音频帧消息(
 
 1. 有声音识别不准（从实时转写改成一次性收集完再发送）
 2. 收音太广（要降噪）
+^ 改成了直接让大模型过滤无意义的词语
+
 3. 视觉识别
 4. 移植操作等页面到手机上
 5. 改一下动作的提示词
 6. sdk和遥控切换
 8. 下面的bug
 9. 走路速度等调整
+
+新增5%的电量的时候，让机器狗趴下
 
 [robot-cloud:backend] error: 音频处理失败 {"error":"Opus解码失败","robotId":"019c1c9f-a0fa-72fa-a622-af4ed28aa2b1","service":"robot-cloud","sessionId":"019c1dc9-6518-7637-ae11-823433de6a31","stack":"Error: Opus解码失败\n at WebSocketService.decodeOpusChunksToWav (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:875:13)\n at WebSocketService.handleAudioEnd (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:826:30)\n at WebSocketService.handleMessage (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:258:22)\n at WebSocket.<anonymous> (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:174:12)\n at WebSocket.emit (node:events:508:28)\n at Receiver.receiverOnMessage (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\websocket.js:1225:20)\n at Receiver.emit (node:events:508:28)\n at Receiver.dataMessage (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\receiver.js:596:14)\n at Receiver.getData (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\receiver.js:496:10)\n at Receiver.startLoop (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\receiver.js:167:16)","timestamp":"2026-02-02T17:55:07"}
 [robot-cloud:backend] error: 音频处理失败 {"error":"Opus解码失败","robotId":"019c1c9f-a0fa-72fa-a622-af4ed28aa2b1","service":"robot-cloud","sessionId":"019c1dc9-71a9-766b-928e-807ee4c8dd5e","stack":"Error: Opus解码失败\n at WebSocketService.decodeOpusChunksToWav (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:875:13)\n at WebSocketService.handleAudioEnd (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:826:30)\n at WebSocketService.handleMessage (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:258:22)\n at WebSocket.<anonymous> (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\src\\modules\\websocket\\service.ts:174:12)\n at WebSocket.emit (node:events:508:28)\n at Receiver.receiverOnMessage (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\websocket.js:1225:20)\n at Receiver.emit (node:events:508:28)\n at Receiver.dataMessage (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\receiver.js:596:14)\n at Receiver.getData (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\receiver.js:496:10)\n at Receiver.startLoop (D:\\elric\\Code\\Repos\\robot-dog\\app\\robot-cloud\\后端\\node_modules\\ws\\lib\\receiver.js:167:16)","timestamp":"2026-02-02T17:55:09"}

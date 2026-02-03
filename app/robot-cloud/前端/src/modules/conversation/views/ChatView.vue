@@ -461,6 +461,9 @@ onMessage((data) => {
       }
     } catch {}
   } else if (data.type === 'error') {
+    if (data.data?.code === 'ASR_ERROR' || String(data.data?.message || '').includes('Opus解码失败')) {
+      return
+    }
     const timestamp = Date.now()
     const aiMessage: Message = {
       id: `ai-${timestamp}`,

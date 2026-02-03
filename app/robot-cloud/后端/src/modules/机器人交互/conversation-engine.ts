@@ -1,7 +1,7 @@
-import { parseActions, removeActionTags } from '../../core/utils/helpers';
-import { AIResponse, ConversationContext, Message } from '../../types';
-import ActionController from './action-controller';
-import LLMService from './llm-service';
+import { parseActions, removeActionTags } from "../../core/utils/helpers";
+import { AIResponse, ConversationContext, Message } from "../../types";
+import ActionController from "./action-controller";
+import LLMService from "./llm-service";
 
 class ConversationEngine {
   private llmService: LLMService;
@@ -17,10 +17,10 @@ class ConversationEngine {
   /**
    * 处理用户消息
    */
-  async processMessage(
+  async 处理消息(
     robotId: string,
     userMessage: string,
-    context?: Partial<ConversationContext>
+    context?: Partial<ConversationContext>,
   ): Promise<AIResponse> {
     const startTime = Date.now();
 
@@ -37,22 +37,22 @@ class ConversationEngine {
       // 构建消息列表
       const messages: Message[] = [
         {
-          role: 'system',
-          content: context?.systemPrompt || this.llmService.getSystemPrompt(),
+          role: "system",
+          content: context?.systemPrompt || this.llmService.获取系统提示(),
           timestamp: new Date(),
         },
         ...history,
         {
-          role: 'user',
+          role: "user",
           content: userMessage,
           timestamp: new Date(),
         },
       ];
 
       // 调用LLM
-      const llmResponse = await this.llmService.chat(messages, {
-        model: context?.model || '',
-        temperature: context?.temperature
+      const llmResponse = await this.llmService.对话(messages, {
+        model: context?.model || "",
+        temperature: context?.temperature,
       });
       const responseText = llmResponse.content;
 
@@ -60,33 +60,36 @@ class ConversationEngine {
       const actions = parseActions(responseText);
 
       // 移除动作标记，得到纯文本回复
-      const cleanText = removeActionTags(responseText);
+      // const cleanText = removeActionTags(responseText);
+      const cleanText = responseText;
 
       // 安全检查动作
-      const { validActions, rejectedActions } = this.actionController.validateActions(
+      const { validActions, rejectedActions } = this.actionController.验证动作(
         robotId,
-        actions
+        actions,
       );
 
       // 如果有被拒绝的动作，在回复中说明
       let finalText = cleanText;
       if (rejectedActions.length > 0) {
-        const rejectedNames = rejectedActions.map(r => r.action.name).join('、');
+        const rejectedNames = rejectedActions
+          .map((r) => r.action.name)
+          .join("、");
         finalText += `\n\n（注意：动作"${rejectedNames}"因安全原因无法执行）`;
       }
 
       // 更新对话历史
       history.push(
         {
-          role: 'user',
+          role: "user",
           content: userMessage,
           timestamp: new Date(),
         },
         {
-          role: 'assistant',
+          role: "assistant",
           content: responseText,
           timestamp: new Date(),
-        }
+        },
       );
       this.conversationHistory.set(robotId, history);
 
@@ -102,7 +105,7 @@ class ConversationEngine {
         },
       };
     } catch (error: any) {
-      console.error('处理消息失败:', error);
+      console.error("处理消息失败:", error);
       throw error;
     }
   }
@@ -110,14 +113,14 @@ class ConversationEngine {
   /**
    * 清除对话历史
    */
-  clearHistory(robotId: string): void {
+  清除历史(robotId: string): void {
     this.conversationHistory.delete(robotId);
   }
 
   /**
    * 获取对话历史
    */
-  getHistory(robotId: string): Message[] {
+  获取历史(robotId: string): Message[] {
     return this.conversationHistory.get(robotId) || [];
   }
 }

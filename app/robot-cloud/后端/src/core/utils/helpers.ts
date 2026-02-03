@@ -8,7 +8,7 @@ export { uuidv7 };
  */
 export function parseActions(text: string): Array<{ name: string; parameters: Record<string, any> }> {
   const actions: Array<{ name: string; parameters: Record<string, any> }> = [];
-  const actionRegex = /\{\{action=([a-zA-Z_][a-zA-Z0-9_]*)((?:,[a-zA-Z_][a-zA-Z0-9_]*=[^,}]+)*)\}\}/g;
+  const actionRegex = /\{\{\s*action\s*=\s*([a-zA-Z_][a-zA-Z0-9_]*)((?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*[^,}]+)*)\s*\}\}/g;
   let match;
 
   while ((match = actionRegex.exec(text)) !== null) {
@@ -20,7 +20,7 @@ export function parseActions(text: string): Array<{ name: string; parameters: Re
       
       // 解析参数
       if (paramsStr) {
-        const paramPairs = paramsStr.slice(1).split(','); // 去掉开头的逗号
+        const paramPairs = paramsStr.split(',').map(pair => pair.trim()).filter(Boolean);
         paramPairs.forEach(pair => {
           const [key, value] = pair.split('=').map(s => s.trim());
           if (key && value !== undefined) {
@@ -42,7 +42,7 @@ export function parseActions(text: string): Array<{ name: string; parameters: Re
  * 移除文本中的动作标记
  */
 export function removeActionTags(text: string): string {
-  return text.replace(/\{\{action=([a-zA-Z_][a-zA-Z0-9_]*)((?:,[a-zA-Z_][a-zA-Z0-9_]*=[^,}]+)*)\}\}/g, '').trim();
+  return text.replace(/\{\{\s*action\s*=\s*([a-zA-Z_][a-zA-Z0-9_]*)((?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*[^,}]+)*)\s*\}\}/g, '').trim();
 }
 
 /**

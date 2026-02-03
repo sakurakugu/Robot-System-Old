@@ -8,7 +8,7 @@ export class ConversationController {
     private database: DatabaseService
   ) {}
 
-  private getParam(req: Request, key: string): string {
+  private 获取参数(req: Request, key: string): string {
     const v = (req.params as Record<string, unknown>)[key];
     return Array.isArray(v) ? String(v[0]) : String(v ?? '');
   }
@@ -18,11 +18,11 @@ export class ConversationController {
    */
   getHistory = async (req: Request, res: Response) => {
     try {
-      const robotId = this.getParam(req, 'robotId');
+      const robotId = this.获取参数(req, 'robotId');
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      const conversations = this.conversationService.getHistory(robotId, limit, offset);
+      const conversations = this.conversationService.获取历史(robotId, limit, offset);
 
       res.json({
         success: true,
@@ -36,7 +36,7 @@ export class ConversationController {
       res.status(500).json({
         success: false,
         error: error.message,
-      }); 
+      });
     }
   };
 
@@ -45,7 +45,7 @@ export class ConversationController {
    */
   sendCommand = async (req: Request, res: Response) => {
     try {
-      const robotId = this.getParam(req, 'robotId');
+      const robotId = this.获取参数(req, 'robotId');
       const { text } = req.body || {};
       if (typeof text !== 'string' || text.trim().length === 0) {
         return res.status(400).json({ success: false, error: '缺少文本内容' });

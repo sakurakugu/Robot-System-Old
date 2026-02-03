@@ -8,19 +8,19 @@ export class LLMService {
   /**
    * 调用LLM进行对话
    */
-  async chat(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  async 对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const provider = config.llm.provider;
     switch (provider) {
       case 'openai':
-        return this.chatOpenAI(messages, options);
+        return this.OpenAI对话(messages, options);
       case 'bigmodel':
-        return this.chatBigModel(messages, options);
+        return this.大模型对话(messages, options);
       case 'tongyi':
-        return this.chatTongyi(messages, options);
+        return this.通义对话(messages, options);
       case 'anthropic':
-        return this.chatAnthropic(messages, options);
+        return this.Anthropic对话(messages, options);
       case 'deepseek':
-        return this.chatDeepSeek(messages, options);
+        return this.DeepSeek对话(messages, options);
       default:
         throw new Error(`不支持的LLM提供商: ${provider}`);
     }
@@ -29,7 +29,7 @@ export class LLMService {
   /**
    * OpenAI API调用
    */
-  private async chatOpenAI(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async OpenAI对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = config.llm.providers.openai;
     if (!cfg?.apiKey) {
       throw new Error('OpenAI API密钥未配置');
@@ -78,7 +78,7 @@ export class LLMService {
   /**
    * BigModel API调用 (GLM系列)
    */
-  private async chatBigModel(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async 大模型对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = config.llm.providers.bigmodel;
     if (!cfg?.apiKey) {
       throw new Error('BigModel API密钥未配置');
@@ -138,7 +138,7 @@ export class LLMService {
   /**
    * Tongyi API调用 (Qwen系列)
    */
-  private async chatTongyi(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async 通义对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = config.llm.providers.tongyi;
     if (!cfg?.apiKey) {
       throw new Error('Tongyi API密钥未配置');
@@ -199,7 +199,7 @@ export class LLMService {
   /**
    * Anthropic API调用 (Claude系列)
    */
-  private async chatAnthropic(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async Anthropic对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = config.llm.providers.anthropic;
     if (!cfg?.apiKey) {
       throw new Error('Anthropic API密钥未配置');
@@ -248,7 +248,7 @@ export class LLMService {
   /**
    * DeepSeek API调用
    */
-  private async chatDeepSeek(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async DeepSeek对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = config.llm.providers.deepseek;
     if (!cfg?.apiKey) {
       throw new Error('DeepSeek API密钥未配置');
@@ -293,7 +293,7 @@ export class LLMService {
   /**
    * 构建系统提示词
    */
-  getSystemPrompt(): string {
+  获取系统提示(): string {
     return `你是一只可爱的机器狗AI助手。你可以：
 1. 与用户进行自然对话
 2. 执行一些基本动作来配合对话

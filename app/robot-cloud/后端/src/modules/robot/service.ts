@@ -24,7 +24,7 @@ export class RobotService {
   /**
    * 转换数据库记录为 API 响应格式
    */
-  private toResponse(record: RobotRecord | undefined): RobotResponse | undefined {
+  private 转换响应(record: RobotRecord | undefined): RobotResponse | undefined {
     if (!record) return undefined;
 
     // 解析 tags JSON
@@ -54,30 +54,30 @@ export class RobotService {
   /**
    * 获取所有机器人
    */
-  getAllRobots(): RobotResponse[] {
+  获取所有机器人(): RobotResponse[] {
     return this.database.getAllRobots()
-      .map(r => this.toResponse(r))
+      .map(r => this.转换响应(r))
       .filter((r): r is RobotResponse => r !== undefined);
   }
 
   /**
    * 获取机器人详情
    */
-  getRobot(uuid: string): RobotResponse | undefined {
-    return this.toResponse(this.database.getRobot(uuid));
+  获取机器人(uuid: string): RobotResponse | undefined {
+    return this.转换响应(this.database.getRobot(uuid));
   }
 
   /**
    * 获取所有分组
    */
-  getGroups(): string[] {
+  获取分组(): string[] {
     return this.database.getAllGroups();
   }
 
   /**
    * 创建机器人
    */
-  async createRobot(data: CreateRobotDto): Promise<RobotResponse> {
+  async 创建机器人(data: CreateRobotDto): Promise<RobotResponse> {
     const ip = data.ip || null;
     let uuid: string | null = null;
 
@@ -85,7 +85,7 @@ export class RobotService {
     if (ip) {
       const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
       
-      const canSsh = await this.testSSHConnection(pythonScript, ip);
+      const canSsh = await this.测试SSH连接(pythonScript, ip);
       if (!canSsh) {
         throw new Error(`无法通过SSH连接到 ${ip}`);
       }
@@ -98,7 +98,7 @@ export class RobotService {
       ].join(' && ');
 
       try {
-        const remoteUuid = await this.executeSSHCommand(pythonScript, ip, remoteInitCmd);
+        const remoteUuid = await this.执行SSH命令(pythonScript, ip, remoteInitCmd);
         const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (remoteUuid && uuidPattern.test(remoteUuid)) {
           uuid = remoteUuid;
@@ -113,13 +113,13 @@ export class RobotService {
         this.logger.info(`生成新UUID: ${uuid}`);
         
         const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
-        await this.writeSSHFile(pythonScript, ip, '/home/firefly/sparkrobot/config/config.toml', configToml);
+        await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/config.toml', configToml);
       }
 
       // 复制客户端代码
       const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-agent');
       const remoteClientPath = '/home/firefly/sparkrobot/robot-agent/robot-agent';
-      const copyResult = await this.copyToRobot(pythonScript, ip, localClientPath, remoteClientPath);
+      const copyResult = await this.复制到机器人(pythonScript, ip, localClientPath, remoteClientPath);
       if (!copyResult.success) {
         throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
       }
@@ -141,7 +141,7 @@ export class RobotService {
       registered_at: new Date().toISOString(),
     });
 
-    const result = this.getRobot(finalUuid);
+    const result = this.获取机器人(finalUuid);
     if (!result) {
       throw new Error('创建机器人失败');
     }
@@ -151,7 +151,7 @@ export class RobotService {
   /**
    * 更新机器人
    */
-  updateRobot(uuid: string, data: UpdateRobotDto): RobotResponse {
+  更新机器人(uuid: string, data: UpdateRobotDto): RobotResponse {
     const existing = this.database.getRobot(uuid);
     if (!existing) {
       throw new Error('机器人不存在');
@@ -167,7 +167,7 @@ export class RobotService {
       role_id: data.role_id,
     });
 
-    const result = this.getRobot(uuid);
+    const result = this.获取机器人(uuid);
     if (!result) {
       throw new Error('更新机器人失败');
     }
@@ -177,14 +177,14 @@ export class RobotService {
   /**
    * 删除机器人
    */
-  deleteRobot(uuid: string): void {
+  删除机器人(uuid: string): void {
     this.database.deleteRobot(uuid);
   }
 
   /**
    * 测试连接
    */
-  async testConnection(uuid: string): Promise<{ connected: boolean; message: string }> {
+  async 测试连接(uuid: string): Promise<{ connected: boolean; message: string }> {
     const robot = this.database.getRobot(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
@@ -234,7 +234,7 @@ export class RobotService {
   /**
    * 通过 mDNS 发现机器人
    */
-  async discoverRobots(timeout = 3): Promise<{
+  async 发现机器人(timeout = 3): Promise<{
     success: boolean;
     robots: Array<{
       uuid: string;
@@ -281,7 +281,7 @@ export class RobotService {
 
   // ==================== SSH 辅助方法 ====================
 
-  private async testSSHConnection(pythonScript: string, ip: string): Promise<boolean> {
+  private async 测试SSH连接(pythonScript: string, ip: string): Promise<boolean> {
     return new Promise((resolve) => {
       const p = spawn(this.pythonCommand, [pythonScript, 'test', ip]);
       let stdout = '';
@@ -302,7 +302,7 @@ export class RobotService {
     });
   }
 
-  private async executeSSHCommand(pythonScript: string, ip: string, command: string): Promise<string> {
+  private async 执行SSH命令(pythonScript: string, ip: string, command: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const p = spawn(this.pythonCommand, [pythonScript, 'exec', ip, command]);
       let stdout = '';
@@ -327,7 +327,7 @@ export class RobotService {
     });
   }
 
-  private async writeSSHFile(pythonScript: string, ip: string, remotePath: string, content: string): Promise<boolean> {
+  private async 写入SSH文件(pythonScript: string, ip: string, remotePath: string, content: string): Promise<boolean> {
     return new Promise((resolve) => {
       const p = spawn(this.pythonCommand, [pythonScript, 'write', ip, remotePath, content]);
       let stdout = '';
@@ -347,7 +347,7 @@ export class RobotService {
     });
   }
 
-  private async copyToRobot(pythonScript: string, ip: string, localPath: string, remotePath: string): Promise<{ success: boolean; error?: string }> {
+  private async 复制到机器人(pythonScript: string, ip: string, localPath: string, remotePath: string): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
       const p = spawn(this.pythonCommand, [pythonScript, 'copy', ip, localPath, remotePath]);
       let stdout = '';
@@ -372,7 +372,7 @@ export class RobotService {
   /**
    * 连接机器人
    */
-  async connectRobot(uuid: string): Promise<RobotResponse> {
+  async 连接机器人(uuid: string): Promise<RobotResponse> {
     const robot = this.database.getRobot(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
@@ -383,14 +383,14 @@ export class RobotService {
     }
 
     const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
-    const ok = await this.testSSHConnection(pythonScript, robot.ip);
+    const ok = await this.测试SSH连接(pythonScript, robot.ip);
     
     if (!ok) {
       throw new Error('连接失败');
     }
 
     this.database.updateRobot(uuid, { status: 'online' });
-    const result = this.getRobot(uuid);
+    const result = this.获取机器人(uuid);
     if (!result) {
       throw new Error('更新状态失败');
     }
@@ -400,7 +400,7 @@ export class RobotService {
   /**
    * 更新固件
    */
-  async updateFirmware(uuid: string): Promise<{ robotIp: string }> {
+  async 更新固件(uuid: string): Promise<{ robotIp: string }> {
     const robot = this.database.getRobot(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
@@ -414,7 +414,7 @@ export class RobotService {
 
     // 测试连接
     this.logger.info(`测试连接到 ${robot.ip}...`);
-    const canConnect = await this.testSSHConnection(pythonScript, robot.ip);
+    const canConnect = await this.测试SSH连接(pythonScript, robot.ip);
     if (!canConnect) {
       throw new Error(`无法连接到机器人 ${robot.ip}`);
     }
@@ -423,7 +423,7 @@ export class RobotService {
     this.logger.info('创建远程目录...');
     const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-agent && mkdir -p /home/firefly/sparkrobot/config';
     try {
-      await this.executeSSHCommand(pythonScript, robot.ip, mkdirCmd);
+      await this.执行SSH命令(pythonScript, robot.ip, mkdirCmd);
     } catch {
       throw new Error('创建远程目录失败');
     }
@@ -432,7 +432,7 @@ export class RobotService {
     this.logger.info('开始复制客户端代码...');
     const localClientPath = path.resolve(__dirname, '../../../../../robot-agent');
     const remoteClientPath = '/home/firefly/sparkrobot';
-    const copyResult = await this.copyToRobot(pythonScript, robot.ip, localClientPath, remoteClientPath);
+    const copyResult = await this.复制到机器人(pythonScript, robot.ip, localClientPath, remoteClientPath);
     
     if (!copyResult.success) {
       throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);

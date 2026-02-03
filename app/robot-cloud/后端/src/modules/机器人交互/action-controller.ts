@@ -34,7 +34,7 @@ export class ActionController {
   /**
    * 检查动作是否安全
    */
-  checkActionSafety(robotId: string, action: Action): SafetyCheckResult {
+  检查动作安全(robotId: string, action: Action): SafetyCheckResult {
     // 检查频率限制
     if (!this.rateLimiter.check(robotId)) {
       return {
@@ -92,22 +92,22 @@ export class ActionController {
   /**
    * 安全化动作参数
    */
-  sanitizeAction(action: Action): Action {
-    const checkResult = this.checkActionSafety('sanitize', action);
+  安全化动作参数(action: Action): Action {
+    const checkResult = this.检查动作安全('sanitize', action);
     return checkResult.sanitizedAction || action;
   }
 
   /**
    * 获取允许的动作列表
    */
-  getAllowedActions(): string[] {
+  获取允许动作(): string[] {
     return Array.from(this.ALLOWED_ACTIONS);
   }
 
   /**
    * 验证多个动作
    */
-  validateActions(robotId: string, actions: Action[]): {
+  验证动作(robotId: string, actions: Action[]): {
     validActions: Action[];
     rejectedActions: Array<{ action: Action; reason: string }>;
   } {
@@ -115,7 +115,7 @@ export class ActionController {
     const rejectedActions: Array<{ action: Action; reason: string }> = [];
 
     for (const action of actions) {
-      const checkResult = this.checkActionSafety(robotId, action);
+      const checkResult = this.检查动作安全(robotId, action);
       if (checkResult.safe) {
         validActions.push(checkResult.sanitizedAction || action);
       } else {

@@ -7,7 +7,7 @@ import type { RobotService } from './service';
 export class RobotController {
   constructor(private robotService: RobotService) {}
 
-  private getParam(req: Request, ...keys: string[]): string {
+  private 获取参数(req: Request, ...keys: string[]): string {
     for (const key of keys) {
       const v = (req.params as Record<string, unknown>)[key];
       if (v !== undefined) {
@@ -22,7 +22,7 @@ export class RobotController {
    */
   getAllRobots = async (_req: Request, res: Response) => {
     try {
-      const robots = this.robotService.getAllRobots();
+      const robots = this.robotService.获取所有机器人();
       res.json({ success: true, data: { robots } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -34,7 +34,7 @@ export class RobotController {
    */
   getGroups = async (_req: Request, res: Response) => {
     try {
-      const groups = this.robotService.getGroups();
+      const groups = this.robotService.获取分组();
       res.json({ success: true, data: { groups } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -46,8 +46,8 @@ export class RobotController {
    */
   getRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid', 'robotId');
-      const robot = this.robotService.getRobot(uuid);
+      const uuid = this.获取参数(req, 'uuid', 'robotId');
+      const robot = this.robotService.获取机器人(uuid);
       if (!robot) {
         return res.status(404).json({ success: false, error: '机器人不存在' });
       }
@@ -62,7 +62,7 @@ export class RobotController {
    */
   createRobot = async (req: Request, res: Response) => {
     try {
-      const robot = await this.robotService.createRobot(req.body || {});
+      const robot = await this.robotService.创建机器人(req.body || {});
       res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message.includes('无法') ? 400 : 500;
@@ -75,8 +75,8 @@ export class RobotController {
    */
   updateRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
-      const robot = this.robotService.updateRobot(uuid, req.body || {});
+      const uuid = this.获取参数(req, 'uuid');
+      const robot = this.robotService.更新机器人(uuid, req.body || {});
       res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : 500;
@@ -89,8 +89,8 @@ export class RobotController {
    */
   deleteRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
-      this.robotService.deleteRobot(uuid);
+      const uuid = this.获取参数(req, 'uuid');
+      this.robotService.删除机器人(uuid);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -102,8 +102,8 @@ export class RobotController {
    */
   testConnection = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
-      const result = await this.robotService.testConnection(uuid);
+      const uuid = this.获取参数(req, 'uuid');
+      const result = await this.robotService.测试连接(uuid);
       res.json({ 
         success: result.connected, 
         connected: result.connected,
@@ -120,8 +120,8 @@ export class RobotController {
    */
   connectRobot = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
-      const robot = await this.robotService.connectRobot(uuid);
+      const uuid = this.获取参数(req, 'uuid');
+      const robot = await this.robotService.连接机器人(uuid);
       res.json({ success: true, data: robot, message: '连接成功' });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
@@ -134,8 +134,8 @@ export class RobotController {
    */
   updateFirmware = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
-      const result = await this.robotService.updateFirmware(uuid);
+      const uuid = this.获取参数(req, 'uuid');
+      const result = await this.robotService.更新固件(uuid);
       res.json({ 
         success: true, 
         message: '客户端代码已成功更新到机器人',
@@ -153,7 +153,7 @@ export class RobotController {
   discoverRobots = async (req: Request, res: Response) => {
     try {
       const timeout = Math.max(1, Math.min(10, parseFloat(req.query.timeout as string) || 3));
-      const result = await this.robotService.discoverRobots(timeout);
+      const result = await this.robotService.发现机器人(timeout);
       
       if (result.success) {
         res.json({

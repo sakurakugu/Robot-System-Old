@@ -5,7 +5,7 @@ import config from '../../config';
 import { LLM_PROVIDERS } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
 import type Logger from '../../core/logger';
-import { isValidRobotId, RateLimiter, uuidv7 } from '../../core/utils/helpers';
+import { isValidRobotId, RateLimiter, removeActionTags, uuidv7 } from '../../core/utils/helpers';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import ASRService from '../机器人交互/asr-service';
 import ConversationEngine from '../机器人交互/conversation-engine';
@@ -427,7 +427,7 @@ class WebSocketService {
           }
         }
       }
-      const response = await this.conversationEngine.processMessage(robotId, text, {
+      const response = await this.conversationEngine.处理消息(robotId, text, {
         history: [],
         maxHistory,
         systemPrompt,
@@ -838,8 +838,13 @@ class WebSocketService {
         sessionId,
       });
     } catch (error: any) {
+      const message = error?.message || '语音识别失败';
+      if (String(message).includes('Opus解码失败')) {
+        this.logger.warn('音频解码失败', { robotId, sessionId, message });
+        return;
+      }
       this.logger.error('音频处理失败', error, { robotId, sessionId });
-      this.sendError(robotId, 'ASR_ERROR', error.message || '语音识别失败', 'business');
+      this.sendError(robotId, 'ASR_ERROR', message, 'business');
     }
   }
 
@@ -909,9 +914,7 @@ class WebSocketService {
     
     // 移除表情符号
     const emojiRegex = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu;
-    let result = text.replace(emojiRegex, '');
-    
-    // 移除括号内的注意/提示信息（如"（注意：动作"xxx"因安全原因无法执行）"）
+    let result = removeActionTags(text).replace(emojiRegex, '');
     result = result.replace(/[（(][^）)]*(?:注意|提示|警告|说明)[^）)]*[）)]/g, '');
     
     return result.trim();

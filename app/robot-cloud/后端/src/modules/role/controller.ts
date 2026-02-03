@@ -7,7 +7,7 @@ import type { RoleService } from './service';
 export class RoleController {
   constructor(private roleService: RoleService) {}
 
-  private getParam(req: Request, key: string): string {
+  private 获取参数(req: Request, key: string): string {
     const v = (req.params as Record<string, unknown>)[key];
     return Array.isArray(v) ? String(v[0]) : String(v ?? '');
   }
@@ -29,7 +29,7 @@ export class RoleController {
    */
   getRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
+      const uuid = this.获取参数(req, 'uuid');
       const role = this.roleService.getRole(uuid);
       
       if (!role) {
@@ -64,7 +64,7 @@ export class RoleController {
    */
   updateRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
+      const uuid = this.获取参数(req, 'uuid');
       const role = this.roleService.updateRole(uuid, req.body);
       res.json({ success: true, data: role });
     } catch (error: any) {
@@ -78,7 +78,7 @@ export class RoleController {
    */
   deleteRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
+      const uuid = this.获取参数(req, 'uuid');
       this.roleService.deleteRole(uuid);
       res.json({ success: true, message: '角色删除成功' });
     } catch (error: any) {
@@ -95,7 +95,7 @@ export class RoleController {
    */
   getRobotsByRole = async (req: Request, res: Response) => {
     try {
-      const uuid = this.getParam(req, 'uuid');
+      const uuid = this.获取参数(req, 'uuid');
       const robots = this.roleService.getRobotsByRole(uuid);
       res.json({ success: true, data: robots });
     } catch (error: any) {

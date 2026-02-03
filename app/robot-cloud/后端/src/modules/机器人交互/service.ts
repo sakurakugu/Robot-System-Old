@@ -18,7 +18,7 @@ export class ConversationService {
   /**
    * 处理用户消息
    */
-  async processMessage(
+  async 处理消息(
     robotId: string,
     userMessage: string,
     context?: Partial<ConversationContext>
@@ -39,7 +39,7 @@ export class ConversationService {
       const messages: Message[] = [
         {
           role: 'system',
-          content: context?.systemPrompt || this.llmService.getSystemPrompt(),
+          content: context?.systemPrompt || this.llmService.获取系统提示(),
           timestamp: new Date(),
         },
         ...history,
@@ -51,7 +51,7 @@ export class ConversationService {
       ];
 
       // 调用LLM
-      const llmResponse = await this.llmService.chat(messages, {
+      const llmResponse = await this.llmService.对话(messages, {
         model: context?.model || '',
         temperature: context?.temperature
       });
@@ -64,7 +64,7 @@ export class ConversationService {
       const cleanText = removeActionTags(responseText);
 
       // 安全检查动作
-      const { validActions, rejectedActions } = this.actionController.validateActions(
+      const { validActions, rejectedActions } = this.actionController.验证动作(
         robotId,
         actions
       );
@@ -110,14 +110,14 @@ export class ConversationService {
   /**
    * 获取对话历史
    */
-  getHistory(robotId: string, limit: number = 50, offset: number = 0) {
+  获取历史(robotId: string, limit: number = 50, offset: number = 0) {
     return this.database.getConversations(robotId, limit, offset);
   }
 
   /**
    * 清除对话历史
    */
-  clearHistory(robotId: string) {
+  清除历史(robotId: string) {
     this.conversationHistory.delete(robotId);
     this.database.clearConversations(robotId);
   }

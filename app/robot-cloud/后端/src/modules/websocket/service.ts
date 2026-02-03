@@ -53,7 +53,7 @@ class WebSocketService {
   > = new Map();
   private inputRateLimiter = new RateLimiter(3, 3000);
   private ttsRateLimiter = new RateLimiter(5, 5000);
-  private inputMergeWindowMs = 900;
+  private inputMergeWindowMs = 500;
 
   constructor(logger: Logger, database: DatabaseService) {
     this.logger = logger;

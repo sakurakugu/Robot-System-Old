@@ -6,14 +6,14 @@ export class ActionController {
   private readonly ALLOWED_ACTIONS = new Set([
     'stand_up',
     'sit_down',
-    'turn_left',
-    'turn_right',
     'shake_hand',
     'wave',
     'nod',
     'dance',
     'walk_forward',
     'walk_backward',
+    'jump',
+    'move',
   ]);
 
   // 安全规则
@@ -22,6 +22,7 @@ export class ActionController {
     { action: 'walk_backward', maxValue: 3 },
     { action: 'turn_left', maxValue: 720 },
     { action: 'turn_right', maxValue: 720 },
+    { action: 'move', maxValue: 5 }, // duration最大5秒
   ];
 
   // 频率限制器 (每分钟最多10次动作)
@@ -54,34 +55,83 @@ export class ActionController {
     // 检查参数范围
     const rule = this.SAFETY_RULES.find(r => r.action === action.name);
     if (rule) {
-      // 检查步数、角度等参数
-      const paramValue = action.parameters.steps || action.parameters.angle || action.parameters.value;
-      
-      if (paramValue !== undefined) {
-        if (rule.maxValue && paramValue > rule.maxValue) {
-          // 自动修正参数
-          const sanitizedAction = { ...action };
-          const paramKey = action.parameters.steps !== undefined ? 'steps' 
-            : action.parameters.angle !== undefined ? 'angle' 
-            : 'value';
-          
-          sanitizedAction.parameters = {
-            ...action.parameters,
-            [paramKey]: rule.maxValue,
+      // 特殊处理move动作的参数验证
+      if (action.name === 'move') {
+        const sanitizedAction = { ...action };
+        let modified = false;
+        
+        // 验证速度参数范围
+        if (action.parameters.vx !== undefined) {
+          const vx = Number(action.parameters.vx);
+          if (Math.abs(vx) > 0.3) {
+            sanitizedAction.parameters = { ...action.parameters, vx: Math.sign(vx) * 0.3 };
+            modified = true;
+          }
+        }
+        if (action.parameters.vy !== undefined) {
+          const vy = Number(action.parameters.vy);
+          if (Math.abs(vy) > 0.2) {
+            sanitizedAction.parameters = { ...action.parameters, vy: Math.sign(vy) * 0.2 };
+            modified = true;
+          }
+        }
+        if (action.parameters.yaw_rate !== undefined) {
+          const yaw = Number(action.parameters.yaw_rate);
+          if (Math.abs(yaw) > 0.5) {
+            sanitizedAction.parameters = { ...action.parameters, yaw_rate: Math.sign(yaw) * 0.5 };
+            modified = true;
+          }
+        }
+        
+        // 验证持续时间
+        const duration = Number(action.parameters.duration || 0);
+        if (duration > rule.maxValue!) {
+          sanitizedAction.parameters = { ...sanitizedAction.parameters, duration: rule.maxValue };
+          modified = true;
+        } else if (duration < 0) {
+          return {
+            safe: false,
+            reason: '持续时间不能为负数',
           };
-
+        }
+        
+        if (modified) {
           return {
             safe: true,
-            reason: `参数值超出安全范围，已自动调整为 ${rule.maxValue}`,
+            reason: '参数已自动调整到安全范围',
             sanitizedAction,
           };
         }
+      } else {
+        // 检查步数、角度等参数
+        const paramValue = action.parameters.steps || action.parameters.angle || action.parameters.value;
+        
+        if (paramValue !== undefined) {
+          if (rule.maxValue && paramValue > rule.maxValue) {
+            // 自动修正参数
+            const sanitizedAction = { ...action };
+            const paramKey = action.parameters.steps !== undefined ? 'steps' 
+              : action.parameters.angle !== undefined ? 'angle' 
+              : 'value';
+            
+            sanitizedAction.parameters = {
+              ...action.parameters,
+              [paramKey]: rule.maxValue,
+            };
 
-        if (rule.minValue && paramValue < rule.minValue) {
-          return {
-            safe: false,
-            reason: `参数值低于最小值 ${rule.minValue}`,
-          };
+            return {
+              safe: true,
+              reason: `参数值超出安全范围，已自动调整为 ${rule.maxValue}`,
+              sanitizedAction,
+            };
+          }
+
+          if (rule.minValue && paramValue < rule.minValue) {
+            return {
+              safe: false,
+              reason: `参数值低于最小值 ${rule.minValue}`,
+            };
+          }
         }
       }
     }

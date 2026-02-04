@@ -485,7 +485,7 @@ export class RobotService {
   }
 
   /**
-   * 获取机器人音量
+   * 获取机器人音量（通过WebSocket）
    */
   async 获取音量(uuid: string): Promise<{ volume: number; muted: boolean }> {
     const robot = this.database.getRobot(uuid);
@@ -493,23 +493,26 @@ export class RobotService {
       throw new Error('机器人不存在');
     }
 
-    if (!robot.ip) {
-      throw new Error('缺少机器人IP地址');
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
     }
 
     try {
-      const result = await this.调用机器人API(robot.ip, '/api/v1/volume');
-      if (result.success && result.data) {
-        return result.data;
+      // 通过WebSocket发送获取音量命令并等待响应
+      const result = await this.websocketService.请求获取机器人音量(uuid);
+      
+      if (!result.success || !result.data) {
+        throw new Error(result.error || '获取音量失败');
       }
-      throw new Error(result.error || '获取音量失败');
+
+      return result.data;
     } catch (error: any) {
       throw new Error(`获取音量失败: ${error.message}`);
     }
   }
 
   /**
-   * 设置机器人音量
+   * 设置机器人音量（通过WebSocket）
    */
   async 设置音量(uuid: string, volume: number): Promise<void> {
     const robot = this.database.getRobot(uuid);
@@ -517,8 +520,8 @@ export class RobotService {
       throw new Error('机器人不存在');
     }
 
-    if (!robot.ip) {
-      throw new Error('缺少机器人IP地址');
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
     }
 
     if (volume < 0 || volume > 100) {
@@ -526,10 +529,8 @@ export class RobotService {
     }
 
     try {
-      const result = await this.调用机器人API(robot.ip, '/api/v1/volume', {
-        method: 'POST',
-        body: { volume },
-      });
+      // 通过WebSocket发送设置音量命令并等待响应
+      const result = await this.websocketService.请求设置机器人音量(uuid, volume);
       
       if (!result.success) {
         throw new Error(result.error || '设置音量失败');
@@ -540,7 +541,7 @@ export class RobotService {
   }
 
   /**
-   * 设置机器人静音
+   * 设置机器人静音（通过WebSocket）
    */
   async 设置静音(uuid: string, mute: boolean): Promise<void> {
     const robot = this.database.getRobot(uuid);
@@ -548,15 +549,13 @@ export class RobotService {
       throw new Error('机器人不存在');
     }
 
-    if (!robot.ip) {
-      throw new Error('缺少机器人IP地址');
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
     }
 
     try {
-      const result = await this.调用机器人API(robot.ip, '/api/v1/volume/mute', {
-        method: 'POST',
-        body: { mute },
-      });
+      // 通过WebSocket发送设置静音命令并等待响应
+      const result = await this.websocketService.请求设置机器人静音(uuid, mute);
       
       if (!result.success) {
         throw new Error(result.error || '设置静音失败');
@@ -593,6 +592,60 @@ export class RobotService {
       };
     } catch (error: any) {
       throw new Error(`拍照失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 获取机器人配置（通过WebSocket）
+   */
+  async 获取配置(uuid: string): Promise<any> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
+    }
+
+    try {
+      // 通过WebSocket发送获取配置命令并等待响应
+      const result = await this.websocketService.请求获取机器人配置(uuid);
+      
+      if (!result.success || !result.data) {
+        throw new Error(result.error || '获取配置失败');
+      }
+
+      return result.data;
+    } catch (error: any) {
+      throw new Error(`获取配置失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 更新机器人配置（通过WebSocket）
+   */
+  async 更新配置(uuid: string, config: any): Promise<any> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
+    }
+
+    try {
+      // 通过WebSocket发送更新配置命令并等待响应
+      const result = await this.websocketService.请求更新机器人配置(uuid, config);
+      
+      if (!result.success) {
+        throw new Error(result.error || '更新配置失败');
+      }
+
+      return result.data;
+    } catch (error: any) {
+      throw new Error(`更新配置失败: ${error.message}`);
     }
   }
 }

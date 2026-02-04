@@ -235,4 +235,38 @@ export class RobotController {
       res.status(status).json({ success: false, error: error.message });
     }
   };
+
+  /**
+   * 获取机器人配置
+   */
+  getConfig = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const config = await this.robotService.获取配置(uuid);
+      res.json({ success: true, config });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 更新机器人配置
+   */
+  updateConfig = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const config = req.body;
+      
+      if (!config || typeof config !== 'object') {
+        return res.status(400).json({ success: false, error: '缺少配置数据' });
+      }
+
+      const result = await this.robotService.更新配置(uuid, config);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
 }

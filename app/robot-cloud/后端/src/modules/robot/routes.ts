@@ -28,5 +28,9 @@ export function createRobotRoutes(controller: RobotController): Router {
   // 相机控制
   router.post('/:uuid/camera/capture', controller.capturePhoto);
 
+  // 配置管理
+  router.get('/:uuid/config', controller.getConfig);
+  router.post('/:uuid/config', controller.updateConfig);
+
   return router;
 }

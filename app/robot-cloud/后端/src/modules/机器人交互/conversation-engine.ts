@@ -123,6 +123,77 @@ class ConversationEngine {
   获取历史(robotId: string): Message[] {
     return this.conversationHistory.get(robotId) || [];
   }
+
+  /**
+   * 处理带视觉识别的消息
+   * @param robotId 机器人ID
+   * @param userMessage 用户消息
+   * @param imageBase64 base64编码的图片
+   */
+  async 处理视觉消息(
+    robotId: string,
+    userMessage: string,
+    imageBase64: string
+  ): Promise<AIResponse> {
+    const startTime = Date.now();
+
+    try {
+      // 调用视觉模型进行分析
+      const visionResponse = await this.llmService.视觉分析(userMessage, imageBase64);
+      const responseText = visionResponse.content;
+
+      // 解析动作指令（视觉识别结果中也可能包含动作）
+      const actions = parseActions(responseText);
+
+      // 移除动作标记
+      const cleanText = responseText;
+
+      // 安全检查动作
+      const { validActions, rejectedActions } = this.actionController.验证动作(
+        robotId,
+        actions
+      );
+
+      // 如果有被拒绝的动作，在回复中说明
+      let finalText = cleanText;
+      if (rejectedActions.length > 0) {
+        const rejectedNames = rejectedActions.map((r) => r.action.name).join('、');
+        finalText += `\n\n（注意：动作"${rejectedNames}"因安全原因无法执行）`;
+      }
+
+      // 更新对话历史（记录用户问题和AI回复）
+      const history = this.conversationHistory.get(robotId) || [];
+      history.push(
+        {
+          role: 'user',
+          content: `[视觉识别] ${userMessage}`,
+          timestamp: new Date(),
+        },
+        {
+          role: 'assistant',
+          content: responseText,
+          timestamp: new Date(),
+        }
+      );
+      this.conversationHistory.set(robotId, history);
+
+      const responseTime = Date.now() - startTime;
+
+      return {
+        text: finalText,
+        actions: validActions,
+        metadata: {
+          model: visionResponse.finishReason,
+          tokensUsed: visionResponse.usage.totalTokens,
+          responseTime,
+          vision: true,
+        } as any,
+      };
+    } catch (error: any) {
+      console.error('视觉识别处理失败:', error);
+      throw error;
+    }
+  }
 }
 
 export default ConversationEngine;

@@ -69,6 +69,8 @@ export class Application {
     this.choreoService.setWebSocketService(this.websocketService);
     // 延迟注入 WebSocket 服务到机器人服务
     this.robotService.setWebSocketService(this.websocketService);
+    // 延迟注入 RobotService 到 WebSocket 服务
+    this.websocketService.setRobotService(this.robotService);
   }
 
   /**

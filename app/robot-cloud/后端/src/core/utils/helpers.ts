@@ -46,6 +46,20 @@ export function removeActionTags(text: string): string {
 }
 
 /**
+ * 检测文本中是否包含视觉识别标记
+ */
+export function hasVisionTag(text: string): boolean {
+  return /\{\{\s*vision\s*=\s*true\s*\}\}/i.test(text);
+}
+
+/**
+ * 移除文本中的视觉标记
+ */
+export function removeVisionTags(text: string): string {
+  return text.replace(/\{\{\s*vision\s*=\s*true\s*\}\}/gi, '').trim();
+}
+
+/**
  * 格式化时间戳
  */
 export function formatTimestamp(date: Date): string {

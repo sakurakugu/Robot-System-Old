@@ -5,8 +5,9 @@ import config from '../../config';
 import { LLM_PROVIDERS } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
 import type Logger from '../../core/logger';
-import { isValidRobotId, RateLimiter, removeActionTags, uuidv7 } from '../../core/utils/helpers';
+import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
+import type { RobotService } from '../robot/service';
 import ASRService from '../机器人交互/asr-service';
 import ConversationEngine from '../机器人交互/conversation-engine';
 import TTSService from '../机器人交互/tts-service';
@@ -36,6 +37,7 @@ class WebSocketService {
   private logger: Logger;
   private conversationEngine: ConversationEngine;
   private database: DatabaseService;
+  private robotService?: RobotService;
   private ttsService: TTSService;
   private videoStreamManager: VideoStreamManager;
   private asrService: ASRService;
@@ -62,6 +64,13 @@ class WebSocketService {
     this.ttsService = new TTSService();
     this.videoStreamManager = new VideoStreamManager();
     this.asrService = new ASRService();
+  }
+
+  /**
+   * 设置 RobotService 引用（用于拍照等功能）
+   */
+  setRobotService(robotService: RobotService): void {
+    this.robotService = robotService;
   }
 
   /**
@@ -308,6 +317,7 @@ class WebSocketService {
         'video_subscribe',
         'video_unsubscribe',
         'heartbeat',
+        'camera_response',
       ]),
       audio_upload: new Set(['audio_start', 'audio_chunk', 'audio_end', 'heartbeat']),
       audio_download: new Set(['heartbeat']),
@@ -428,6 +438,8 @@ class WebSocketService {
           }
         }
       }
+
+      // 第一步：调用LLM判断是否需要视觉识别
       const response = await this.conversationEngine.处理消息(robotId, text, {
         history: [],
         maxHistory,
@@ -436,8 +448,87 @@ class WebSocketService {
         temperature
       });
 
+      // 检查回复中是否包含 {{vision=true}} 标记
+      const needsVision = hasVisionTag(response.text);
+      
+      let finalResponse = response;
+      
+      if (needsVision) {
+        this.logger.info('检测到视觉识别需求，开始拍照', { robotId });
+        
+        try {
+          // 检查是否有 robotService
+          if (!this.robotService) {
+            throw new Error('RobotService 未初始化');
+          }
+
+          // 发送状态消息到UI
+          this.sendToUI(robotId, {
+            type: 'vision_status',
+            robotId,
+            timestamp: Date.now(),
+            conversationId: traceId,
+            data: {
+              status: 'capturing',
+              message: '正在拍照...',
+            },
+          }, 'business');
+
+          // 调用拍照功能
+          const photoResult = await this.robotService.拍照(robotId);
+          
+          this.logger.info('拍照成功，开始视觉分析', { robotId });
+
+          // 发送状态消息
+          this.sendToUI(robotId, {
+            type: 'vision_status',
+            robotId,
+            timestamp: Date.now(),
+            conversationId: traceId,
+            data: {
+              status: 'analyzing',
+              message: '正在分析图片...',
+            },
+          }, 'business');
+
+          // 移除视觉标记，得到纯净的LLM回复
+          const cleanedText = removeVisionTags(response.text);
+          
+          // 使用用户原始问题和图片调用视觉模型
+          const visionResponse = await this.conversationEngine.处理视觉消息(
+            robotId,
+            text, // 用户的原始问题
+            photoResult.image
+          );
+
+          finalResponse = visionResponse;
+
+          this.logger.info('视觉分析完成', { robotId });
+        } catch (error: any) {
+          this.logger.error('视觉识别失败', error, { robotId });
+          
+          // 发送错误状态
+          this.sendToUI(robotId, {
+            type: 'vision_status',
+            robotId,
+            timestamp: Date.now(),
+            conversationId: traceId,
+            data: {
+              status: 'error',
+              message: `视觉识别失败: ${error.message}`,
+            },
+          }, 'business');
+
+          // 使用原始回复，但移除视觉标记
+          finalResponse = {
+            ...response,
+            text: removeVisionTags(response.text) + `\n\n（抱歉，我现在看不到周围环境：${error.message}）`,
+          };
+        }
+      }
+
       const processingTime = Date.now() - startTime;
-      const ttsText = this.sanitizeTtsText(response.text);
+      const ttsText = this.sanitizeTtsText(finalResponse.text);
       const ttsDone = Boolean(ttsText);
 
       // 发送文本回复（广播到机器人和所有UI）
@@ -447,9 +538,10 @@ class WebSocketService {
         timestamp: Date.now(),
         conversationId: traceId,
         data: {
-          text: response.text,
+          text: finalResponse.text,
           ttsDone,
           noTTS: ttsDone ? undefined : true,
+          vision: needsVision,
         },
       }, 'business');
 
@@ -933,6 +1025,9 @@ class WebSocketService {
     // 移除特殊标记如 {{meaning=false}}，这些标记用于控制AI行为但不应被朗读
     result = result.replace(/\{\{\s*meaning\s*=\s*false\s*\}\}/g, '');
     
+    // 移除视觉标记 {{vision=true}}
+    result = removeVisionTags(result);
+    
     return result.trim();
   }
 
@@ -1350,6 +1445,226 @@ class WebSocketService {
         try {
           const message = JSON.parse(data.toString());
           if (message.type === 'camera_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求获取机器人音量（用于API调用）
+   */
+  async 请求获取机器人音量(robotId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'volume_get',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送获取音量命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('获取音量请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'volume_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求设置机器人音量（用于API调用）
+   */
+  async 请求设置机器人音量(robotId: string, volume: number): Promise<{ success: boolean; data?: any; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'volume_set',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId, volume },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送设置音量命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('设置音量请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'volume_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求设置机器人静音（用于API调用）
+   */
+  async 请求设置机器人静音(robotId: string, mute: boolean): Promise<{ success: boolean; data?: any; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'volume_mute',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId, mute },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送设置静音命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('设置静音请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'volume_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求获取机器人配置（用于API调用）
+   */
+  async 请求获取机器人配置(robotId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'config_get',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送获取配置命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('获取配置请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'config_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求更新机器人配置（用于API调用）
+   */
+  async 请求更新机器人配置(robotId: string, config: any): Promise<{ success: boolean; data?: any; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'config_update',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId, config },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送更新配置命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('更新配置请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'config_response' && message.data?.requestId === requestId) {
             clearTimeout(timeout);
             connection.websocket.off('message', checkResponse);
             resolve(message.data);

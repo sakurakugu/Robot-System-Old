@@ -27,6 +27,86 @@ export class LLMService {
   }
 
   /**
+   * 调用视觉模型进行分析（通义千问VL）
+   * @param userQuestion 用户的问题
+   * @param imageBase64 base64编码的图片
+   */
+  async 视觉分析(userQuestion: string, imageBase64: string): Promise<LLMResponse> {
+    const cfg = config.llm.providers.tongyi;
+    if (!cfg?.apiKey) {
+      throw new Error('Tongyi API密钥未配置');
+    }
+
+    const baseUrl = cfg.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    const url = `${baseUrl}/chat/completions`;
+
+    try {
+      const response = await axios.post(
+        url,
+        {
+          model: 'qwen-vl-max-latest',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: userQuestion,
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${imageBase64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${cfg.apiKey}`,
+          },
+          timeout: 30000,
+        }
+      );
+
+      const choice = response.data?.choices?.[0];
+      return {
+        content: choice?.message?.content || '',
+        finishReason: choice?.finish_reason || 'stop',
+        usage: {
+          promptTokens: response.data?.usage?.prompt_tokens || 0,
+          completionTokens: response.data?.usage?.completion_tokens || 0,
+          totalTokens: response.data?.usage?.total_tokens || 0,
+        },
+      };
+    } catch (error: any) {
+      const errorData = error.response?.data;
+      console.error('Tongyi Vision API调用失败:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: errorData,
+        message: error.message,
+      });
+
+      let errorMessage = error.message;
+      if (errorData?.error) {
+        errorMessage = errorData.error.message || errorData.error.code || JSON.stringify(errorData.error);
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      }
+
+      throw new Error(`视觉模型调用失败: ${errorMessage}`);
+    }
+  }
+
+  /**
    * OpenAI API调用
    */
   private async OpenAI对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
@@ -321,6 +401,12 @@ export class LLMService {
 - 用户："向右移动" -> 回复："好的，我向右移{{action=move,vy=-0.2,duration=2}}"
 - 用户："左转" -> 回复："好的，我左转{{action=move,yaw_rate=0.3,duration=2}}"
 - 用户："右转" -> 回复："好的，我右转{{action=move,yaw_rate=-0.3,duration=2}}"
+
+move动作参数说明：
+- vx: 前后速度（-0.3到0.3，正数向前，负数向后）
+- vy: 左右速度（-0.2到0.2，正数向左，负数向右）
+- yaw_rate: 转向角速度（-0.5到0.5，正数左转，负数右转）
+- duration: 持续时间（秒），建议1-3秒
 
 move动作参数说明：
 - vx: 前后速度（-0.3到0.3，正数向前，负数向后）

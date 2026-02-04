@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 
 export interface VideoStreamOptions {
@@ -150,8 +150,8 @@ export class VideoStreamManager {
     if (!streamData) {
       const service = new VideoStreamService({
         rtspUrl,
-        width: 640,
-        height: 480,
+        width: 1920,
+        height: 1080,
         fps: 15,
         quality: 75,
       });

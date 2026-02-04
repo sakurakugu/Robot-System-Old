@@ -40,12 +40,23 @@ export class LLMService {
     const baseUrl = cfg.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     const url = `${baseUrl}/chat/completions`;
 
+    // 构建系统提示词
+    const systemPrompt = `你是一只机器狗，现在通过摄像头看到眼前的画面。
+回答要求：
+1. 以第一人称描述你看到的内容（例如："我看到..."），这是你自己的视角，不要说"图片中"、"照片里"之类的话
+2. 语言简短精炼，只说关键信息，避免冗余描述
+3. 重点关注用户问题相关的内容`;
+
     try {
       const response = await axios.post(
         url,
         {
-          model: 'qwen-vl-max-latest',
+          model: 'qwen-vl-plus',
           messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
             {
               role: 'user',
               content: [

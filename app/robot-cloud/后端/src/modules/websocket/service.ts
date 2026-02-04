@@ -877,6 +877,7 @@ class WebSocketService {
     const sessionId = String(audioData?.sessionId || '');
     const buffer = audioData?.buffer;
     if (!buffer) {
+      this.logger.debug('音频块数据为空', { robotId, sessionId });
       return;
     }
     let session = sessionId ? this.audioSessions.get(sessionId) : undefined;
@@ -897,10 +898,22 @@ class WebSocketService {
     }
 
     try {
-      session.chunks.push(Buffer.from(buffer, 'base64'));
-      session.lastChunkAt = Date.now();
+      const chunk = Buffer.from(buffer, 'base64');
+      if (chunk.length > 0) {
+        this.logger.debug('接收音频块', {
+          robotId,
+          sessionId,
+          chunkLength: chunk.length,
+          base64Length: buffer.length,
+          totalChunks: session.chunks.length + 1
+        });
+        session.chunks.push(chunk);
+        session.lastChunkAt = Date.now();
+      } else {
+        this.logger.debug('音频块长度为0', { robotId, sessionId });
+      }
     } catch (e) {
-      this.logger.warn('音频块解码失败', { robotId, sessionId, error: String(e) });
+      this.logger.warn('音频块解码失败', { robotId, sessionId, error: String(e), bufferType: typeof buffer });
     }
   }
 
@@ -925,6 +938,13 @@ class WebSocketService {
       return;
     }
 
+    // 检查是否所有 chunks 都是空的
+    const validChunks = session.chunks.filter(chunk => chunk && chunk.length > 0);
+    if (validChunks.length === 0) {
+      this.logger.warn('音频会话所有数据块都为空', { robotId, sessionId, totalChunks: session.chunks.length });
+      return;
+    }
+
     const durationMs = session.frameDurationMs * session.chunks.length;
     const asrStart = Date.now();
     try {
@@ -945,7 +965,14 @@ class WebSocketService {
     } catch (error: any) {
       const message = error?.message || '语音识别失败';
       if (String(message).includes('Opus解码失败')) {
-        this.logger.warn('音频解码失败', { robotId, sessionId, message });
+        this.logger.warn('Opus解码失败', { 
+          robotId, 
+          sessionId, 
+          chunks: session.chunks.length,
+          sampleRate: session.sampleRate,
+          channels: session.channels,
+          frameDurationMs: session.frameDurationMs
+        });
         return;
       }
       this.logger.error('音频处理失败', error, { robotId, sessionId });
@@ -959,11 +986,23 @@ class WebSocketService {
     const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
     const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
     const frameSize = Math.floor((sr * fd) / 1000);
-    const decoder = new (OpusScript as any)(
-      sr,
-      ch,
-      (OpusScript as any).Application.VOIP
-    );
+    
+    let decoder: any;
+    try {
+      decoder = new (OpusScript as any)(
+        sr,
+        ch,
+        (OpusScript as any).Application.VOIP
+      );
+    } catch (error) {
+      this.logger.error('Opus解码器初始化失败', { 
+        error: String(error),
+        sampleRate: sr,
+        channels: ch,
+        sessionId: session.sessionId
+      });
+      throw new Error('Opus解码失败');
+    }
 
     const pcmBuffers: Uint8Array[] = [];
     const toUint8Array = (value: any): Uint8Array => {
@@ -972,17 +1011,68 @@ class WebSocketService {
       return new Uint8Array(value);
     };
 
-    for (const chunk of session.chunks) {
-      if (!chunk || chunk.length === 0) continue;
+    let successCount = 0;
+    let failCount = 0;
+    for (let i = 0; i < session.chunks.length; i++) {
+      const chunk = session.chunks[i];
+      if (!chunk || chunk.length === 0) {
+        this.logger.debug('跳过空音频块', { sessionId: session.sessionId, index: i });
+        continue;
+      }
       try {
+        // 记录音频块的详细信息
+        this.logger.debug('尝试解码音频块', {
+          sessionId: session.sessionId,
+          index: i,
+          chunkLength: chunk.length,
+          expectedFrameSize: frameSize,
+          // 前16字节的十六进制，用于诊断
+          hexPreview: chunk.slice(0, Math.min(16, chunk.length)).toString('hex')
+        });
+        
         const decoded = decoder.decode(chunk, frameSize);
-        pcmBuffers.push(toUint8Array(decoded));
-      } catch {
+        if (decoded && decoded.length > 0) {
+          pcmBuffers.push(toUint8Array(decoded));
+          successCount++;
+          this.logger.debug('音频块解码成功', {
+            sessionId: session.sessionId,
+            index: i,
+            decodedLength: decoded.length
+          });
+        }
+      } catch (error) {
+        failCount++;
+        this.logger.warn('音频块解码失败', { 
+          sessionId: session.sessionId, 
+          index: i,
+          chunkLength: chunk.length,
+          expectedFrameSize: frameSize,
+          error: String(error),
+          errorStack: error instanceof Error ? error.stack : undefined
+        });
       }
     }
 
     if (pcmBuffers.length === 0) {
+      this.logger.warn('Opus解码失败：所有音频块解码失败', {
+        sessionId: session.sessionId,
+        totalChunks: session.chunks.length,
+        failCount,
+        sampleRate: sr,
+        channels: ch,
+        frameDurationMs: fd,
+        frameSize
+      });
       throw new Error('Opus解码失败');
+    }
+
+    if (failCount > 0) {
+      this.logger.debug('部分音频块解码失败', {
+        sessionId: session.sessionId,
+        successCount,
+        failCount,
+        totalChunks: session.chunks.length
+      });
     }
 
     const pcmData = Buffer.concat(pcmBuffers);

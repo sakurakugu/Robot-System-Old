@@ -59,7 +59,8 @@ export type ClientMessage =
   | ControlInputMessage
   | AudioControlMessage
   | SdkModeSetMessage
-  | SdkModeGetMessage;
+  | SdkModeGetMessage
+  | SdkModeResponseMessage;
 
 export interface SdkModeSetMessage {
   type: 'sdk_mode_set';
@@ -75,6 +76,16 @@ export interface SdkModeGetMessage {
   robotId: string;
   timestamp: number;
   data?: any;
+}
+
+export interface SdkModeResponseMessage {
+  type: 'sdk_mode_response';
+  robotId: string;
+  timestamp: number;
+  data: {
+    mode: number;
+    result: 'success' | 'failure';
+  };
 }
 
 export interface AudioStartMessage {

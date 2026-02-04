@@ -1017,7 +1017,6 @@ const loadTimelineData = (data: { tracks?: any[]; config?: Partial<TimelineConfi
       ...track,
       type: track.type === 'audio' ? TrackType.AUDIO
         : track.type === 'action' ? TrackType.ACTION
-        : track.type === 'keyframe' ? TrackType.KEYFRAME
         : track.type, // 如果已经是枚举值则保留
       locked: track.locked ?? false,
       visible: track.visible ?? true,

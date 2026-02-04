@@ -326,7 +326,8 @@ export type ClientMessage =
   | ControlInputMessage
   | AudioControlMessage
   | SdkModeSetMessage
-  | SdkModeGetMessage;
+  | SdkModeGetMessage
+  | SdkModeResponseMessage;
 
 export interface SdkModeSetMessage extends BaseClientMessage {
   type: 'sdk_mode_set';
@@ -338,6 +339,14 @@ export interface SdkModeSetMessage extends BaseClientMessage {
 export interface SdkModeGetMessage extends BaseClientMessage {
   type: 'sdk_mode_get';
   data?: any;
+}
+
+export interface SdkModeResponseMessage extends BaseClientMessage {
+  type: 'sdk_mode_response';
+  data: {
+    mode: number;
+    result: 'success' | 'failure';
+  };
 }
 
 // 服务端消息

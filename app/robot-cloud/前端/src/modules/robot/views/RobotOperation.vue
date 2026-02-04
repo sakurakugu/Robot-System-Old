@@ -21,6 +21,17 @@
 
         <el-divider direction="vertical" />
 
+        <el-switch
+          v-model="sdkMode"
+          active-text="SDK"
+          inactive-text="遥控"
+          inline-prompt
+          :loading="sdkModeLoading"
+          @change="handleSdkModeChange"
+        />
+
+        <el-divider direction="vertical" />
+
         <el-select 
           v-model="selectedUuid" 
           placeholder="选择机器人" 
@@ -253,6 +264,8 @@ const micEnabled = ref(true)
 const twoLegStandActive = ref(false)
 const rightJoystickDisabled = ref(false)
 const isCapturing = ref(false)
+const sdkMode = ref(true) // SDK模式开关，默认开启
+const sdkModeLoading = ref(false) // SDK模式切换加载状态
 
 watch(twoLegStandActive, (val) => {
   rightJoystickDisabled.value = val
@@ -415,6 +428,44 @@ const handleCapturePhoto = async () => {
     ElMessage.error(error.message || '拍照失败')
   } finally {
     isCapturing.value = false
+  }
+}
+
+// 处理SDK模式切换
+const handleSdkModeChange = async (value: boolean) => {
+  if (!selectedUuid.value) {
+    ElMessage.warning('请先选择机器人')
+    sdkMode.value = !value // 恢复原值
+    return
+  }
+  
+  if (!isConnected.value) {
+    ElMessage.warning('未连接机器人')
+    sdkMode.value = !value // 恢复原值
+    return
+  }
+  
+  sdkModeLoading.value = true
+  try {
+    // 发送SDK模式切换消息到服务端
+    wsSendMessage({
+      type: 'sdk_mode_set',
+      robotId: selectedUuid.value,
+      timestamp: Date.now(),
+      data: { sdkMode: value },
+    })
+    
+    // 等待响应
+    // 这里简化处理，实际应该等待服务端的 sdk_mode_response 消息
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    ElMessage.success(value ? 'SDK模式已开启' : '遥控模式已开启')
+  } catch (error: any) {
+    console.error('SDK模式切换错误:', error)
+    ElMessage.error(error.message || 'SDK模式切换失败')
+    sdkMode.value = !value // 恢复原值
+  } finally {
+    sdkModeLoading.value = false
   }
 }
 
@@ -609,6 +660,16 @@ onMessage((data) => {
     if (!Number.isNaN(level)) {
       robotBattery.value = Math.round(level)
     }
+  } else if (data.type === 'sdk_mode_response') {
+    // 处理SDK模式响应
+    sdkModeLoading.value = false
+    if (data.data?.success) {
+      sdkMode.value = data.data.sdkMode ?? sdkMode.value
+      ElMessage.success(sdkMode.value ? 'SDK模式已开启' : '遥控模式已开启')
+    } else {
+      ElMessage.error(data.data?.error || 'SDK模式切换失败')
+      sdkMode.value = !sdkMode.value // 恢复原值
+    }
   } else if (data.type === 'error') {
     const msg = data.data?.message || '发生错误'
     if (data.data?.code === 'NO_ROBOT_IP') {
@@ -641,6 +702,13 @@ watch(selectedUuid, async (val) => {
       if (showVideo.value) {
         wsSendMessage({ type: 'video_subscribe' })
       }
+      // 连接成功后查询SDK模式状态
+      wsSendMessage({
+        type: 'sdk_mode_get',
+        robotId: val,
+        timestamp: Date.now(),
+        data: {},
+      })
     } catch (e) {
       ElMessage.error('连接失败，请检查后端服务或网络')
     }

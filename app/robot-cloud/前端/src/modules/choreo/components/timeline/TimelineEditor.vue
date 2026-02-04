@@ -9,9 +9,6 @@
             <el-button size="small" @click="addTrack(TrackType.ACTION)">
               <el-icon><Plus /></el-icon> 动作轨道
             </el-button>
-            <el-button size="small" @click="addTrack(TrackType.KEYFRAME)">
-              <el-icon><Plus /></el-icon> 关键帧轨道
-            </el-button>
             <el-button size="small" @click="addTrack(TrackType.AUDIO)">
               <el-icon><Plus /></el-icon> 音频轨道
             </el-button>
@@ -95,7 +92,7 @@
                 <div class="track-name" @dblclick="editTrackName(track.id)">{{ track.name }}</div>
                 <div class="track-badges">
                   <div class="track-type-badge" :class="track.type">
-                    {{ track.type === TrackType.AUDIO ? '音频' : track.type === TrackType.ACTION ? '动作' : '关键帧' }}
+                    {{ track.type === TrackType.AUDIO ? '音频' : '动作' }}
                   </div>
                   <!-- 动作轨道的机器狗绑定状态 -->
                   <div v-if="track.type === TrackType.ACTION" class="robot-binding" @click.stop="selectRobotForTrack(track.id)">
@@ -123,15 +120,6 @@
                   @add-block="addActionBlock(track.id)"
                   @select-block="selectBlock(track.id, $event)"
                   @edit-block="editActionBlock(track.id, $event)"
-                />
-
-                <!-- 关键帧轨道 -->
-                <KeyframeTrack
-                  v-if="track.type === TrackType.KEYFRAME"
-                  :track="track"
-                  :config="config"
-                  @update:keyframes="updateTrackKeyframes(track.id, $event)"
-                  @add-keyframe="addKeyframe(track.id, $event)"
                 />
 
                 <!-- 音频轨道 -->
@@ -248,7 +236,6 @@ import {
     TrackType,
     type ActionBlock,
     type HistoryRecord,
-    type Keyframe,
     type Robot,
     type TimelineConfig,
     type Track,
@@ -256,7 +243,6 @@ import {
 import ActionSelectorDialog from './ActionSelectorDialog.vue'
 import ActionTrack from './ActionTrack.vue'
 import AudioTrack from './AudioTrack.vue'
-import KeyframeTrack from './KeyframeTrack.vue'
 
 // Props
 const props = defineProps<{
@@ -324,7 +310,6 @@ const playheadLayer = ref<HTMLElement>()
 // 计数器
 let trackIdCounter = 0
 let blockIdCounter = 0
-let keyframeIdCounter = 0
 let historyIdCounter = 0
 
 // 计算时间轴宽度
@@ -528,16 +513,6 @@ const applyHistoryReverse = (record: HistoryRecord) => {
         }
       }
       break
-    case HistoryActionType.ADD_KEYFRAME:
-    case HistoryActionType.DELETE_KEYFRAME:
-    case HistoryActionType.UPDATE_KEYFRAME:
-      if (record.trackId && record.data.before) {
-        const track = tracks.value.find((t) => t.id === record.trackId)
-        if (track && track.type === TrackType.KEYFRAME) {
-          track.keyframes = JSON.parse(JSON.stringify(record.data.before))
-        }
-      }
-      break
     case HistoryActionType.UPDATE_AUDIO:
       if (record.trackId && record.data.before !== undefined) {
         const track = tracks.value.find((t) => t.id === record.trackId)
@@ -576,16 +551,6 @@ const applyHistoryForward = (record: HistoryRecord) => {
         const track = tracks.value.find((t) => t.id === record.trackId)
         if (track && track.type === TrackType.ACTION) {
           track.blocks = JSON.parse(JSON.stringify(record.data.after))
-        }
-      }
-      break
-    case HistoryActionType.ADD_KEYFRAME:
-    case HistoryActionType.DELETE_KEYFRAME:
-    case HistoryActionType.UPDATE_KEYFRAME:
-      if (record.trackId && record.data.after) {
-        const track = tracks.value.find((t) => t.id === record.trackId)
-        if (track && track.type === TrackType.KEYFRAME) {
-          track.keyframes = JSON.parse(JSON.stringify(record.data.after))
         }
       }
       break
@@ -674,14 +639,13 @@ const addTrack = (type: TrackType) => {
   trackIdCounter++
   const track: Track = {
     id: `track-${trackIdCounter}`,
-    name: `${type === TrackType.AUDIO ? '音频' : type === TrackType.ACTION ? '动作' : '关键帧'}轨道 ${trackIdCounter}`,
+    name: `${type === TrackType.AUDIO ? '音频' : '动作'}轨道 ${trackIdCounter}`,
     type,
     robotId: type === TrackType.ACTION && props.selectedRobot ? props.selectedRobot : undefined,
     locked: false,
     visible: true,
     height: type === TrackType.AUDIO ? 100 : 85,
     blocks: type === TrackType.ACTION ? [] : undefined,
-    keyframes: type === TrackType.KEYFRAME ? [] : undefined,
     audioUrl: type === TrackType.AUDIO ? undefined : undefined,
   }
   tracks.value.push(track)
@@ -944,52 +908,6 @@ const handleActionSelected = (action: { actionType: string; actionName: string; 
   editingBlockId.value = null
   editingActionData.value = undefined
   maxDurationLimit.value = undefined
-}
-
-// 更新关键帧
-const updateTrackKeyframes = (trackId: string, keyframes: Keyframe[]) => {
-  const track = tracks.value.find((t) => t.id === trackId)
-  if (track && track.type === TrackType.KEYFRAME) {
-    const oldKeyframes = JSON.parse(JSON.stringify(track.keyframes || []))
-    track.keyframes = keyframes
-    emit('update:tracks', tracks.value)
-
-    const record = createHistoryRecord(
-      HistoryActionType.UPDATE_KEYFRAME,
-      `更新${track.name}中的关键帧`,
-      { before: oldKeyframes, after: keyframes },
-      trackId,
-      track.name
-    )
-    addHistoryRecord(record)
-  }
-}
-
-// 添加关键帧
-const addKeyframe = (trackId: string, time: number) => {
-  const track = tracks.value.find((t) => t.id === trackId)
-  if (track && track.type === TrackType.KEYFRAME) {
-    keyframeIdCounter++
-    const newKeyframe: Keyframe = {
-      id: `keyframe-${keyframeIdCounter}`,
-      time,
-      value: 0.5,
-      easing: 'linear',
-    }
-
-    const oldKeyframes = JSON.parse(JSON.stringify(track.keyframes || []))
-    track.keyframes = [...(track.keyframes || []), newKeyframe]
-    emit('update:tracks', tracks.value)
-
-    const record = createHistoryRecord(
-      HistoryActionType.ADD_KEYFRAME,
-      `在${track.name}中添加关键帧`,
-      { before: oldKeyframes, after: track.keyframes },
-      trackId,
-      track.name
-    )
-    addHistoryRecord(record)
-  }
 }
 
 // 更新音频
@@ -1426,10 +1344,7 @@ defineExpose({
   color: #000;
 }
 
-.track-type-badge.keyframe {
-  background: #ce9178;
-  color: #000;
-}
+/* keyframe css removed */
 
 .robot-binding {
   font-size: 10px;

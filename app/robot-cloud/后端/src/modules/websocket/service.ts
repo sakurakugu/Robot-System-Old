@@ -296,6 +296,19 @@ class WebSocketService {
           await this.handleControlInput(robotId, (message as any).data);
           break;
 
+        case 'sdk_mode_set':
+          await this.handleSdkModeSet(robotId, (message as any).data);
+          break;
+
+        case 'sdk_mode_get':
+          await this.handleSdkModeGet(robotId);
+          break;
+
+        // SDK模式响应（来自robot-agent，需要转发到UI）
+        case 'sdk_mode_response':
+          await this.handleSdkModeResponse(robotId, (message as any).data);
+          break;
+
         default:
           this.logger.warn('未知的消息类型', { robotId, type: (message as any).type });
       }
@@ -318,6 +331,11 @@ class WebSocketService {
         'video_unsubscribe',
         'heartbeat',
         'camera_response',
+        'sdk_mode_set',
+        'sdk_mode_get',
+        'sdk_mode_response',
+        'volume_response',
+        'config_response',
       ]),
       audio_upload: new Set(['audio_start', 'audio_chunk', 'audio_end', 'heartbeat']),
       audio_download: new Set(['heartbeat']),
@@ -995,8 +1013,7 @@ class WebSocketService {
         (OpusScript as any).Application.VOIP
       );
     } catch (error) {
-      this.logger.error('Opus解码器初始化失败', { 
-        error: String(error),
+      this.logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), { 
         sampleRate: sr,
         channels: ch,
         sessionId: session.sessionId
@@ -1004,79 +1021,89 @@ class WebSocketService {
       throw new Error('Opus解码失败');
     }
 
-    const pcmBuffers: Uint8Array[] = [];
-    const toUint8Array = (value: any): Uint8Array => {
-      if (value instanceof Uint8Array) return value;
-      if (value?.buffer) return new Uint8Array(value.buffer);
-      return new Uint8Array(value);
-    };
+    try {
+      const pcmBuffers: Uint8Array[] = [];
+      const toUint8Array = (value: any): Uint8Array => {
+        if (value instanceof Uint8Array) return value;
+        if (value?.buffer) return new Uint8Array(value.buffer);
+        return new Uint8Array(value);
+      };
 
-    let successCount = 0;
-    let failCount = 0;
-    for (let i = 0; i < session.chunks.length; i++) {
-      const chunk = session.chunks[i];
-      if (!chunk || chunk.length === 0) {
-        this.logger.debug('跳过空音频块', { sessionId: session.sessionId, index: i });
-        continue;
-      }
-      try {
-        // 记录音频块的详细信息
-        this.logger.debug('尝试解码音频块', {
-          sessionId: session.sessionId,
-          index: i,
-          chunkLength: chunk.length,
-          expectedFrameSize: frameSize,
-          // 前16字节的十六进制，用于诊断
-          hexPreview: chunk.slice(0, Math.min(16, chunk.length)).toString('hex')
-        });
-        
-        const decoded = decoder.decode(chunk, frameSize);
-        if (decoded && decoded.length > 0) {
-          pcmBuffers.push(toUint8Array(decoded));
-          successCount++;
-          this.logger.debug('音频块解码成功', {
+      let successCount = 0;
+      let failCount = 0;
+      for (let i = 0; i < session.chunks.length; i++) {
+        const chunk = session.chunks[i];
+        if (!chunk || chunk.length === 0) {
+          this.logger.debug('跳过空音频块', { sessionId: session.sessionId, index: i });
+          continue;
+        }
+        try {
+          // 记录音频块的详细信息
+          this.logger.debug('尝试解码音频块', {
             sessionId: session.sessionId,
             index: i,
-            decodedLength: decoded.length
+            chunkLength: chunk.length,
+            expectedFrameSize: frameSize,
+            // 前16字节的十六进制，用于诊断
+            hexPreview: chunk.slice(0, Math.min(16, chunk.length)).toString('hex')
+          });
+          
+          const decoded = decoder.decode(chunk, frameSize);
+          if (decoded && decoded.length > 0) {
+            pcmBuffers.push(toUint8Array(decoded));
+            successCount++;
+            this.logger.debug('音频块解码成功', {
+              sessionId: session.sessionId,
+              index: i,
+              decodedLength: decoded.length
+            });
+          }
+        } catch (error) {
+          failCount++;
+          this.logger.warn('音频块解码失败', { 
+            sessionId: session.sessionId, 
+            index: i,
+            chunkLength: chunk.length,
+            expectedFrameSize: frameSize,
+            error: String(error),
+            errorStack: error instanceof Error ? error.stack : undefined
           });
         }
-      } catch (error) {
-        failCount++;
-        this.logger.warn('音频块解码失败', { 
-          sessionId: session.sessionId, 
-          index: i,
-          chunkLength: chunk.length,
-          expectedFrameSize: frameSize,
-          error: String(error),
-          errorStack: error instanceof Error ? error.stack : undefined
+      }
+
+      if (pcmBuffers.length === 0) {
+        this.logger.warn('Opus解码失败：所有音频块解码失败', {
+          sessionId: session.sessionId,
+          totalChunks: session.chunks.length,
+          failCount,
+          sampleRate: sr,
+          channels: ch,
+          frameDurationMs: fd,
+          frameSize
+        });
+        throw new Error('Opus解码失败');
+      }
+
+      if (failCount > 0) {
+        this.logger.debug('部分音频块解码失败', {
+          sessionId: session.sessionId,
+          successCount,
+          failCount,
+          totalChunks: session.chunks.length
         });
       }
-    }
 
-    if (pcmBuffers.length === 0) {
-      this.logger.warn('Opus解码失败：所有音频块解码失败', {
-        sessionId: session.sessionId,
-        totalChunks: session.chunks.length,
-        failCount,
-        sampleRate: sr,
-        channels: ch,
-        frameDurationMs: fd,
-        frameSize
-      });
-      throw new Error('Opus解码失败');
+      const pcmData = Buffer.concat(pcmBuffers);
+      return this.buildWavBuffer(pcmData, sr, ch);
+    } finally {
+      if (decoder) {
+        try {
+          decoder.delete();
+        } catch (e) {
+          this.logger.error('Opus解码器释放失败', e instanceof Error ? e : new Error(String(e)));
+        }
+      }
     }
-
-    if (failCount > 0) {
-      this.logger.debug('部分音频块解码失败', {
-        sessionId: session.sessionId,
-        successCount,
-        failCount,
-        totalChunks: session.chunks.length
-      });
-    }
-
-    const pcmData = Buffer.concat(pcmBuffers);
-    return this.buildWavBuffer(pcmData, sr, ch);
   }
 
   private buildWavBuffer(pcmData: Buffer, sampleRate: number, channels: number): Buffer {
@@ -1755,6 +1782,164 @@ class WebSocketService {
         try {
           const message = JSON.parse(data.toString());
           if (message.type === 'config_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 处理SDK模式设置（来自UI）
+   */
+  private async handleSdkModeSet(robotId: string, data: any): Promise<void> {
+    try {
+      const sdkMode = data?.sdkMode;
+      this.logger.info('收到SDK模式设置请求', { robotId, sdkMode });
+
+      // 转发给机器人客户端
+      const requestId = uuidv7();
+      const success = this.sendToRobot(robotId, {
+        type: 'sdk_mode_set',
+        robotId,
+        timestamp: Date.now(),
+        data: { requestId, sdkMode },
+      }, 'business');
+
+      if (!success) {
+        this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
+      }
+    } catch (error: any) {
+      this.logger.error('处理SDK模式设置失败', error, { robotId });
+      this.sendError(robotId, 'SDK_MODE_ERROR', error.message || 'SDK模式设置失败', 'business');
+    }
+  }
+
+  /**
+   * 处理SDK模式获取（来自UI）
+   */
+  private async handleSdkModeGet(robotId: string): Promise<void> {
+    try {
+      this.logger.info('收到SDK模式获取请求', { robotId });
+
+      // 转发给机器人客户端
+      const requestId = uuidv7();
+      const success = this.sendToRobot(robotId, {
+        type: 'sdk_mode_get',
+        robotId,
+        timestamp: Date.now(),
+        data: { requestId },
+      }, 'business');
+
+      if (!success) {
+        this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
+      }
+    } catch (error: any) {
+      this.logger.error('处理SDK模式获取失败', error, { robotId });
+      this.sendError(robotId, 'SDK_MODE_ERROR', error.message || 'SDK模式获取失败', 'business');
+    }
+  }
+
+  /**
+   * 处理SDK模式响应（来自robot-agent，转发到UI）
+   */
+  private async handleSdkModeResponse(robotId: string, data: any): Promise<void> {
+    try {
+      this.logger.info('收到SDK模式响应，转发到UI', { robotId, data });
+
+      // 广播到所有UI客户端
+      this.sendToUI(robotId, {
+        type: 'sdk_mode_response',
+        robotId,
+        timestamp: Date.now(),
+        data,
+      }, 'business');
+    } catch (error: any) {
+      this.logger.error('处理SDK模式响应失败', error, { robotId });
+    }
+  }
+
+  /**
+   * 请求设置SDK模式（用于API调用）
+   */
+  async 请求设置SDK模式(robotId: string, sdkMode: boolean): Promise<{ success: boolean; sdkMode?: boolean; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'sdk_mode_set',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId, sdkMode },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送设置SDK模式命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('设置SDK模式请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'sdk_mode_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求获取SDK模式（用于API调用）
+   */
+  async 请求获取SDK模式(robotId: string): Promise<{ success: boolean; sdkMode?: boolean; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    const success = this.sendToRobot(robotId, {
+      type: 'sdk_mode_get',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送获取SDK模式命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('获取SDK模式请求超时'));
+      }, 30000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'sdk_mode_response' && message.data?.requestId === requestId) {
             clearTimeout(timeout);
             connection.websocket.off('message', checkResponse);
             resolve(message.data);

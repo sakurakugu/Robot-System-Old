@@ -29,7 +29,7 @@ export interface ChoreoRobot {
 export interface TimelineTrack {
   id: string;
   name: string;
-  type: 'action' | 'audio' | 'keyframe';
+  type: 'action' | 'audio';
   robotId?: string;           // 关联的机器人 ID
   muted?: boolean;
   locked?: boolean;
@@ -45,20 +45,12 @@ export interface TimelineClip {
   duration: number;           // 持续时间（秒）
   action?: ActionCommand;     // 动作指令
   audioFile?: string;         // 音频文件路径
-  keyframes?: Keyframe[];     // 关键帧数据
 }
 
 // 动作指令
 export interface ActionCommand {
   action: string;
   parameters?: Record<string, any>;
-}
-
-// 关键帧
-export interface Keyframe {
-  time: number;               // 相对于 clip 开始的时间偏移
-  value: Record<string, any>; // 关键帧值
-  easing?: string;            // 缓动函数
 }
 
 // 时间轴配置

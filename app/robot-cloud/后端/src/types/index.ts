@@ -324,7 +324,21 @@ export type ClientMessage =
   | VideoUnsubscribeMessage
   | ActionInputMessage
   | ControlInputMessage
-  | AudioControlMessage;
+  | AudioControlMessage
+  | SdkModeSetMessage
+  | SdkModeGetMessage;
+
+export interface SdkModeSetMessage extends BaseClientMessage {
+  type: 'sdk_mode_set';
+  data: {
+    mode: number;
+  };
+}
+
+export interface SdkModeGetMessage extends BaseClientMessage {
+  type: 'sdk_mode_get';
+  data?: any;
+}
 
 // 服务端消息
 export interface ServerMessage {

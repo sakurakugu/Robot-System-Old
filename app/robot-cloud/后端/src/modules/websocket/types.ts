@@ -57,7 +57,25 @@ export type ClientMessage =
   | VideoUnsubscribeMessage
   | ActionInputMessage
   | ControlInputMessage
-  | AudioControlMessage;
+  | AudioControlMessage
+  | SdkModeSetMessage
+  | SdkModeGetMessage;
+
+export interface SdkModeSetMessage {
+  type: 'sdk_mode_set';
+  robotId: string;
+  timestamp: number;
+  data: {
+    mode: number;
+  };
+}
+
+export interface SdkModeGetMessage {
+  type: 'sdk_mode_get';
+  robotId: string;
+  timestamp: number;
+  data?: any;
+}
 
 export interface AudioStartMessage {
   type: 'audio_start';

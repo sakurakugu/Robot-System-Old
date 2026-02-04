@@ -7,8 +7,7 @@
 // 图层类型
 export enum TrackType {
   AUDIO = 'audio',
-  ACTION = 'action',
-  KEYFRAME = 'keyframe'
+  ACTION = 'action'
 }
 
 // ==================== 动作块和关键帧 ====================
@@ -26,14 +25,6 @@ export interface ActionBlock {
   robotId?: string // 绑定的机器狗ID
 }
 
-// 关键帧
-export interface Keyframe {
-  id: string
-  time: number // 秒
-  value: number
-  easing?: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out'
-}
-
 // ==================== 轨道定义 ====================
 
 // 轨道/图层
@@ -46,7 +37,6 @@ export interface Track {
   visible: boolean
   height: number
   blocks?: ActionBlock[] // 动作块（仅 action 类型）
-  keyframes?: Keyframe[] // 关键帧（仅 keyframe 类型）
   audioUrl?: string // 音频URL（仅 audio 类型）
 }
 
@@ -72,9 +62,6 @@ export enum HistoryActionType {
   DELETE_BLOCK = 'delete_block',
   UPDATE_BLOCK = 'update_block',
   MOVE_BLOCK = 'move_block',
-  ADD_KEYFRAME = 'add_keyframe',
-  DELETE_KEYFRAME = 'delete_keyframe',
-  UPDATE_KEYFRAME = 'update_keyframe',
   UPDATE_AUDIO = 'update_audio'
 }
 
@@ -130,7 +117,7 @@ export interface ChoreoRobot {
 export interface TimelineTrack {
   id: string
   name: string
-  type: 'action' | 'audio' | 'keyframe'
+  type: 'action' | 'audio'
   robotId?: string
   muted?: boolean
   locked?: boolean
@@ -139,7 +126,6 @@ export interface TimelineTrack {
   height?: number
   clips?: TimelineClip[]
   blocks?: ActionBlock[]
-  keyframes?: Keyframe[]
   audioUrl?: string
 }
 
@@ -151,7 +137,6 @@ export interface TimelineClip {
   duration: number
   action?: ActionCommand
   audioFile?: string
-  keyframes?: Keyframe[]
 }
 
 // 动作指令

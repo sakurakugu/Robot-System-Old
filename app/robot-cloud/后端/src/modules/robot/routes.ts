@@ -20,5 +20,13 @@ export function createRobotRoutes(controller: RobotController): Router {
   router.post('/:uuid/connect', controller.connectRobot);
   router.post('/:uuid/update-firmware', controller.updateFirmware);
 
+  // 音量控制
+  router.get('/:uuid/volume', controller.getVolume);
+  router.post('/:uuid/volume', controller.setVolume);
+  router.post('/:uuid/volume/mute', controller.setMute);
+
+  // 相机控制
+  router.post('/:uuid/camera/capture', controller.capturePhoto);
+
   return router;
 }

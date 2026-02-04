@@ -167,4 +167,72 @@ export class RobotController {
       res.status(500).json({ success: false, error: error.message });
     }
   };
+
+  /**
+   * 获取机器人音量
+   */
+  getVolume = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const volumeInfo = await this.robotService.获取音量(uuid);
+      res.json({ success: true, data: volumeInfo });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 设置机器人音量
+   */
+  setVolume = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const { volume } = req.body || {};
+      
+      if (typeof volume !== 'number') {
+        return res.status(400).json({ success: false, error: '缺少音量参数' });
+      }
+
+      await this.robotService.设置音量(uuid, volume);
+      res.json({ success: true, message: `音量已设置为 ${volume}` });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') || error.message.includes('必须') ? 400 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 设置机器人静音
+   */
+  setMute = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const { mute } = req.body || {};
+      
+      if (typeof mute !== 'boolean') {
+        return res.status(400).json({ success: false, error: '缺少静音参数' });
+      }
+
+      await this.robotService.设置静音(uuid, mute);
+      res.json({ success: true, message: mute ? '已静音' : '已取消静音' });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 拍照
+   */
+  capturePhoto = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const result = await this.robotService.拍照(uuid);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
 }

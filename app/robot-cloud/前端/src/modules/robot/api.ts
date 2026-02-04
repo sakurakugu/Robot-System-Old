@@ -2,13 +2,13 @@
 
 import { http } from '@/api/request'
 import type {
-    ApiResponse,
-    ConnectionTestResult,
-    CreateRobotDTO,
-    RobotGroupsResponse,
-    RobotListResponse,
-    RobotResponse,
-    UpdateRobotDTO
+  ApiResponse,
+  ConnectionTestResult,
+  CreateRobotDTO,
+  RobotGroupsResponse,
+  RobotListResponse,
+  RobotResponse,
+  UpdateRobotDTO
 } from './types'
 
 /**
@@ -88,4 +88,32 @@ export function getLogHistory(uuid: string, limit = 5) {
  */
 export function uploadLog(uuid: string, data: { from?: string; to?: string; logType?: string }) {
   return http.post<ApiResponse>(`/api/v1/robots/${uuid}/logs/upload`, data)
+}
+
+/**
+ * 获取机器人音量
+ */
+export function getRobotVolume(uuid: string) {
+  return http.get<{ success: boolean; data: { volume: number; muted: boolean } }>(`/api/v1/robots/${uuid}/volume`)
+}
+
+/**
+ * 设置机器人音量
+ */
+export function setRobotVolume(uuid: string, volume: number) {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/volume`, { volume })
+}
+
+/**
+ * 设置机器人静音
+ */
+export function setRobotMute(uuid: string, mute: boolean) {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/volume/mute`, { mute })
+}
+
+/**
+ * 拍照
+ */
+export function capturePhoto(uuid: string) {
+  return http.post<{ success: boolean; data: { image: string; format: string } }>(`/api/v1/robots/${uuid}/camera/capture`)
 }

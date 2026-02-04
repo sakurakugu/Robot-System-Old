@@ -6,12 +6,14 @@ import type DatabaseService from '../../core/database';
 import type Logger from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
 import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from '../../types';
+import type WebSocketService from '../websocket/service';
 
 /**
  * 机器人服务
  */
 export class RobotService {
   private pythonCommand: string = 'python'; // 默认使用 python
+  private websocketService?: WebSocketService;
 
   constructor(
     private database: DatabaseService,
@@ -19,6 +21,46 @@ export class RobotService {
   ) {
     // Windows 上通常是 python，Linux/Mac 上通常是 python3
     this.pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+  }
+
+  /**
+   * 设置WebSocket服务（延迟注入，避免循环依赖）
+   */
+  setWebSocketService(service: WebSocketService): void {
+    this.websocketService = service;
+  }
+
+  /**
+   * 调用机器人 HTTP API
+   */
+  private async 调用机器人API(ip: string, path: string, options: {
+    method?: string;
+    body?: any;
+  } = {}): Promise<any> {
+    const method = options.method || 'GET';
+    const url = `http://${ip}:8080${path}`;
+    
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: method !== 'GET' && options.body 
+          ? { 'Content-Type': 'application/json' } 
+          : undefined,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: AbortSignal.timeout(5000), // 5秒超时
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error(`请求超时: ${url}`);
+      }
+      throw new Error(`API调用失败: ${error.message}`);
+    }
   }
 
   /**
@@ -440,5 +482,117 @@ export class RobotService {
 
     this.logger.info('固件更新成功');
     return { robotIp: robot.ip };
+  }
+
+  /**
+   * 获取机器人音量
+   */
+  async 获取音量(uuid: string): Promise<{ volume: number; muted: boolean }> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!robot.ip) {
+      throw new Error('缺少机器人IP地址');
+    }
+
+    try {
+      const result = await this.调用机器人API(robot.ip, '/api/v1/volume');
+      if (result.success && result.data) {
+        return result.data;
+      }
+      throw new Error(result.error || '获取音量失败');
+    } catch (error: any) {
+      throw new Error(`获取音量失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 设置机器人音量
+   */
+  async 设置音量(uuid: string, volume: number): Promise<void> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!robot.ip) {
+      throw new Error('缺少机器人IP地址');
+    }
+
+    if (volume < 0 || volume > 100) {
+      throw new Error('音量值必须在 0-100 之间');
+    }
+
+    try {
+      const result = await this.调用机器人API(robot.ip, '/api/v1/volume', {
+        method: 'POST',
+        body: { volume },
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '设置音量失败');
+      }
+    } catch (error: any) {
+      throw new Error(`设置音量失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 设置机器人静音
+   */
+  async 设置静音(uuid: string, mute: boolean): Promise<void> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!robot.ip) {
+      throw new Error('缺少机器人IP地址');
+    }
+
+    try {
+      const result = await this.调用机器人API(robot.ip, '/api/v1/volume/mute', {
+        method: 'POST',
+        body: { mute },
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '设置静音失败');
+      }
+    } catch (error: any) {
+      throw new Error(`设置静音失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 拍照并获取base64图片（通过WebSocket）
+   */
+  async 拍照(uuid: string): Promise<{ image: string; format: string }> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
+    }
+
+    try {
+      // 通过WebSocket发送拍照命令并等待响应
+      const result = await this.websocketService.请求机器人拍照(uuid);
+      
+      if (!result.success || !result.image) {
+        throw new Error(result.error || '拍照失败');
+      }
+
+      return {
+        image: result.image,
+        format: result.format || 'jpeg',
+      };
+    } catch (error: any) {
+      throw new Error(`拍照失败: ${error.message}`);
+    }
   }
 }

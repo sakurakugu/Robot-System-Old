@@ -67,6 +67,8 @@ export class Application {
 
     // 延迟注入 WebSocket 服务到编舞服务
     this.choreoService.setWebSocketService(this.websocketService);
+    // 延迟注入 WebSocket 服务到机器人服务
+    this.robotService.setWebSocketService(this.websocketService);
   }
 
   /**

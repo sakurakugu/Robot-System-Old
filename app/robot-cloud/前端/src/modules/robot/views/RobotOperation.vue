@@ -61,6 +61,12 @@
 
         <el-divider direction="vertical" />
 
+        <el-button size="small" @click="handleCapturePhoto" :loading="isCapturing" :icon="Camera">
+          拍照
+        </el-button>
+
+        <el-divider direction="vertical" />
+
         <el-button type="danger" size="small" @click="emergencyStop" class="estop-btn" :icon="SwitchButton">
           急停
         </el-button>
@@ -202,17 +208,19 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import ChatView from '@/modules/conversation/views/ChatView.vue'
 import ActionButton from '@/modules/robot/components/ActionButton.vue'
 import {
-  Back,
-  Cellphone,
-  ChatLineSquare,
-  Setting,
-  SwitchButton,
-  VideoCamera
+    Back,
+    Camera,
+    Cellphone,
+    ChatLineSquare,
+    Setting,
+    SwitchButton,
+    VideoCamera
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot, Mic, MicOff } from 'lucide-vue-next'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { capturePhoto } from '../api'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string }>()
 const router = useRouter()
@@ -244,6 +252,7 @@ const floatingLayerRef = ref<HTMLDivElement | null>(null)
 const micEnabled = ref(true)
 const twoLegStandActive = ref(false)
 const rightJoystickDisabled = ref(false)
+const isCapturing = ref(false)
 
 watch(twoLegStandActive, (val) => {
   rightJoystickDisabled.value = val
@@ -375,6 +384,38 @@ const sendAction = (action: string) => {
     timestamp: Date.now(),
     data: { action },
   })
+}
+
+const handleCapturePhoto = async () => {
+  if (!selectedUuid.value) {
+    ElMessage.warning('请先选择机器人')
+    return
+  }
+  
+  isCapturing.value = true
+  try {
+    ElMessage.info('正在拍照，请稍候...')
+    const res = await capturePhoto(selectedUuid.value)
+    
+    if (res.success && res.data.image) {
+      // 下载图片
+      const link = document.createElement('a')
+      link.href = `data:image/${res.data.format || 'jpeg'};base64,${res.data.image}`
+      link.download = `robot-photo-${Date.now()}.${res.data.format || 'jpg'}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      ElMessage.success('拍照成功，已开始下载')
+    } else {
+      ElMessage.error('拍照失败')
+    }
+  } catch (error: any) {
+    console.error('拍照错误:', error)
+    ElMessage.error(error.message || '拍照失败')
+  } finally {
+    isCapturing.value = false
+  }
 }
 
 type JoystickPayload = { x: number; y: number }

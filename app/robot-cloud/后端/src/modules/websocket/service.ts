@@ -1314,6 +1314,54 @@ class WebSocketService {
       }
     }
   }
+
+  /**
+   * 请求机器人拍照（用于API调用）
+   */
+  async 请求机器人拍照(robotId: string): Promise<{ success: boolean; image?: string; format?: string; error?: string }> {
+    // 检查机器人是否在线
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+    
+    // 发送拍照命令
+    const success = this.sendToRobot(robotId, {
+      type: 'camera_capture',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送拍照命令失败');
+    }
+
+    // 等待响应（最多30秒）
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('拍照请求超时'));
+      }, 30000);
+
+      // 临时监听响应
+      const checkResponse = (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (message.type === 'camera_response' && message.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(message.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
 }
 
 export default WebSocketService;

@@ -100,6 +100,46 @@
                 </div>
               </el-form-item>
               <el-divider />
+              <h4 class="subsection-title">系统音量</h4>
+              <el-form-item label="音量">
+                <div class="volume-control">
+                  <el-slider
+                    v-model="volumeData.volume"
+                    :min="0"
+                    :max="100"
+                    :disabled="volumeData.loading || !status.connected"
+                    @change="handleVolumeChange"
+                    style="flex: 1; margin-right: 12px;"
+                  />
+                  <el-input-number
+                    v-model="volumeData.volume"
+                    :min="0"
+                    :max="100"
+                    :disabled="volumeData.loading || !status.connected"
+                    @change="handleVolumeChange"
+                    style="width: 100px; margin-right: 8px;"
+                  />
+                  <el-button
+                    :icon="volumeData.muted ? 'VideoPause' : 'VideoPlay'"
+                    @click="handleMuteToggle"
+                    :disabled="volumeData.loading || !status.connected"
+                    :type="volumeData.muted ? 'danger' : 'default'"
+                  >
+                    {{ volumeData.muted ? '静音' : '取消静音' }}
+                  </el-button>
+                  <el-button
+                    @click="loadVolume"
+                    :loading="volumeData.loading"
+                    :disabled="!status.connected"
+                    icon="Refresh"
+                    circle
+                  />
+                </div>
+                <el-text v-if="!status.connected" type="info" size="small">
+                  机器人未连接，无法控制音量
+                </el-text>
+              </el-form-item>
+              <el-divider />
               <el-form-item label="SN">
                 <el-input v-model="formData.sn" disabled />
               </el-form-item>
@@ -316,11 +356,11 @@
 </template>
 
 <script setup lang="ts">
+import { isValidIP } from '@/utils/validator'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { isValidIP } from '@/utils/validator'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string; hideTabs?: boolean; activeTab?: string }>()
 const route = useRoute()
@@ -359,6 +399,13 @@ const status = reactive({
   temperature: 42,
   battery: 85,
   connected: true
+})
+
+// Volume Control
+const volumeData = reactive({
+  volume: 50,
+  muted: false,
+  loading: false
 })
 
 // Logs
@@ -412,6 +459,11 @@ const loadData = async () => {
       const lipJson = await lipRes.json().catch(() => ({}))
       if (lipRes.ok && lipJson.success) {
         formData.local_ip = lipJson.data?.ip || ''
+      }
+      
+      // 加载音量信息
+      if (status.connected) {
+        await loadVolume()
       }
     }
   } catch (e) {
@@ -560,6 +612,88 @@ const openWifiSettings = () => {
   window.open(url, '_blank')
 }
 
+// Volume Control
+let volumeDebounceTimer: number | null = null
+
+const loadVolume = async () => {
+  if (!uuid.value || !status.connected) return
+  
+  volumeData.loading = true
+  try {
+    const response = await fetch(`/api/v1/robots/${uuid.value}/volume`)
+    const json = await response.json().catch(() => ({}))
+    
+    if (response.ok && json.success && json.data) {
+      volumeData.volume = json.data.volume || 50
+      volumeData.muted = json.data.muted || false
+    }
+  } catch (error) {
+    console.error('加载音量失败:', error)
+  } finally {
+    volumeData.loading = false
+  }
+}
+
+const handleVolumeChange = (value: number) => {
+  // 防抖处理
+  if (volumeDebounceTimer) {
+    clearTimeout(volumeDebounceTimer)
+  }
+  
+  volumeDebounceTimer = window.setTimeout(async () => {
+    if (!uuid.value) return
+    
+    volumeData.loading = true
+    try {
+      const response = await fetch(`/api/v1/robots/${uuid.value}/volume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume: value })
+      })
+      
+      const json = await response.json().catch(() => ({}))
+      
+      if (response.ok && json.success) {
+        ElMessage.success({ message: `音量已设置为 ${value}`, duration: 1000 })
+      } else {
+        ElMessage.error('设置音量失败: ' + (json.error || '未知错误'))
+      }
+    } catch (error: any) {
+      ElMessage.error('设置音量失败: ' + (error?.message || '网络错误'))
+    } finally {
+      volumeData.loading = false
+    }
+  }, 500)
+}
+
+const handleMuteToggle = async () => {
+  if (!uuid.value) return
+  
+  const newMuteState = !volumeData.muted
+  volumeData.loading = true
+  
+  try {
+    const response = await fetch(`/api/v1/robots/${uuid.value}/volume/mute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mute: newMuteState })
+    })
+    
+    const json = await response.json().catch(() => ({}))
+    
+    if (response.ok && json.success) {
+      volumeData.muted = newMuteState
+      ElMessage.success(newMuteState ? '已静音' : '已取消静音')
+    } else {
+      ElMessage.error('设置静音失败: ' + (json.error || '未知错误'))
+    }
+  } catch (error: any) {
+    ElMessage.error('设置静音失败: ' + (error?.message || '网络错误'))
+  } finally {
+    volumeData.loading = false
+  }
+}
+
 // Unbind
 const handleUnbind = () => {
   if (!uuid.value) {
@@ -650,6 +784,21 @@ watch(
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+}
+
+.subsection-title {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
 }
 
 .tags-container {

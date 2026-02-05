@@ -63,16 +63,16 @@
 
 <script setup lang="ts">
 import {
-    Back,
-    CircleCheckFilled,
-    Delete,
-    DocumentCopy,
-    Edit,
-    Minus,
-    Plus,
-    Rank,
-    Right,
-    VideoPlay,
+  Back,
+  CircleCheckFilled,
+  Delete,
+  DocumentCopy,
+  Edit,
+  Minus,
+  Plus,
+  Rank,
+  Right,
+  VideoPlay,
 } from '@element-plus/icons-vue';
 import { computed } from 'vue';
 import { HistoryActionType, type HistoryRecord } from '../../types';
@@ -129,9 +129,6 @@ const getActionIcon = (type: HistoryActionType) => {
     [HistoryActionType.DELETE_BLOCK]: Minus,
     [HistoryActionType.UPDATE_BLOCK]: Edit,
     [HistoryActionType.MOVE_BLOCK]: Rank,
-    [HistoryActionType.ADD_KEYFRAME]: Plus,
-    [HistoryActionType.DELETE_KEYFRAME]: Minus,
-    [HistoryActionType.UPDATE_KEYFRAME]: Edit,
     [HistoryActionType.UPDATE_AUDIO]: VideoPlay,
   }
   return iconMap[type] || Edit

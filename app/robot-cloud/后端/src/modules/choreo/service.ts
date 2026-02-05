@@ -575,6 +575,11 @@ export class ChoreoService {
     if (!status) return;
 
     try {
+      // 舞蹈开始前，禁止所有机器人收音
+      for (const robotId of robotIds) {
+        await this.setAudioRecording(robotId, false);
+      }
+
       for (let i = 0; i < actions.length; i++) {
         // 检查是否被停止
         if (status.status === 'stopped') {
@@ -606,6 +611,25 @@ export class ChoreoService {
       this.broadcastExecutionProgress(executionId, status);
       throw error;
     }
+  }
+
+  /**
+   * 设置机器人的收音状态
+   */
+  private async setAudioRecording(robotId: string, enabled: boolean): Promise<void> {
+    if (!this.wsService) return;
+
+    const message = {
+      type: 'audio_control',
+      robotId,
+      timestamp: Date.now(),
+      data: {
+        enabled,
+        source: 'choreo',
+      },
+    };
+
+    this.wsService.sendToRobot(robotId, message, 'business');
   }
 
   /**

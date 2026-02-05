@@ -8,7 +8,7 @@ import { router } from './modules/layouts/router'
 import './style.css'
 // 导入编舞系统样式
 import { useThemeStore } from './stores/theme'
-import './modules/choreo/styles/index.css'
+import './modules/编舞系统/styles/index.css'
 
 const app = createApp(App)
 const pinia = createPinia()

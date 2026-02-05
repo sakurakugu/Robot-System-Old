@@ -15,24 +15,24 @@ import type Logger from '../../core/logger';
 import { PythonExecutor } from '../../core/services/python-executor';
 import type WebSocketService from '../websocket/service';
 import type {
-    ActionCommand,
-    AddProjectRobotDirectDto,
-    AddRobotToProjectDto,
-    BuildResult,
-    ChoreoProject,
-    ChoreoRobot,
-    ConnectionTestResult,
-    CreateProjectDto,
-    CustomAction,
-    ExecutionStatus,
-    ProjectRobotConfig,
-    RunResult,
-    SaveTimelineDto,
-    TimelineConfig,
-    TimelineData,
-    TimelineTrack,
-    UpdateProjectDto,
-    UpdateProjectRobotDto,
+  ActionCommand,
+  AddProjectRobotDirectDto,
+  AddRobotToProjectDto,
+  BuildResult,
+  ChoreoProject,
+  ChoreoRobot,
+  ConnectionTestResult,
+  CreateProjectDto,
+  CustomAction,
+  ExecutionStatus,
+  ProjectRobotConfig,
+  RunResult,
+  SaveTimelineDto,
+  TimelineConfig,
+  TimelineData,
+  TimelineTrack,
+  UpdateProjectDto,
+  UpdateProjectRobotDto,
 } from './types';
 
 // 数据目录配置
@@ -54,7 +54,7 @@ const getProjectsDir = (): string => {
 const DATA_DIR = process.env.CHOREO_DATA_DIR || getDataDir();
 const PROJECTS_DIR = process.env.CHOREO_PROJECTS_DIR || getProjectsDir();
 
-export class ChoreoService {
+export class 编舞服务 {
   private projects: Map<string, ChoreoProject> = new Map();
   private executions: Map<string, ExecutionStatus> = new Map();
   private pythonExecutor: PythonExecutor;
@@ -1579,4 +1579,6 @@ export class ChoreoService {
   }
 }
 
-export default ChoreoService;
+export default 编舞服务;
+
+export { 编舞服务 as ChoreoService };

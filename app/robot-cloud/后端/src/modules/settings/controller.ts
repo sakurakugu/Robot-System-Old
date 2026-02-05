@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-import config from '../../config';
+import 配置 from '../../config';
 import type { SettingsService } from './service';
 
 /**
  * 设置控制器
  */
-export class SettingsController {
+export class 设置控制器 {
   constructor(private settingsService: SettingsService) {}
 
   /**
@@ -66,10 +66,10 @@ export class SettingsController {
         }
       };
 
-      const wsControlUrl = data.wsControlUrl || resolveWsBaseUrl(serverUrl, config.ports.control);
-      const wsBusinessUrl = data.wsBusinessUrl || resolveWsBaseUrl(serverUrl, config.ports.business);
-      const wsAudioUploadUrl = data.wsAudioUploadUrl || resolveWsBaseUrl(serverUrl, config.ports.audioUpload);
-      const wsAudioDownloadUrl = data.wsAudioDownloadUrl || resolveWsBaseUrl(serverUrl, config.ports.audioDownload);
+      const wsControlUrl = data.wsControlUrl || resolveWsBaseUrl(serverUrl, 配置.ports.control);
+      const wsBusinessUrl = data.wsBusinessUrl || resolveWsBaseUrl(serverUrl, 配置.ports.business);
+      const wsAudioUploadUrl = data.wsAudioUploadUrl || resolveWsBaseUrl(serverUrl, 配置.ports.audioUpload);
+      const wsAudioDownloadUrl = data.wsAudioDownloadUrl || resolveWsBaseUrl(serverUrl, 配置.ports.audioDownload);
 
       res.json({
         success: true,
@@ -112,3 +112,5 @@ export class SettingsController {
     }
   };
 }
+
+export { 设置控制器 as SettingsController };

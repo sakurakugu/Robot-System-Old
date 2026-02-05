@@ -6,13 +6,13 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 import type { ChoreoService } from './service';
 import type {
-    AddProjectRobotDirectDto,
-    AddRobotToProjectDto,
-    CreateProjectDto,
-    ExecuteActionsDto,
-    SaveTimelineDto,
-    UpdateProjectDto,
-    UpdateProjectRobotDto,
+  AddProjectRobotDirectDto,
+  AddRobotToProjectDto,
+  CreateProjectDto,
+  ExecuteActionsDto,
+  SaveTimelineDto,
+  UpdateProjectDto,
+  UpdateProjectRobotDto,
 } from './types';
 
 // 辅助函数：安全获取路由参数
@@ -28,7 +28,7 @@ const getQueryParam = (value: unknown): string => {
   return '';
 };
 
-export class ChoreoController {
+export class 编舞控制器 {
   constructor(private service: ChoreoService) {}
 
   // ==================== 项目管理 ====================
@@ -756,4 +756,6 @@ export class ChoreoController {
   };
 }
 
-export default ChoreoController;
+export default 编舞控制器;
+
+export { 编舞控制器 as ChoreoController };

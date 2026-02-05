@@ -4,13 +4,13 @@ import type { LLMProvider } from '../types';
 
 dotenv.config();
 
-export interface LLMProviderConfig {
+export interface LLM供应商配置 {
   apiKey: string;
   model: string;
   baseUrl?: string;
 }
 
-export interface Config {
+export interface 配置 {
   // 服务配置
   port: number;
   ports: {
@@ -31,7 +31,7 @@ export interface Config {
   // AI服务配置
   llm: {
     provider: LLMProvider;
-    providers: Record<LLMProvider, LLMProviderConfig>;
+    providers: Record<LLMProvider, LLM供应商配置>;
   };
 
   // 语音识别配置
@@ -77,7 +77,7 @@ export interface Config {
 /**
  * 默认 LLM 供应商配置
  */
-const defaultProviders: Record<LLMProvider, LLMProviderConfig> = {
+const 默认供应商: Record<LLMProvider, LLM供应商配置> = {
   openai: {
     apiKey: '',
     model: 'gpt-4o-mini',
@@ -105,7 +105,7 @@ const defaultProviders: Record<LLMProvider, LLMProviderConfig> = {
   },
 };
 
-const config: Config = {
+const 配置: 配置 = {
   port: parseInt(process.env.PORT || '9004', 10),
   ports: {
     http: parseInt(process.env.PORT || '9004', 10),
@@ -123,7 +123,7 @@ const config: Config = {
 
   llm: {
     provider: (process.env.LLM_PROVIDER as LLMProvider) || 'tongyi',
-    providers: { ...defaultProviders },
+    providers: { ...默认供应商 },
   },
 
   asr: {
@@ -162,4 +162,4 @@ const config: Config = {
   },
 };
 
-export default config;
+export default 配置;

@@ -11,7 +11,7 @@ type PendingRequest = {
   onChunk?: (chunk: { seq: number; base64: string; format: 'mp3' }) => void;
 };
 
-class TTSService {
+class 语音合成服务 {
   private proc?: ChildProcessWithoutNullStreams;
   private stdoutBuffer = '';
   private pending = new Map<string, PendingRequest>();
@@ -150,4 +150,6 @@ class TTSService {
   }
 }
 
-export default TTSService;
+export default 语音合成服务;
+
+export { 语音合成服务 as TTSService };

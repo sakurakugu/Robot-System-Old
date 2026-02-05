@@ -4,7 +4,7 @@ import type { RoleService } from './service';
 /**
  * 角色控制器
  */
-export class RoleController {
+export class 角色控制器 {
   constructor(private roleService: RoleService) {}
 
   private 获取参数(req: Request, key: string): string {
@@ -103,3 +103,5 @@ export class RoleController {
     }
   };
 }
+
+export { 角色控制器 as RoleController };

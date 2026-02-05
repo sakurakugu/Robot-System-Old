@@ -1,7 +1,7 @@
 import { RateLimiter } from '../../core/utils/helpers';
 import { Action, SafetyCheckResult, SafetyRule } from '../../types';
 
-export class ActionController {
+export class 动作控制器 {
   // 动作白名单
   private readonly ALLOWED_ACTIONS = new Set([
     'stand_up',
@@ -180,4 +180,6 @@ export class ActionController {
   }
 }
 
-export default ActionController;
+export default 动作控制器;
+
+export { 动作控制器 as ActionController };

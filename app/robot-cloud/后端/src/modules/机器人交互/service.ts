@@ -4,7 +4,7 @@ import type { AIResponse, ConversationContext, Message } from '../../types';
 import { ActionController } from './action-controller';
 import { LLMService } from './llm-service';
 
-export class ConversationService {
+export class 对话服务 {
   private llmService: LLMService;
   private actionController: ActionController;
   private conversationHistory: Map<string, Message[]>;
@@ -192,3 +192,5 @@ export class ConversationService {
     this.database.clearConversations(robotId);
   }
 }
+
+export { 对话服务 as ConversationService };

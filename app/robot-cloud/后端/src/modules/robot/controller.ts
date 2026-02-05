@@ -4,7 +4,7 @@ import type { RobotService } from './service';
 /**
  * 机器人控制器
  */
-export class RobotController {
+export class 机器人控制器 {
   constructor(private robotService: RobotService) {}
 
   private 获取参数(req: Request, ...keys: string[]): string {
@@ -270,3 +270,5 @@ export class RobotController {
     }
   };
 }
+
+export { 机器人控制器 as RobotController };

@@ -1,15 +1,15 @@
 import axios from 'axios';
-import config from '../../config';
+import 配置 from '../../config';
 import type { LLMOptions, LLMResponse, Message } from '../../types';
 
-export class LLMService {
+export class LLM服务 {
   constructor() {}
 
   /**
    * 调用LLM进行对话
    */
   async 对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const provider = config.llm.provider;
+    const provider = 配置.llm.provider;
     switch (provider) {
       case 'openai':
         return this.OpenAI对话(messages, options);
@@ -32,7 +32,7 @@ export class LLMService {
    * @param imageBase64 base64编码的图片
    */
   async 视觉分析(userQuestion: string, imageBase64: string): Promise<LLMResponse> {
-    const cfg = config.llm.providers.tongyi;
+    const cfg = 配置.llm.providers.tongyi;
     if (!cfg?.apiKey) {
       throw new Error('Tongyi API密钥未配置');
     }
@@ -121,7 +121,7 @@ export class LLMService {
    * OpenAI API调用
    */
   private async OpenAI对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const cfg = config.llm.providers.openai;
+    const cfg = 配置.llm.providers.openai;
     if (!cfg?.apiKey) {
       throw new Error('OpenAI API密钥未配置');
     }
@@ -170,7 +170,7 @@ export class LLMService {
    * BigModel API调用 (GLM系列)
    */
   private async 大模型对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const cfg = config.llm.providers.bigmodel;
+    const cfg = 配置.llm.providers.bigmodel;
     if (!cfg?.apiKey) {
       throw new Error('BigModel API密钥未配置');
     }
@@ -230,7 +230,7 @@ export class LLMService {
    * Tongyi API调用 (Qwen系列)
    */
   private async 通义对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const cfg = config.llm.providers.tongyi;
+    const cfg = 配置.llm.providers.tongyi;
     if (!cfg?.apiKey) {
       throw new Error('Tongyi API密钥未配置');
     }
@@ -291,7 +291,7 @@ export class LLMService {
    * Anthropic API调用 (Claude系列)
    */
   private async Anthropic对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const cfg = config.llm.providers.anthropic;
+    const cfg = 配置.llm.providers.anthropic;
     if (!cfg?.apiKey) {
       throw new Error('Anthropic API密钥未配置');
     }
@@ -340,7 +340,7 @@ export class LLMService {
    * DeepSeek API调用
    */
   private async DeepSeek对话(messages: Message[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const cfg = config.llm.providers.deepseek;
+    const cfg = 配置.llm.providers.deepseek;
     if (!cfg?.apiKey) {
       throw new Error('DeepSeek API密钥未配置');
     }
@@ -437,4 +437,6 @@ move动作参数说明：
   }
 }
 
-export default LLMService;
+export default LLM服务;
+
+export { LLM服务 as LLMService };

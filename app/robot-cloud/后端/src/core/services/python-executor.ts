@@ -32,7 +32,7 @@ export interface ExecutionOptions {
 /**
  * Python 执行器服务
  */
-export class PythonExecutor extends EventEmitter {
+export class Python执行器 extends EventEmitter {
   private processes: Map<string, ChildProcess> = new Map();
   private readonly pythonPath: string;
   private readonly robotControlPath: string;
@@ -389,6 +389,8 @@ except Exception as e:
 }
 
 // 导出单例
-export const pythonExecutor = new PythonExecutor();
+export const pythonExecutor = new Python执行器();
 
-export default PythonExecutor;
+export default Python执行器;
+
+export { Python执行器 as PythonExecutor };

@@ -1,8 +1,8 @@
 import { Server } from 'http';
 import OpusScript from 'opusscript';
 import { WebSocket, WebSocketServer } from 'ws';
-import config from '../../config';
-import { LLM_PROVIDERS } from '../../config/llm-providers';
+import 配置 from '../../config';
+import { LLM供应商列表 } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
 import type Logger from '../../core/logger';
 import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
@@ -28,7 +28,7 @@ type AudioSession = {
   lastChunkAt: number;
 };
 
-class WebSocketService {
+class 网络套接字服务 {
   private wssMap: Map<Channel, WebSocketServer> = new Map();
   // 机器人客户端连接（按通道）
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
@@ -429,9 +429,9 @@ class WebSocketService {
       
       if (robot) {
         // 仅当机器人模型是有效的LLM模型时才传递，否则使用系统配置的默认模型
-        const provider = config.llm.provider;
+        const provider = 配置.llm.provider;
         const allowedModels =
-          LLM_PROVIDERS.find(p => p.value === (provider as any))?.models.map(m => m.value) || [];
+          LLM供应商列表.find(p => p.value === (provider as any))?.models.map(m => m.value) || [];
         if (robot.model && allowedModels.includes(robot.model)) {
           model = robot.model;
         } else {
@@ -578,7 +578,7 @@ class WebSocketService {
                 format: 'mp3',
               },
             }, 'audio_download');
-            const audio = await this.ttsService.synthesizeStream(ttsText, ttsOptions, (chunk) => {
+            const audio = await this.ttsService.synthesizeStream(ttsText, ttsOptions, (chunk: { seq: number; base64: string; format: 'mp3' }) => {
               this.broadcastMessage(robotId, {
                 type: 'audio_stream_chunk',
                 robotId,
@@ -661,7 +661,7 @@ class WebSocketService {
         },
       });
 
-      this.logger.logConversation({
+      this.logger.记录对话({
         robotId,
         input: text,
         output: response.text,
@@ -708,7 +708,7 @@ class WebSocketService {
             format: 'mp3',
           },
         }, 'audio_download');
-        const audio = await this.ttsService.synthesizeStream(sanitizedText, ttsOptions, (chunk) => {
+        const audio = await this.ttsService.synthesizeStream(sanitizedText, ttsOptions, (chunk: { seq: number; base64: string; format: 'mp3' }) => {
           this.broadcastMessage(robotId, {
             type: 'audio_stream_chunk',
             robotId,
@@ -1954,4 +1954,4 @@ class WebSocketService {
   }
 }
 
-export default WebSocketService;
+export default 网络套接字服务;

@@ -1,5 +1,5 @@
-import config from '../../config';
-import { LLM_PROVIDERS, type LLMProviderOption } from '../../config/llm-providers';
+import 配置 from '../../config';
+import { LLM供应商列表, type LLM供应商选项 } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
 import type { LLMProvider } from '../../types';
 
@@ -34,20 +34,20 @@ interface UIConfig {
  * 设置服务
  * 统一管理所有系统配置
  */
-export class SettingsService {
+export class 设置服务 {
   constructor(private database: DatabaseService) {}
 
   /**
    * 获取 LLM 配置（用于前端显示）
    */
   getLLMConfig(): LLMConfigView {
-    const provider = config.llm.provider;
+    const provider = 配置.llm.provider;
     const providers = {} as LLMConfigView['providers'];
 
     const allProviders: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
     
     for (const p of allProviders) {
-      const cfg = config.llm.providers[p];
+      const cfg = 配置.llm.providers[p];
       providers[p] = {
         model: cfg.model,
         baseUrl: cfg.baseUrl || '',
@@ -62,8 +62,8 @@ export class SettingsService {
   /**
    * 获取 LLM 供应商列表
    */
-  getLLMProviders(): LLMProviderOption[] {
-    return LLM_PROVIDERS;
+  getLLMProviders(): LLM供应商选项[] {
+    return LLM供应商列表;
   }
 
   /**
@@ -81,7 +81,7 @@ export class SettingsService {
     if (data.provider) {
       const validProviders: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
       if (validProviders.includes(data.provider)) {
-        config.llm.provider = data.provider;
+        配置.llm.provider = data.provider;
         this.database.setSetting('llm.provider', data.provider);
       }
     }
@@ -92,7 +92,7 @@ export class SettingsService {
       const providerData = data[provider];
       if (!providerData) continue;
 
-      const cfg = config.llm.providers[provider];
+      const cfg = 配置.llm.providers[provider];
       
       if (typeof providerData.apiKey === 'string') {
         cfg.apiKey = providerData.apiKey;
@@ -116,7 +116,7 @@ export class SettingsService {
    */
   getUIConfig(): UIConfig {
     const serverUrl = this.database.getSetting('ui.serverUrl') || '';
-    const wsPath = this.database.getSetting('ui.wsPath') || config.ws.path;
+    const wsPath = this.database.getSetting('ui.wsPath') || 配置.ws.path;
     const wsControlUrl = this.database.getSetting('ui.wsControlUrl') || '';
     const wsBusinessUrl = this.database.getSetting('ui.wsBusinessUrl') || '';
     const wsAudioUploadUrl = this.database.getSetting('ui.wsAudioUploadUrl') || '';
@@ -197,13 +197,13 @@ export class SettingsService {
     // 加载 provider
     const provider = settings['llm.provider'] as LLMProvider;
     if (provider && ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'].includes(provider)) {
-      config.llm.provider = provider;
+      配置.llm.provider = provider;
     }
 
     // 加载各供应商配置
     const providers: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
     for (const p of providers) {
-      const cfg = config.llm.providers[p];
+      const cfg = 配置.llm.providers[p];
       const apiKey = settings[`${p}.apiKey`];
       const model = settings[`${p}.model`];
       const baseUrl = settings[`${p}.baseUrl`];
@@ -218,10 +218,12 @@ export class SettingsService {
    * 获取当前激活的 LLM 配置
    */
   getActiveLLMConfig() {
-    const provider = config.llm.provider;
+    const provider = 配置.llm.provider;
     return {
       provider,
-      ...config.llm.providers[provider],
+      ...配置.llm.providers[provider],
     };
   }
 }
+
+export { 设置服务 as SettingsService };

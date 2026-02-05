@@ -11,7 +11,7 @@ import type WebSocketService from '../websocket/service';
 /**
  * 机器人服务
  */
-export class RobotService {
+export class 机器人服务 {
   private pythonCommand: string = 'python'; // 默认使用 python
   private websocketService?: WebSocketService;
 
@@ -136,7 +136,7 @@ export class RobotService {
       const remoteInitCmd = [
         'mkdir -p /home/firefly/sparkrobot/robot-agent',
         'mkdir -p /home/firefly/sparkrobot/config',
-        'if [ -f /home/firefly/sparkrobot/config/config.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/config.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
+        'if [ -f /home/firefly/sparkrobot/config/配置.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/配置.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
       ].join(' && ');
 
       try {
@@ -155,7 +155,7 @@ export class RobotService {
         this.logger.info(`生成新UUID: ${uuid}`);
         
         const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
-        await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/config.toml', configToml);
+        await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/配置.toml', configToml);
       }
 
       // 复制客户端代码
@@ -649,3 +649,6 @@ export class RobotService {
     }
   }
 }
+
+export { 机器人服务 as RobotService };
+

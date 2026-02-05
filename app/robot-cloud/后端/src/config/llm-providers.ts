@@ -3,7 +3,7 @@ import type { LLMProvider } from '../types';
 /**
  * 模型选项
  */
-export interface ModelOption {
+export interface 模型选项 {
   value: string;
   label: string;
 }
@@ -11,17 +11,17 @@ export interface ModelOption {
 /**
  * LLM 供应商配置
  */
-export interface LLMProviderOption {
+export interface LLM供应商选项 {
   value: LLMProvider;
   label: string;
   baseUrl: string;
-  models: ModelOption[];
+  models: 模型选项[];
 }
 
 /**
  * 所有支持的 LLM 供应商配置
  */
-export const LLM_PROVIDERS: LLMProviderOption[] = [
+export const LLM供应商列表: LLM供应商选项[] = [
   {
     value: 'openai',
     label: 'OpenAI',
@@ -79,22 +79,22 @@ export const LLM_PROVIDERS: LLMProviderOption[] = [
 /**
  * 获取供应商配置
  */
-export function getProviderConfig(provider: LLMProvider): LLMProviderOption | undefined {
-  return LLM_PROVIDERS.find((p) => p.value === provider);
+export function 获取供应商配置(供应商: LLMProvider): LLM供应商选项 | undefined {
+  return LLM供应商列表.find((项) => 项.value === 供应商);
 }
 
 /**
  * 获取供应商的默认模型
  */
-export function getDefaultModel(provider: LLMProvider): string {
-  const config = getProviderConfig(provider);
-  return config?.models[0]?.value || '';
+export function 获取默认模型(供应商: LLMProvider): string {
+  const 配置 = 获取供应商配置(供应商);
+  return 配置?.models[0]?.value || '';
 }
 
 /**
  * 验证模型是否属于供应商
  */
-export function isValidModel(provider: LLMProvider, model: string): boolean {
-  const config = getProviderConfig(provider);
-  return config?.models.some((m) => m.value === model) || false;
+export function 验证模型(供应商: LLMProvider, 模型: string): boolean {
+  const 配置 = 获取供应商配置(供应商);
+  return 配置?.models.some((项) => 项.value === 模型) || false;
 }

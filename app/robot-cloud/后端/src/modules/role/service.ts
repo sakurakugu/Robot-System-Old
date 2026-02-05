@@ -6,7 +6,7 @@ import type { CreateRoleDto, RoleRecord, UpdateRoleDto } from '../../types';
 /**
  * 角色服务
  */
-export class RoleService {
+export class 角色服务 {
   constructor(
     private database: DatabaseService,
     private logger: Logger
@@ -112,3 +112,5 @@ export class RoleService {
     return this.database.getRobotsByRole(roleId);
   }
 }
+
+export { 角色服务 as RoleService };

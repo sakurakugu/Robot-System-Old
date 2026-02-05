@@ -2,16 +2,16 @@ import axios from 'axios';
 import crypto from 'crypto';
 import FormData from 'form-data';
 import WebSocket from 'ws';
-import config from '../../config';
+import 配置 from '../../config';
 
 export interface ASROptions {
   language?: string;
   prompt?: string;
 }
 
-class ASRService {
+class 语音识别服务 {
   async transcribeWav(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
-    const provider = config.asr.provider;
+    const provider = 配置.asr.provider;
     switch (provider) {
       case 'xunfei':
         return this.transcribeXunfei(wavBuffer, options);
@@ -23,7 +23,7 @@ class ASRService {
   }
 
   private async transcribeXunfei(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
-    const xunfei = config.asr.xunfei;
+    const xunfei = 配置.asr.xunfei;
     if (!xunfei?.appId || !xunfei.apiKey || !xunfei.apiSecret) {
       throw new Error('讯飞ASR密钥未配置');
     }
@@ -173,7 +173,7 @@ class ASRService {
   }
 
   private async transcribeOpenAI(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
-    const openai = config.asr.openai;
+    const openai = 配置.asr.openai;
     if (!openai?.apiKey) {
       throw new Error('OpenAI ASR API密钥未配置');
     }
@@ -214,4 +214,6 @@ class ASRService {
   }
 }
 
-export default ASRService;
+export default 语音识别服务;
+
+export { 语音识别服务 as ASRService };

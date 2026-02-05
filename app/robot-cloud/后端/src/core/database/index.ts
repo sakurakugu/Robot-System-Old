@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import config from '../../config';
+import 配置 from '../../config';
 import type {
   ActionStatus,
   ConversationRecord,
@@ -14,32 +14,32 @@ import type {
  * 数据库服务
  * 统一管理所有数据库操作
  */
-class DatabaseService {
-  private db!: Database.Database;
+class 数据库服务 {
+  private 数据库!: Database.Database;
 
   constructor() {
-    this.initialize();
+    this.初始化();
   }
 
-  private initialize() {
-    const dbPath = config.database.path!;
-    const dbDir = path.dirname(dbPath);
+  private 初始化() {
+    const 数据库路径 = 配置.database.path!;
+    const 数据库目录 = path.dirname(数据库路径);
 
     // 确保数据目录存在
-    if (!require('fs').existsSync(dbDir)) {
-      require('fs').mkdirSync(dbDir, { recursive: true });
+    if (!require('fs').existsSync(数据库目录)) {
+      require('fs').mkdirSync(数据库目录, { recursive: true });
     }
 
-    this.db = new Database(dbPath);
-    this.createTables();
+    this.数据库 = new Database(数据库路径);
+    this.创建表();
   }
 
   /**
    * 创建所有表（全新设计，无需迁移）
    */
-  private createTables(): void {
+  private 创建表(): void {
     // 系统设置表（统一存储所有配置，替代原来的 settings 和 params 表）
-    this.db.exec(`
+    this.数据库.exec(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
@@ -48,7 +48,7 @@ class DatabaseService {
     `);
 
     // 角色表
-    this.db.exec(`
+    this.数据库.exec(`
       CREATE TABLE IF NOT EXISTS roles (
         uuid TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -67,7 +67,7 @@ class DatabaseService {
     `);
 
     // 机器狗注册表
-    this.db.exec(`
+    this.数据库.exec(`
       CREATE TABLE IF NOT EXISTS robots (
         uuid TEXT PRIMARY KEY,
         name TEXT,
@@ -88,7 +88,7 @@ class DatabaseService {
     `);
 
     // 对话历史表
-    this.db.exec(`
+    this.数据库.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
         uuid INTEGER PRIMARY KEY AUTOINCREMENT,
         robot_id TEXT NOT NULL,
@@ -104,7 +104,7 @@ class DatabaseService {
     `);
 
     // 动作执行记录
-    this.db.exec(`
+    this.数据库.exec(`
       CREATE TABLE IF NOT EXISTS action_logs (
         uuid INTEGER PRIMARY KEY AUTOINCREMENT,
         robot_id TEXT NOT NULL,
@@ -117,7 +117,7 @@ class DatabaseService {
     `);
 
     // 创建索引
-    this.db.exec(`
+    this.数据库.exec(`
       CREATE INDEX IF NOT EXISTS idx_robots_status ON robots(status);
       CREATE INDEX IF NOT EXISTS idx_robots_group ON robots(group_name);
       CREATE INDEX IF NOT EXISTS idx_conversations_robot_id ON conversations(robot_id);
@@ -140,12 +140,12 @@ class DatabaseService {
    */
   private migrateDatabase(): void {
     // 检查 roles 表是否有 is_default 列
-    const tableInfo = this.db.prepare("PRAGMA table_info(roles)").all() as Array<{ name: string }>;
+    const tableInfo = this.数据库.prepare("PRAGMA table_info(roles)").all() as Array<{ name: string }>;
     const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
     
     if (!hasIsDefault) {
       console.log('正在迁移数据库：添加 is_default 列...');
-      this.db.exec('ALTER TABLE roles ADD COLUMN is_default INTEGER DEFAULT 0');
+      this.数据库.exec('ALTER TABLE roles ADD COLUMN is_default INTEGER DEFAULT 0');
       console.log('数据库迁移完成');
     }
   }
@@ -154,7 +154,7 @@ class DatabaseService {
    * 初始化默认角色（如果不存在）
    */
   private initializeDefaultRole(): void {
-    const existingDefault = this.db.prepare('SELECT * FROM roles WHERE is_default = 1').get() as RoleRecord | undefined;
+    const existingDefault = this.数据库.prepare('SELECT * FROM roles WHERE is_default = 1').get() as RoleRecord | undefined;
     
     if (!existingDefault) {
       const defaultRoleId = 'default-role';
@@ -205,7 +205,7 @@ move动作参数说明：
 4. 如果用户要求危险动作，要委婉拒绝
 5. 一次回复中可以包含多个动作标记`;
 
-      const stmt = this.db.prepare(`
+      const stmt = this.数据库.prepare(`
         INSERT INTO roles (uuid, name, description, temperature, system_prompt, max_history, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
       `);
@@ -229,7 +229,7 @@ move动作参数说明：
    * 设置配置项
    */
   setSetting(key: string, value: string): void {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       INSERT INTO settings (key, value, updated_at)
       VALUES (?, ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
@@ -241,7 +241,7 @@ move动作参数说明：
    * 获取配置项
    */
   getSetting(key: string): string | undefined {
-    const stmt = this.db.prepare(`SELECT value FROM settings WHERE key = ?`);
+    const stmt = this.数据库.prepare(`SELECT value FROM settings WHERE key = ?`);
     const row = stmt.get(key) as { value: string } | undefined;
     return row?.value;
   }
@@ -250,7 +250,7 @@ move动作参数说明：
    * 获取所有配置
    */
   getAllSettings(): Record<string, string> {
-    const stmt = this.db.prepare(`SELECT key, value FROM settings`);
+    const stmt = this.数据库.prepare(`SELECT key, value FROM settings`);
     const rows = stmt.all() as { key: string; value: string }[];
     const map: Record<string, string> = {};
     for (const r of rows) map[r.key] = r.value;
@@ -261,7 +261,7 @@ move动作参数说明：
    * 删除配置项
    */
   deleteSetting(key: string): void {
-    const stmt = this.db.prepare(`DELETE FROM settings WHERE key = ?`);
+    const stmt = this.数据库.prepare(`DELETE FROM settings WHERE key = ?`);
     stmt.run(key);
   }
 
@@ -271,7 +271,7 @@ move动作参数说明：
    * 注册/更新机器人
    */
   upsertRobot(robot: Partial<RobotRecord> & { uuid: string }): void {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       INSERT INTO robots (uuid, name, model, version, ip, group_name, tags, sn, role_id, status, last_connected, registered_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(uuid) DO UPDATE SET
@@ -308,7 +308,7 @@ move动作参数说明：
    * 更新机器人状态
    */
   updateRobotStatus(robotId: string, status: RobotStatus): void {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       UPDATE robots 
       SET status = ?, last_connected = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
       WHERE uuid = ?
@@ -320,7 +320,7 @@ move动作参数说明：
    * 获取机器人
    */
   getRobot(robotId: string): RobotRecord | undefined {
-    const stmt = this.db.prepare('SELECT * FROM robots WHERE uuid = ?');
+    const stmt = this.数据库.prepare('SELECT * FROM robots WHERE uuid = ?');
     return stmt.get(robotId) as RobotRecord | undefined;
   }
 
@@ -328,7 +328,7 @@ move动作参数说明：
    * 获取所有机器人
    */
   getAllRobots(): RobotRecord[] {
-    const stmt = this.db.prepare('SELECT * FROM robots ORDER BY last_connected DESC');
+    const stmt = this.数据库.prepare('SELECT * FROM robots ORDER BY last_connected DESC');
     return stmt.all() as RobotRecord[];
   }
 
@@ -358,7 +358,7 @@ move动作参数说明：
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
-    const stmt = this.db.prepare(`UPDATE robots SET ${fields.join(', ')} WHERE uuid = ?`);
+    const stmt = this.数据库.prepare(`UPDATE robots SET ${fields.join(', ')} WHERE uuid = ?`);
     stmt.run(...values, uuid);
     return this.getRobot(uuid);
   }
@@ -367,7 +367,7 @@ move动作参数说明：
    * 删除机器人（级联删除对话和动作日志）
    */
   deleteRobot(uuid: string): void {
-    const stmt = this.db.prepare('DELETE FROM robots WHERE uuid = ?');
+    const stmt = this.数据库.prepare('DELETE FROM robots WHERE uuid = ?');
     stmt.run(uuid);
   }
 
@@ -375,7 +375,7 @@ move动作参数说明：
    * 获取所有分组
    */
   getAllGroups(): string[] {
-    const stmt = this.db.prepare('SELECT DISTINCT group_name FROM robots WHERE group_name IS NOT NULL ORDER BY group_name');
+    const stmt = this.数据库.prepare('SELECT DISTINCT group_name FROM robots WHERE group_name IS NOT NULL ORDER BY group_name');
     const rows = stmt.all() as { group_name: string }[];
     return rows.map(r => r.group_name);
   }
@@ -398,7 +398,7 @@ move动作参数说明：
     max_history?: number;
     is_default?: number;
   }): RoleRecord | undefined {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       INSERT INTO roles (uuid, name, description, llm_provider, llm_model, temperature, system_prompt, voice, intent_strategy, max_history, is_default)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
@@ -422,7 +422,7 @@ move动作参数说明：
    * 获取角色
    */
   getRole(uuid: string): RoleRecord | undefined {
-    const stmt = this.db.prepare('SELECT * FROM roles WHERE uuid = ?');
+    const stmt = this.数据库.prepare('SELECT * FROM roles WHERE uuid = ?');
     return stmt.get(uuid) as RoleRecord | undefined;
   }
 
@@ -430,7 +430,7 @@ move动作参数说明：
    * 获取所有角色
    */
   getAllRoles(): RoleRecord[] {
-    const stmt = this.db.prepare('SELECT * FROM roles ORDER BY created_at DESC');
+    const stmt = this.数据库.prepare('SELECT * FROM roles ORDER BY created_at DESC');
     return stmt.all() as RoleRecord[];
   }
 
@@ -455,7 +455,7 @@ move动作参数说明：
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
-    const stmt = this.db.prepare(`UPDATE roles SET ${fields.join(', ')} WHERE uuid = ?`);
+    const stmt = this.数据库.prepare(`UPDATE roles SET ${fields.join(', ')} WHERE uuid = ?`);
     stmt.run(...values, uuid);
     return this.getRole(uuid);
   }
@@ -465,11 +465,11 @@ move动作参数说明：
    */
   deleteRole(uuid: string): void {
     // 解绑所有使用该角色的机器人
-    const unbindStmt = this.db.prepare('UPDATE robots SET role_id = NULL WHERE role_id = ?');
+    const unbindStmt = this.数据库.prepare('UPDATE robots SET role_id = NULL WHERE role_id = ?');
     unbindStmt.run(uuid);
 
     // 删除角色
-    const stmt = this.db.prepare('DELETE FROM roles WHERE uuid = ?');
+    const stmt = this.数据库.prepare('DELETE FROM roles WHERE uuid = ?');
     stmt.run(uuid);
   }
 
@@ -477,7 +477,7 @@ move动作参数说明：
    * 获取使用该角色的所有机器人
    */
   getRobotsByRole(roleId: string): RobotRecord[] {
-    const stmt = this.db.prepare('SELECT * FROM robots WHERE role_id = ?');
+    const stmt = this.数据库.prepare('SELECT * FROM robots WHERE role_id = ?');
     return stmt.all(roleId) as RobotRecord[];
   }
 
@@ -495,7 +495,7 @@ move动作参数说明：
     processing_time?: number;
     metadata?: any;
   }): number {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       INSERT INTO conversations (robot_id, timestamp, type, user_input, ai_response, actions, processing_time, metadata)
       VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?)
     `);
@@ -517,7 +517,7 @@ move动作参数说明：
    * 获取对话历史
    */
   getConversations(robotId: string, limit = 50, offset = 0): ConversationRecord[] {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       SELECT * FROM conversations
       WHERE robot_id = ?
       ORDER BY timestamp DESC
@@ -530,7 +530,7 @@ move动作参数说明：
    * 清空对话历史
    */
   clearConversations(robotId: string): void {
-    const stmt = this.db.prepare('DELETE FROM conversations WHERE robot_id = ?');
+    const stmt = this.数据库.prepare('DELETE FROM conversations WHERE robot_id = ?');
     stmt.run(robotId);
   }
 
@@ -540,7 +540,7 @@ move动作参数说明：
    * 插入动作日志
    */
   insertActionLog(robotId: string, actionName: string, parameters: any, status: ActionStatus): void {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       INSERT INTO action_logs (robot_id, action_name, parameters, status, executed_at)
       VALUES (?, ?, ?, ?, datetime('now'))
     `);
@@ -551,7 +551,7 @@ move动作参数说明：
    * 获取动作日志
    */
   getActionLogs(robotId: string, limit = 50, offset = 0) {
-    const stmt = this.db.prepare(`
+    const stmt = this.数据库.prepare(`
       SELECT * FROM action_logs
       WHERE robot_id = ?
       ORDER BY executed_at DESC
@@ -566,15 +566,15 @@ move动作参数说明：
    * 关闭数据库连接
    */
   close(): void {
-    this.db.close();
+    this.数据库.close();
   }
 
   /**
    * 获取原始数据库实例（用于高级操作）
    */
   getDb(): Database.Database {
-    return this.db;
+    return this.数据库;
   }
 }
 
-export default DatabaseService;
+export default 数据库服务;

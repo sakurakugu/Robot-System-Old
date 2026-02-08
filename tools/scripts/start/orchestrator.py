@@ -8,7 +8,7 @@ from typing import List, Tuple
 from .utils import (
     ROOT,
     LOGS_DIR,
-    ensure_dirs,
+    确保目录存在,
     ensure_node_modules,
     copy_env_example_if_missing,
     run,
@@ -17,7 +17,7 @@ from .utils import (
     kill_pid_file,
     http_ok,
     pkill_patterns,
-    check_env,
+    检查运行环境,
     ensure_ports_available,
 )
 
@@ -102,7 +102,7 @@ def _chat_frontend_port() -> int:
 
 
 def start_chat() -> List[Tuple[str, int]]:
-    ensure_dirs()
+    确保目录存在()
     if copy_env_example_if_missing(CHAT_BACKEND):
         # 首次创建 .env 即退出，等待用户配置
         return []
@@ -149,7 +149,7 @@ def stop_all() -> None:
 
 
 def start_all() -> List[Tuple[str, int]]:
-    check_env()
+    检查运行环境()
     print("========================================")
     print("  机器狗控制系统 - 启动")
     print("========================================")

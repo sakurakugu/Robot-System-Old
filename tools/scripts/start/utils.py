@@ -20,17 +20,18 @@ LOGS_DIR: Path = ROOT / ".cache" / "logs"
 PID_DIR: Path = ROOT / ".cache" /"pid"
 
 
-def ensure_dirs() -> None:
+def 确保目录存在() -> None:
     """确保日志目录和 PID 目录存在"""
     (LOGS_DIR / "robot-cloud").mkdir(parents=True, exist_ok=True)
     PID_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def which(cmd: str) -> Optional[str]:
+    """查找命令路径"""
     return shutil.which(cmd)
 
 
-def check_env() -> None:
+def 检查运行环境() -> None:
     if which("node") is None:
         print("❌ 未检测到 Node.js，请先安装 Node.js 24+", file=sys.stderr)
         sys.exit(1)
@@ -67,6 +68,7 @@ def run(cmd: Iterable[str], cwd: Optional[Path] = None, check: bool = True) -> s
 
 
 def _tee_stream(stream, log_file, label: str) -> None:
+    """将流内容 tee 到日志文件和标准输出"""
     for line in iter(stream.readline, ""):
         log_file.write(line)
         log_file.flush()
@@ -75,6 +77,7 @@ def _tee_stream(stream, log_file, label: str) -> None:
 
 
 def _log_label(log_path: Path) -> str:
+    """生成日志标签，包含父目录和文件名"""
     parent = log_path.parent.name
     name = log_path.stem
     if parent:
@@ -83,6 +86,7 @@ def _log_label(log_path: Path) -> str:
 
 
 def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Popen, int]:
+    """启动进程并 tee 输出到日志文件"""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "a", buffering=1, encoding="utf-8")
     列表 = 根据平台调整命令(list(cmd))

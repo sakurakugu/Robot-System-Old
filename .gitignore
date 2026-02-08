@@ -36,6 +36,7 @@ htmlcov/
 .vscode/
 .idea/
 .trae/
+.qoder/
 
 # 系统文件
 .DS_Store

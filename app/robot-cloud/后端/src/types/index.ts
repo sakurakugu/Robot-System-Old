@@ -5,8 +5,8 @@
 
 // ============ 基础类型 ============
 
-export type RobotStatus = 'online' | 'offline' | 'error';
-export type ConversationType = 'audio' | 'text';
+export type 机器人状态 = 'online' | 'offline' | 'error';
+export type 对话类型 = 'audio' | 'text';
 export type ActionStatus = 'success' | 'failed' | 'rejected';
 
 // ============ 数据库实体 ============
@@ -24,7 +24,7 @@ export interface RobotRecord {
   tags: string | null; // JSON array string
   sn: string | null;
   role_id: string | null;
-  status: RobotStatus;
+  status: 机器人状态;
   last_connected: string | null;
   registered_at: string | null;
   updated_at: string;
@@ -57,7 +57,7 @@ export interface ConversationRecord {
   uuid: number;
   robot_id: string;
   timestamp: string;
-  type: ConversationType;
+  type: 对话类型;
   user_input: string;
   ai_response: string;
   actions: string | null; // JSON string

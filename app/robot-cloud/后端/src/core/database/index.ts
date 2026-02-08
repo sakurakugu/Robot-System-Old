@@ -4,10 +4,10 @@ import 配置 from '../../config';
 import type {
   ActionStatus,
   ConversationRecord,
-  ConversationType,
   RobotRecord,
-  RobotStatus,
-  RoleRecord
+  RoleRecord,
+  对话类型,
+  机器人状态
 } from '../../types';
 
 /**
@@ -142,7 +142,7 @@ class 数据库服务 {
     // 检查 roles 表是否有 is_default 列
     const tableInfo = this.数据库.prepare("PRAGMA table_info(roles)").all() as Array<{ name: string }>;
     const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
-    
+
     if (!hasIsDefault) {
       console.log('正在迁移数据库：添加 is_default 列...');
       this.数据库.exec('ALTER TABLE roles ADD COLUMN is_default INTEGER DEFAULT 0');
@@ -155,7 +155,7 @@ class 数据库服务 {
    */
   private initializeDefaultRole(): void {
     const existingDefault = this.数据库.prepare('SELECT * FROM roles WHERE is_default = 1').get() as RoleRecord | undefined;
-    
+
     if (!existingDefault) {
       const defaultRoleId = 'default-role';
       const systemPrompt = `你是一只可爱的机器狗AI助手。你可以：
@@ -209,7 +209,7 @@ move动作参数说明：
         INSERT INTO roles (uuid, name, description, temperature, system_prompt, max_history, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
       `);
-      
+
       stmt.run(
         defaultRoleId,
         '默认角色',
@@ -218,7 +218,7 @@ move动作参数说明：
         systemPrompt,
         10
       );
-      
+
       console.log('已创建默认角色');
     }
   }
@@ -307,9 +307,9 @@ move动作参数说明：
   /**
    * 更新机器人状态
    */
-  updateRobotStatus(robotId: string, status: RobotStatus): void {
+  updateRobotStatus(robotId: string, status: 机器人状态): void {
     const stmt = this.数据库.prepare(`
-      UPDATE robots 
+      UPDATE robots
       SET status = ?, last_connected = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
       WHERE uuid = ?
     `);
@@ -340,7 +340,7 @@ move动作参数说明：
     const values: any[] = [];
 
     const allowedFields = ['name', 'model', 'version', 'ip', 'group_name', 'tags', 'sn', 'role_id', 'status', 'last_connected'];
-    
+
     for (const field of allowedFields) {
       if ((data as any)[field] !== undefined) {
         fields.push(`${field} = ?`);
@@ -442,7 +442,7 @@ move动作参数说明：
     const values: any[] = [];
 
     const allowedFields = ['name', 'description', 'llm_provider', 'llm_model', 'temperature', 'system_prompt', 'voice', 'intent_strategy', 'max_history'];
-    
+
     for (const field of allowedFields) {
       if ((data as any)[field] !== undefined) {
         fields.push(`${field} = ?`);
@@ -488,7 +488,7 @@ move动作参数说明：
    */
   insertConversation(data: {
     robot_id: string;
-    type: ConversationType;
+    type: 对话类型;
     user_input: string;
     ai_response: string;
     actions?: any;

@@ -41,7 +41,7 @@ detect_os() {
     else
         OS=$(uname -s)
     fi
-    
+
     print_info "检测到操作系统: $OS $VER"
 }
 
@@ -76,7 +76,7 @@ show_menu() {
 # 安装项目依赖
 install_project_dependencies() {
     print_info "安装项目依赖..."
-    
+
     # 安装 robot-cloud Node.js 依赖
     if [ -f "$ROOT_DIR/app/robot-cloud/后端/package.json" ]; then
         print_info "安装对话系统后端依赖..."
@@ -84,14 +84,14 @@ install_project_dependencies() {
         npm install
         print_success "对话系统后端依赖安装完成"
     fi
-    
+
     if [ -f "$ROOT_DIR/app/robot-cloud/前端/package.json" ]; then
         print_info "安装对话系统前端依赖..."
         cd "$ROOT_DIR/app/robot-cloud/前端"
         npm install
         print_success "对话系统前端依赖安装完成"
     fi
-    
+
     # 安装 Python 依赖（如果有 requirements.txt）
     if [ -f "$ROOT_DIR/requirements.txt" ]; then
         print_info "安装 Python 依赖..."
@@ -99,14 +99,14 @@ install_project_dependencies() {
         pip install -r requirements.txt
         print_success "Python 依赖安装完成"
     fi
-    
+
     cd "$ROOT_DIR"
 }
 
 # 更新项目依赖
 update_project_dependencies() {
     print_info "更新项目依赖..."
-    
+
     # 更新 robot-cloud 后端依赖
     if [ -f "$ROOT_DIR/app/robot-cloud/后端/package.json" ]; then
         print_info "更新对话系统后端依赖..."
@@ -126,7 +126,7 @@ update_project_dependencies() {
         npm install
         print_success "对话系统前端依赖更新完成"
     fi
-    
+
     cd "$ROOT_DIR"
 }
 
@@ -134,7 +134,7 @@ update_project_dependencies() {
 main() {
     print_info "开始环境配置..."
     detect_os
-    
+
     # 自动检测环境
     if [ "$OS" = "ubuntu" ] && [ "$VER" = "22.04" ]; then
         print_info "检测到Ubuntu 22.04，可以直接安装"
@@ -151,24 +151,24 @@ main() {
         print_info "检测到WSL环境"
         AUTO_CHOICE="3"
     fi
-    
+
     # 显示菜单
     show_menu
-    
+
     # 如果有自动检测的选择，提示用户
     if [ ! -z "$AUTO_CHOICE" ]; then
         echo -n "当前已自动选择 [$AUTO_CHOICE]，请输入选项 (直接回车使用建议): "
     else
         echo -n "请输入选项: "
     fi
-    
+
     read choice
-    
+
     # 如果用户直接回车且有建议选项，使用建议选项
     if [ -z "$choice" ] && [ ! -z "$AUTO_CHOICE" ]; then
         choice=$AUTO_CHOICE
     fi
-    
+
     case $choice in
         1)
             print_info "执行 Ubuntu 22.04 快速安装..."
@@ -207,7 +207,7 @@ main() {
             exit 1
             ;;
     esac
-    
+
     echo ""
     print_success "安装完成！"
     echo ""

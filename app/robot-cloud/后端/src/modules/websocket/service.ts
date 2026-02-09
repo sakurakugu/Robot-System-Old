@@ -1505,14 +1505,14 @@ class WebSocket服务 {
       }, 'business');
 
       // 单独通知 UI
-      this.sendToUI(robotId, {
-        type: 'text_response',
-        robotId,
-        timestamp: Date.now(),
-        data: {
-          text: `客户端注册成功！欢迎 ${name || '机器狗'}`,
-        },
-      }, 'business');
+      // this.sendToUI(robotId, {
+      //   type: 'text_response',
+      //   robotId,
+      //   timestamp: Date.now(),
+      //   data: {
+      //     text: `客户端注册成功！欢迎 ${name || '机器狗'}`,
+      //   },
+      // }, 'business');
     } catch (error: any) {
       this.logger.error('处理客户端注册失败', error, { robotId });
       this.sendError(robotId, 'REGISTER_ERROR', error.message, 'business');

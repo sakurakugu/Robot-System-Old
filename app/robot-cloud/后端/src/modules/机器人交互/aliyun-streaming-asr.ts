@@ -127,7 +127,7 @@ export class AliyunStreamingASR {
 
     // 将音频块加入队列
     this.audioQueue.push(pcmChunk);
-    console.log('[流式ASR] 音频块入队，队列长度:', this.audioQueue.length, 'chunk大小:', pcmChunk.length);
+    // console.log('[流式ASR] 音频块入队，队列长度:', this.audioQueue.length, 'chunk大小:', pcmChunk.length);
 
     // 如果任务已启动且没有正在处理队列，则开始处理
     if (this.taskStarted && !this.isProcessingQueue) {
@@ -232,7 +232,7 @@ export class AliyunStreamingASR {
       try {
         // 发送音频数据（二进制格式）
         this.ws.send(chunk);
-        console.log('[流式ASR] 发送音频块，大小:', chunk.length, '剩余队列:', this.audioQueue.length);
+        // console.log('[流式ASR] 发送音频块，大小:', chunk.length, '剩余队列:', this.audioQueue.length);
 
         // 控制发送速率（每 100ms 约 3200 字节，因此延迟约 20ms）
         await new Promise(resolve => setTimeout(resolve, 20));

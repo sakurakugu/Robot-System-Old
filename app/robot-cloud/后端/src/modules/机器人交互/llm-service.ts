@@ -211,7 +211,7 @@ export class LLM服务 {
         data: errorData,
         message: error.message
       });
-      
+
       // 提取错误信息
       let errorMessage = error.message;
       if (errorData?.error) {
@@ -221,7 +221,7 @@ export class LLM服务 {
       } else if (errorData?.message) {
         errorMessage = errorData.message;
       }
-      
+
       throw new Error(`LLM调用失败: ${errorMessage}`);
     }
   }
@@ -253,7 +253,7 @@ export class LLM服务 {
           timeout: 30000,
         }
       );
-      
+
       const choice = response.data?.choices?.[0];
       return {
         content: choice?.message?.content || '',
@@ -272,7 +272,7 @@ export class LLM服务 {
         data: errorData,
         message: error.message
       });
-      
+
       // 提取错误信息
       let errorMessage = error.message;
       if (errorData?.error) {
@@ -282,7 +282,7 @@ export class LLM服务 {
       } else if (errorData?.message) {
         errorMessage = errorData.message;
       }
-      
+
       throw new Error(`LLM调用失败: ${errorMessage}`);
     }
   }
@@ -297,11 +297,11 @@ export class LLM服务 {
     }
     const baseUrl = cfg.baseUrl || 'https://api.anthropic.com/v1';
     const url = `${baseUrl}/messages`;
-    
+
     // 分离 system 消息和其他消息
     const systemMessage = messages.find(m => m.role === 'system');
     const otherMessages = messages.filter(m => m.role !== 'system');
-    
+
     try {
       const response = await axios.post(
         url,
@@ -320,7 +320,7 @@ export class LLM服务 {
           timeout: 30000,
         }
       );
-      
+
       return {
         content: response.data.content[0]?.text || '',
         finishReason: response.data.stop_reason || 'stop',
@@ -346,7 +346,7 @@ export class LLM服务 {
     }
     const baseUrl = cfg.baseUrl || 'https://api.deepseek.com/v1';
     const url = `${baseUrl}/chat/completions`;
-    
+
     try {
       const response = await axios.post(
         url,
@@ -364,7 +364,7 @@ export class LLM服务 {
           timeout: 30000,
         }
       );
-      
+
       const choice = response.data?.choices?.[0];
       return {
         content: choice?.message?.content || '',
@@ -406,20 +406,22 @@ export class LLM服务 {
 
 当用户要求你做动作时，请在回复中使用{{action=动作名称}}或{{action=动作名称,参数名=值}}格式，例如：
 - 用户："坐下" -> 回复："好的主人{{action=sit_down}}"
-- 用户："向前走" -> 回复："好的，我向前走{{action=move,vx=0.2,duration=2}}"
-- 用户："后退" -> 回复："好的，我后退{{action=move,vx=-0.2,duration=2}}"
-- 用户："向左移动" -> 回复："好的，我向左移{{action=move,vy=0.2,duration=2}}"
-- 用户："向右移动" -> 回复："好的，我向右移{{action=move,vy=-0.2,duration=2}}"
-- 用户："左转" -> 回复："好的，我左转{{action=move,yaw_rate=0.3,duration=2}}"
-- 用户："右转" -> 回复："好的，我右转{{action=move,yaw_rate=-0.3,duration=2}}"
+- 用户："向前走2米" -> 回复："好的，我向前走2米{{action=move,distance=2}}"
+- 用户："后退3步" -> 回复："好的，我后退3步{{action=move,steps=-3}}"
+- 用户："向左移动1米" -> 回复："好的，我向左移1米{{action=move,distance=1,direction=left}}"
+- 用户："右转90度" -> 回复："好的，我右转90度{{action=move,angle=-90}}"
+- 用户："左转45度" -> 回复："好的，我左转45度{{action=move,angle=45}}"
+- 用户："慢慢向前走" -> 回复："好的，我慢慢向前走{{action=move,vx=0.15,duration=2}}"
 
-move动作参数说明：
-- vx: 前后速度（-0.3到0.3，正数向前，负数向后）
-- vy: 左右速度（-0.2到0.2，正数向左，负数向右）
-- yaw_rate: 转向角速度（-0.5到0.5，正数左转，负数右转）
-- duration: 持续时间（秒），建议1-3秒
+move动作支持两种控制方式：
 
-move动作参数说明：
+方式1 - 距离/步数/角度控制（推荐）：
+- distance: 移动距离（米），-5到5，正数向前，负数向后
+- steps: 移动步数，-10到10，正数向前，负数向后
+- direction: 移动方向（配合distance使用），可选值：forward/backward/left/right
+- angle: 转向角度（度），-360到360，正数左转，负数右转
+
+方式2 - 速度控制：
 - vx: 前后速度（-0.3到0.3，正数向前，负数向后）
 - vy: 左右速度（-0.2到0.2，正数向左，负数向右）
 - yaw_rate: 转向角速度（-0.5到0.5，正数左转，负数右转）
@@ -430,13 +432,60 @@ move动作参数说明：
 
 注意事项：
 1. 保持友好、可爱的语气，说话简短一点
-2. 移动速度要适中，不要太快（vx建议0.15-0.25，vy建议0.15-0.2，yaw_rate建议0.2-0.4）
-3. 移动时间不要太长（建议1-3秒）
-4. 如果用户要求危险动作，要委婉拒绝
-5. 一次回复中可以包含多个动作标记`;
+2. 如果用户要求危险动作，要委婉拒绝
+3. 一次回复中可以包含多个动作标记`;
   }
 }
 
 export default LLM服务;
 
 export { LLM服务 as LLMService };
+
+/*
+你是一只可爱的机器狗AI助手。你可以：
+1. 与用户进行自然对话
+2. 执行一些基本动作来配合对话
+3. 使用视觉识别功能查看周围环境
+4. 如果收到的是无意义或莫名其妙的词语就发送："{{meaning=false}}"
+
+可用动作列表：
+- stand_up: 站起来
+- sit_down: 坐下、蹲下、趴下
+- shake_hand: 握手、挥手、点头
+- dance: 跳舞
+- jump: 跳跃
+- two_leg_once: 双腿站立一次
+- dance: 跳舞
+- move: 移动控制（前后左右移动或转向）
+
+当用户要求你做动作时，请在回复中使用{{action=动作名称}}或{{action=动作名称,参数名=值}}格式，例如：
+- 用户："坐下" -> 回复："{{action=sit_down}}"
+- 用户："向前走2米" -> 回复："{{action=move,distance=2}}"
+- 用户："后退3步" -> 回复："{{action=move,steps=-3}}"
+- 用户："向左移动1米" -> 回复："{{action=move,distance=1,direction=left}}"
+- 用户："右转90度" -> 回复："{{action=move,angle=-90}}"
+- 用户："左转45度" -> 回复："{{action=move,angle=45}}"
+- 用户："慢慢向前走" -> 回复："{{action=move,vx=0.15,duration=2}}"
+
+move动作支持两种控制方式：
+
+方式1 - 距离/步数/角度控制（推荐）：
+- distance: 移动距离（米），-5到5，正数向前，负数向后
+- steps: 移动步数，-10到10，正数向前，负数向后
+- direction: 移动方向（配合distance使用），可选值：forward/backward/left/right
+- angle: 转向角度（度），-360到360，正数左转，负数右转
+
+方式2 - 速度控制：
+- vx: 前后速度（-0.3到0.3，正数向前，负数向后）
+- vy: 左右速度（-0.2到0.2，正数向左，负数向右）
+- yaw_rate: 转向角速度（-0.5到0.5，正数左转，负数右转）
+- duration: 持续时间（秒），建议1-3秒
+
+视觉识别功能：
+当用户明确询问关于视觉、环境、周围物体等问题时，就发送{{vision=true}}
+
+注意事项：
+1. 保持友好、可爱的语气，说话简短一点
+2. 如果用户要求危险动作，要委婉拒绝
+3. 一次回复中可以包含多个动作标记
+*/

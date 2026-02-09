@@ -60,7 +60,43 @@ export class 动作控制器 {
         const sanitizedAction = { ...action };
         let modified = false;
         
-        // 验证速度参数范围
+        // 方式1：距离/步数/角度控制
+        if (action.parameters.distance !== undefined) {
+          const distance = Number(action.parameters.distance);
+          if (Math.abs(distance) > 5) {
+            sanitizedAction.parameters = { ...action.parameters, distance: Math.sign(distance) * 5 };
+            modified = true;
+          }
+        }
+        
+        if (action.parameters.steps !== undefined) {
+          const steps = Number(action.parameters.steps);
+          if (Math.abs(steps) > 10) {
+            sanitizedAction.parameters = { ...action.parameters, steps: Math.sign(steps) * 10 };
+            modified = true;
+          }
+        }
+        
+        if (action.parameters.angle !== undefined) {
+          const angle = Number(action.parameters.angle);
+          if (Math.abs(angle) > 360) {
+            sanitizedAction.parameters = { ...action.parameters, angle: Math.sign(angle) * 360 };
+            modified = true;
+          }
+        }
+        
+        // 验证 direction 参数
+        if (action.parameters.direction !== undefined) {
+          const validDirections = ['forward', 'backward', 'left', 'right'];
+          if (!validDirections.includes(action.parameters.direction)) {
+            return {
+              safe: false,
+              reason: `无效的移动方向，必须是: ${validDirections.join(', ')}`,
+            };
+          }
+        }
+        
+        // 方式2：速度控制
         if (action.parameters.vx !== undefined) {
           const vx = Number(action.parameters.vx);
           if (Math.abs(vx) > 0.3) {
@@ -84,15 +120,17 @@ export class 动作控制器 {
         }
         
         // 验证持续时间
-        const duration = Number(action.parameters.duration || 0);
-        if (duration > rule.maxValue!) {
-          sanitizedAction.parameters = { ...sanitizedAction.parameters, duration: rule.maxValue };
-          modified = true;
-        } else if (duration < 0) {
-          return {
-            safe: false,
-            reason: '持续时间不能为负数',
-          };
+        if (action.parameters.duration !== undefined) {
+          const duration = Number(action.parameters.duration);
+          if (duration > rule.maxValue!) {
+            sanitizedAction.parameters = { ...sanitizedAction.parameters, duration: rule.maxValue };
+            modified = true;
+          } else if (duration < 0) {
+            return {
+              safe: false,
+              reason: '持续时间不能为负数',
+            };
+          }
         }
         
         if (modified) {

@@ -7,16 +7,20 @@ import 配置 from '../../config';
 export interface ASROptions {
   language?: string;
   prompt?: string;
+  provider?: 'xunfei' | 'openai' | 'aliyun';
+  model?: string;
 }
 
 class 语音识别服务 {
   async transcribeWav(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
-    const provider = 配置.asr.provider;
+    const provider = options?.provider || 配置.asr.provider;
     switch (provider) {
       case 'xunfei':
         return this.transcribeXunfei(wavBuffer, options);
       case 'openai':
         return this.transcribeOpenAI(wavBuffer, options);
+      case 'aliyun':
+        return this.transcribeAliyun(wavBuffer, options);
       default:
         throw new Error(`不支持的ASR提供商: ${provider}`);
     }
@@ -212,8 +216,191 @@ class 语音识别服务 {
       throw new Error(`ASR调用失败: ${message}`);
     }
   }
+
+  private async transcribeAliyun(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
+    const aliyun = 配置.asr.aliyun;
+    if (!aliyun?.apiKey) {
+      throw new Error('阿里云 ASR API密钥未配置');
+    }
+
+    const wsUrl = aliyun.baseUrl || 'wss://dashscope.aliyuncs.com/api-ws/v1/inference';
+    const model = options?.model || aliyun.model || 'fun-asr-realtime';
+
+    const pcmBuffer = this.extractPcmFromWav(wavBuffer);
+    const sampleRate = this.detectSampleRate(wavBuffer) || 16000;
+
+    console.log('[阿里云ASR] 开始识别', {
+      wsUrl,
+      model,
+      wavBufferSize: wavBuffer.length,
+      pcmBufferSize: pcmBuffer.length,
+      sampleRate,
+    });
+
+    return new Promise<string>((resolve, reject) => {
+      const taskId = crypto.randomUUID();
+      const ws = new WebSocket(wsUrl, {
+        headers: {
+          'Authorization': `Bearer ${aliyun.apiKey}`,
+        },
+      });
+
+      let closed = false;
+      let taskStarted = false;
+      let finalText = '';
+      const chunkSize = 3200; // 每次发送 3200 字节（约 100ms 的 16kHz 16bit PCM 音频）
+      let currentOffset = 0;
+
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        try {
+          ws.close();
+        } catch {}
+      };
+
+      // 分块发送音频数据（二进制格式）
+      const sendAudioChunks = () => {
+        const sendNextChunk = () => {
+          if (currentOffset >= pcmBuffer.length) {
+            // 所有音频发送完成，发送结束消息
+            const endMessage = {
+              header: {
+                action: 'finish-task',
+                task_id: taskId,
+                streaming: 'duplex',
+              },
+              payload: {
+                input: {},
+              },
+            };
+            console.log('[阿里云ASR] 音频发送完成，发送结束消息');
+            ws.send(JSON.stringify(endMessage));
+            return;
+          }
+
+          const chunk = pcmBuffer.slice(currentOffset, currentOffset + chunkSize);
+          currentOffset += chunkSize;
+
+          // 直接发送二进制音频数据，不是 JSON
+          ws.send(chunk);
+
+          if (currentOffset % (chunkSize * 10) === 0) {
+            console.log('[阿里云ASR] 音频发送进度:', Math.round((currentOffset / pcmBuffer.length) * 100) + '%');
+          }
+
+          // 控制发送速率，避免过快（每 100ms 发送一次）
+          setTimeout(sendNextChunk, 100);
+        };
+
+        sendNextChunk();
+      };
+
+      ws.on('open', () => {
+        console.log('[阿里云ASR] WebSocket 连接成功');
+        try {
+          // 发送开始消息（必须包含 payload.input 和 task_group）
+          const startMessage = {
+            header: {
+              action: 'run-task',
+              task_id: taskId,
+              streaming: 'duplex',
+            },
+            payload: {
+              task_group: 'audio',
+              task: 'asr',
+              function: 'recognition',
+              model: model,
+              parameters: {
+                format: 'pcm',
+                sample_rate: sampleRate,
+              },
+              input: {},
+            },
+          };
+          console.log('[阿里云ASR] 发送开始消息:', JSON.stringify(startMessage, null, 2));
+          ws.send(JSON.stringify(startMessage));
+        } catch (err) {
+          cleanup();
+          reject(err);
+        }
+      });
+
+      ws.on('message', (data: WebSocket.RawData) => {
+        try {
+          const msg = JSON.parse(data.toString());
+
+          // 添加详细日志用于调试
+          console.log('[阿里云ASR] 收到消息:', JSON.stringify(msg, null, 2));
+
+          // 处理不同的事件类型
+          switch (msg.header?.event) {
+            case 'task-started':
+              console.log('[阿里云ASR] 任务已启动，开始发送音频');
+              taskStarted = true;
+              sendAudioChunks();
+              break;
+
+            case 'result-generated':
+              // 提取识别结果
+              if (msg.payload?.output?.sentence?.text) {
+                const text = msg.payload.output.sentence.text;
+                console.log('[阿里云ASR] 识别结果:', text);
+                // 如果是句子结束（sentence_end 为 true），更新 finalText
+                if (msg.payload.output.sentence.sentence_end) {
+                  finalText = text;
+                  console.log('[阿里云ASR] 句子结束，更新最终文本:', finalText);
+                }
+              }
+              break;
+
+            case 'task-finished':
+              console.log('[阿里云ASR] 任务完成，最终文本:', finalText);
+              cleanup();
+              resolve(finalText.trim());
+              break;
+
+            case 'task-failed':
+              const errorMsg = msg.header?.error_message || '未知错误';
+              const errorCode = msg.header?.error_code || 'UNKNOWN';
+              console.error('[阿里云ASR] 任务失败:', errorCode, errorMsg);
+              cleanup();
+              reject(new Error(`阿里云ASR失败 [${errorCode}]: ${errorMsg}`));
+              break;
+
+            default:
+              console.log('[阿里云ASR] 未知事件:', msg.header?.event);
+          }
+        } catch (err) {
+          console.error('[阿里云ASR] 消息处理错误:', err);
+          cleanup();
+          reject(err);
+        }
+      });
+
+      ws.on('error', (err) => {
+        console.error('[阿里云ASR] WebSocket 错误:', err);
+        cleanup();
+        reject(new Error(`阿里云ASR连接错误: ${err.message}`));
+      });
+
+      ws.on('close', (code, reason) => {
+        console.log('[阿里云ASR] WebSocket 关闭:', { code, reason: reason.toString() });
+        if (!closed) {
+          closed = true;
+          if (!taskStarted) {
+            reject(new Error('阿里云ASR任务未启动就关闭了连接'));
+          } else {
+            // 正常关闭，返回已收集的结果
+            resolve(finalText.trim());
+          }
+        }
+      });
+    });
+  }
 }
 
 export default 语音识别服务;
 
 export { 语音识别服务 as ASRService };
+

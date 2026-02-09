@@ -58,6 +58,8 @@ class 数据库服务 {
         temperature REAL DEFAULT 0.7,
         system_prompt TEXT,
         voice TEXT,
+        asr_provider TEXT,
+        asr_model TEXT,
         intent_strategy TEXT,
         max_history INTEGER DEFAULT 10,
         is_default INTEGER DEFAULT 0,
@@ -142,10 +144,26 @@ class 数据库服务 {
     // 检查 roles 表是否有 is_default 列
     const tableInfo = this.数据库.prepare("PRAGMA table_info(roles)").all() as Array<{ name: string }>;
     const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
+    const hasAsrProvider = tableInfo.some(col => col.name === 'asr_provider');
+    const hasAsrModel = tableInfo.some(col => col.name === 'asr_model');
 
     if (!hasIsDefault) {
       console.log('正在迁移数据库：添加 is_default 列...');
       this.数据库.exec('ALTER TABLE roles ADD COLUMN is_default INTEGER DEFAULT 0');
+      console.log('数据库迁移完成');
+    }
+
+    if (!hasAsrProvider) {
+      console.log('正在迁移数据库：添加 asr_provider 列...');
+      this.数据库.exec('ALTER TABLE roles ADD COLUMN asr_provider TEXT');
+    }
+
+    if (!hasAsrModel) {
+      console.log('正在迁移数据库：添加 asr_model 列...');
+      this.数据库.exec('ALTER TABLE roles ADD COLUMN asr_model TEXT');
+    }
+
+    if (!hasIsDefault || !hasAsrProvider || !hasAsrModel) {
       console.log('数据库迁移完成');
     }
   }
@@ -394,13 +412,15 @@ move动作参数说明：
     temperature?: number;
     system_prompt?: string;
     voice?: string;
+    asr_provider?: string;
+    asr_model?: string;
     intent_strategy?: string;
     max_history?: number;
     is_default?: number;
   }): RoleRecord | undefined {
     const stmt = this.数据库.prepare(`
-      INSERT INTO roles (uuid, name, description, llm_provider, llm_model, temperature, system_prompt, voice, intent_strategy, max_history, is_default)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO roles (uuid, name, description, llm_provider, llm_model, temperature, system_prompt, voice, asr_provider, asr_model, intent_strategy, max_history, is_default)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       data.uuid,
@@ -411,6 +431,8 @@ move动作参数说明：
       data.temperature ?? 0.7,
       data.system_prompt ?? null,
       data.voice ?? null,
+      data.asr_provider ?? null,
+      data.asr_model ?? null,
       data.intent_strategy ?? null,
       data.max_history ?? 10,
       data.is_default ?? 0
@@ -441,7 +463,7 @@ move动作参数说明：
     const fields: string[] = [];
     const values: any[] = [];
 
-    const allowedFields = ['name', 'description', 'llm_provider', 'llm_model', 'temperature', 'system_prompt', 'voice', 'intent_strategy', 'max_history'];
+    const allowedFields = ['name', 'description', 'llm_provider', 'llm_model', 'temperature', 'system_prompt', 'voice', 'asr_provider', 'asr_model', 'intent_strategy', 'max_history'];
 
     for (const field of allowedFields) {
       if ((data as any)[field] !== undefined) {

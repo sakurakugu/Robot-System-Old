@@ -132,7 +132,7 @@ class 网络套接字服务 {
           // 忽略关闭错误
         }
       }
-      
+
       const connection: RobotConnection = {
         robotId,
         websocket: ws,
@@ -405,7 +405,7 @@ class 网络套接字服务 {
       if (!robot.role_id) {
         const errorMsg = '该机器人未配置角色，无法进行对话。请在管理界面为机器人分配一个角色。';
         this.logger.warn('机器人未配置角色', { robotId });
-        
+
         // 发送错误消息到UI
         this.sendToUI(robotId, {
           type: 'error',
@@ -417,7 +417,7 @@ class 网络套接字服务 {
             code: 'NO_ROLE_CONFIGURED'
           },
         }, 'business');
-        
+
         return;
       }
 
@@ -426,7 +426,7 @@ class 网络套接字服务 {
       let temperature: number | undefined = undefined;
       let model: string | undefined = undefined;
       let maxHistory: number = 10;
-      
+
       if (robot) {
         // 仅当机器人模型是有效的LLM模型时才传递，否则使用系统配置的默认模型
         const provider = 配置.llm.provider;
@@ -468,12 +468,12 @@ class 网络套接字服务 {
 
       // 检查回复中是否包含 {{vision=true}} 标记
       const needsVision = hasVisionTag(response.text);
-      
+
       let finalResponse = response;
-      
+
       if (needsVision) {
         this.logger.info('检测到视觉识别需求，开始拍照', { robotId });
-        
+
         try {
           // 检查是否有 robotService
           if (!this.robotService) {
@@ -494,7 +494,7 @@ class 网络套接字服务 {
 
           // 调用拍照功能
           const photoResult = await this.robotService.拍照(robotId);
-          
+
           this.logger.info('拍照成功，开始视觉分析', { robotId });
 
           // 发送状态消息
@@ -511,7 +511,7 @@ class 网络套接字服务 {
 
           // 移除视觉标记，得到纯净的LLM回复
           const cleanedText = removeVisionTags(response.text);
-          
+
           // 使用用户原始问题和图片调用视觉模型
           const visionResponse = await this.conversationEngine.处理视觉消息(
             robotId,
@@ -524,7 +524,7 @@ class 网络套接字服务 {
           this.logger.info('视觉分析完成', { robotId });
         } catch (error: any) {
           this.logger.error('视觉识别失败', error, { robotId });
-          
+
           // 发送错误状态
           this.sendToUI(robotId, {
             type: 'vision_status',
@@ -687,14 +687,14 @@ class 网络套接字服务 {
         this.sendError(robotId, 'RATE_LIMITED', '请求过于频繁，请稍后再试', 'business');
         return;
       }
-      
+
       // 对TTS文本进行清理，移除不应该被朗读的标记
       const sanitizedText = this.sanitizeTtsText(text);
       if (!sanitizedText) {
         this.logger.info('TTS跳过：清理后文本为空', { robotId });
         return;
       }
-      
+
       const streamEnabled = ttsOptions?.stream !== false;
       const sessionId = conversationId || uuidv7();
       if (streamEnabled) {
@@ -967,7 +967,21 @@ class 网络套接字服务 {
     const asrStart = Date.now();
     try {
       const wavBuffer = this.decodeOpusChunksToWav(session);
-      const text = (await this.asrService.transcribeWav(wavBuffer)) || '';
+
+      // 获取机器人的角色配置，优先使用角色的 ASR 配置
+      const robot = this.database.getRobot(robotId);
+      const asrOptions: any = {};
+      if (robot?.role_id) {
+        const role = this.database.getRole(robot.role_id);
+        if (role?.asr_provider) {
+          asrOptions.provider = role.asr_provider;
+          if (role.asr_model) {
+            asrOptions.model = role.asr_model;
+          }
+        }
+      }
+
+      const text = (await this.asrService.transcribeWav(wavBuffer, asrOptions)) || '';
       const asrTime = Date.now() - asrStart;
 
       if (!text.trim()) {
@@ -983,9 +997,9 @@ class 网络套接字服务 {
     } catch (error: any) {
       const message = error?.message || '语音识别失败';
       if (String(message).includes('Opus解码失败')) {
-        this.logger.warn('Opus解码失败', { 
-          robotId, 
-          sessionId, 
+        this.logger.warn('Opus解码失败', {
+          robotId,
+          sessionId,
           chunks: session.chunks.length,
           sampleRate: session.sampleRate,
           channels: session.channels,
@@ -1004,7 +1018,7 @@ class 网络套接字服务 {
     const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
     const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
     const frameSize = Math.floor((sr * fd) / 1000);
-    
+
     let decoder: any;
     try {
       decoder = new (OpusScript as any)(
@@ -1013,7 +1027,7 @@ class 网络套接字服务 {
         (OpusScript as any).Application.VOIP
       );
     } catch (error) {
-      this.logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), { 
+      this.logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
         sampleRate: sr,
         channels: ch,
         sessionId: session.sessionId
@@ -1047,7 +1061,7 @@ class 网络套接字服务 {
             // 前16字节的十六进制，用于诊断
             hexPreview: chunk.slice(0, Math.min(16, chunk.length)).toString('hex')
           });
-          
+
           const decoded = decoder.decode(chunk, frameSize);
           if (decoded && decoded.length > 0) {
             pcmBuffers.push(toUint8Array(decoded));
@@ -1060,8 +1074,8 @@ class 网络套接字服务 {
           }
         } catch (error) {
           failCount++;
-          this.logger.warn('音频块解码失败', { 
-            sessionId: session.sessionId, 
+          this.logger.warn('音频块解码失败', {
+            sessionId: session.sessionId,
             index: i,
             chunkLength: chunk.length,
             expectedFrameSize: frameSize,
@@ -1133,18 +1147,18 @@ class 网络套接字服务 {
 
   private sanitizeTtsText(text: string): string {
     if (!text) return '';
-    
+
     // 移除表情符号
     const emojiRegex = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu;
     let result = removeActionTags(text).replace(emojiRegex, '');
     result = result.replace(/[（(][^）)]*(?:注意|提示|警告|说明)[^）)]*[）)]/g, '');
-    
+
     // 移除特殊标记如 {{meaning=false}}，这些标记用于控制AI行为但不应被朗读
     result = result.replace(/\{\{\s*meaning\s*=\s*false\s*\}\}/g, '');
-    
+
     // 移除视觉标记 {{vision=true}}
     result = removeVisionTags(result);
-    
+
     return result.trim();
   }
 
@@ -1234,7 +1248,7 @@ class 网络套接字服务 {
       data: msg?.data ?? msg,
     };
     this.logger.debug('收到状态更新', { robotId, payload });
-    
+
     // 由于新数据库结构不再使用 metadata 存储状态，这里仅广播到 UI
     // TODO: 如果需要持久化状态，可以添加专门的状态表
 
@@ -1274,19 +1288,19 @@ class 网络套接字服务 {
    */
   private async handleRobotRegister(robotId: string, data: any): Promise<void> {
     this.logger.info('收到机器人注册', { robotId, data });
-    
+
     try {
       const { name, model, version } = data;
-      
+
       // 更新机器人信息
       const robot = this.database.getRobot(robotId);
-      
+
       this.database.updateRobot(robotId, {
         name: name || robot?.name || null,
         model: model || robot?.model || null,
         status: 'online',
       });
-      
+
       // 更新连接元数据
       const connection = this.robotConnections.get(robotId)?.get('business');
       if (connection) {
@@ -1296,9 +1310,9 @@ class 网络套接字服务 {
           version: version || connection.metadata.version,
         };
       }
-      
+
       this.logger.info('客户端注册成功', { robotId, name, model });
-      
+
       // 发送注册确认 - 仅发送到 business 通道，不要广播到其他通道
       this.sendToRobot(robotId, {
         type: 'text_response',
@@ -1308,7 +1322,7 @@ class 网络套接字服务 {
           text: `客户端注册成功！欢迎 ${name || '机器狗'}`,
         },
       }, 'business');
-      
+
       // 单独通知 UI
       this.sendToUI(robotId, {
         type: 'text_response',
@@ -1538,7 +1552,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     // 发送拍照命令
     const success = this.sendToRobot(robotId, {
       type: 'camera_capture',
@@ -1585,7 +1599,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'volume_get',
       robotId,
@@ -1629,7 +1643,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'volume_set',
       robotId,
@@ -1673,7 +1687,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'volume_mute',
       robotId,
@@ -1717,7 +1731,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'config_get',
       robotId,
@@ -1761,7 +1775,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'config_update',
       robotId,
@@ -1875,7 +1889,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'sdk_mode_set',
       robotId,
@@ -1919,7 +1933,7 @@ class 网络套接字服务 {
     }
 
     const requestId = uuidv7();
-    
+
     const success = this.sendToRobot(robotId, {
       type: 'sdk_mode_get',
       robotId,

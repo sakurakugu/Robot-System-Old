@@ -36,7 +36,7 @@ export interface 配置 {
 
   // 语音识别配置
   asr: {
-    provider: 'xunfei' | 'openai';
+    provider: 'xunfei' | 'openai' | 'aliyun';
     xunfei?: {
       appId: string;
       apiKey: string;
@@ -48,6 +48,11 @@ export interface 配置 {
       baseUrl?: string;
       language?: string;
       prompt?: string;
+    };
+    aliyun?: {
+      apiKey: string;
+      model: string;
+      baseUrl?: string;
     };
   };
 
@@ -139,6 +144,11 @@ const 配置: 配置 = {
       baseUrl: process.env.OPENAI_ASR_BASE_URL || 'https://api.openai.com/v1',
       language: process.env.OPENAI_ASR_LANGUAGE || 'zh',
       prompt: process.env.OPENAI_ASR_PROMPT || '',
+    },
+    aliyun: {
+      apiKey: process.env.ALIYUN_ASR_API_KEY || '',
+      model: process.env.ALIYUN_ASR_MODEL || 'fun-asr-realtime',
+      baseUrl: process.env.ALIYUN_ASR_BASE_URL || 'wss://dashscope.aliyuncs.com/api-ws/v1/inference',
     },
   },
 

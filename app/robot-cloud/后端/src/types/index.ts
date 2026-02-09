@@ -43,6 +43,8 @@ export interface RoleRecord {
   temperature: number;
   system_prompt: string | null;
   voice: string | null;
+  asr_provider: string | null;
+  asr_model: string | null;
   intent_strategy: string | null;
   max_history: number;
   is_default: number;
@@ -144,6 +146,8 @@ export interface CreateRoleDto {
   temperature?: number;
   system_prompt?: string;
   voice?: string;
+  asr_provider?: string;
+  asr_model?: string;
   intent_strategy?: string;
   max_history?: number;
 }
@@ -157,6 +161,8 @@ export interface UpdateRoleDto {
   llm_provider?: string;
   llm_model?: string;
   temperature?: number;
+  asr_provider?: string;
+  asr_model?: string;
   system_prompt?: string;
   voice?: string;
   intent_strategy?: string;

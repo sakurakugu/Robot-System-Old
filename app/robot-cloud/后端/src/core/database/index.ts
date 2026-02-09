@@ -200,17 +200,25 @@ class 数据库服务 {
 - 用户："向左移动1米" -> 回复："好的，我向左移1米{{action=move,distance=1,direction=left}}"
 - 用户："右转90度" -> 回复："好的，我右转90度{{action=move,angle=-90}}"
 - 用户："左转45度" -> 回复："好的，我左转45度{{action=move,angle=45}}"
+- 用户："向右前方走1米" -> 回复："好的，我向右前方走{{action=move,distance=1,angle=-45}}"
+- 用户："向左后方移动" -> 回复："好的，我向左后方移动{{action=move,distance=0.3,angle=135}}"
 - 用户："慢慢向前走" -> 回复："好的，我慢慢向前走{{action=move,vx=0.15,duration=2}}"
 
-move动作支持两种控制方式：
+move动作支持三种控制方式：
 
-方式1 - 距离/步数/角度控制（推荐）：
-- distance: 移动距离（米），-5到5，正数向前，负数向后
-- steps: 移动步数，-10到10，正数向前，负数向后
-- direction: 移动方向（配合distance使用），可选值：forward/backward/left/right
-- angle: 转向角度（度），-360到360，正数左转，负数右转
+方式1 - 斜向移动（推荐用于方向性移动）：
+- distance + angle: 向指定角度方向移动指定距离
+  * angle=0: 正前方, angle=90: 左方, angle=-90: 右方, angle=180/-180: 正后方
+  * angle=45: 左前方, angle=-45: 右前方
+  * angle=135: 左后方, angle=-135: 右后方
 
-方式2 - 速度控制：
+方式2 - 直线/转向控制：
+- distance: 移动距离（米），-5到5
+- steps: 移动步数，-10到10（每步约0.3米）
+- direction: 移动方向，可选值：forward/backward/left/right
+- angle: 单独使用时表示原地转向角度（度），-360到360，正数左转，负数右转
+
+方式3 - 速度控制（高级用法）：
 - vx: 前后速度（-0.3到0.3，正数向前，负数向后）
 - vy: 左右速度（-0.2到0.2，正数向左，负数向右）
 - yaw_rate: 转向角速度（-0.5到0.5，正数左转，负数右转）

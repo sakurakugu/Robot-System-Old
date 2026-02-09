@@ -8,6 +8,7 @@ import type Logger from '../../core/logger';
 import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import type { RobotService } from '../robot/service';
+import { AliyunStreamingASR } from '../机器人交互/aliyun-streaming-asr';
 import ASRService from '../机器人交互/asr-service';
 import ConversationEngine from '../机器人交互/conversation-engine';
 import TTSService from '../机器人交互/tts-service';
@@ -26,6 +27,13 @@ type AudioSession = {
   chunks: Buffer[];
   startedAt: number;
   lastChunkAt: number;
+  // 流式 ASR 相关
+  streamingASR?: AliyunStreamingASR;
+  opusDecoder?: any;
+  asrOptions?: any;
+  // PCM 缓冲区（用于累积多帧再发送）
+  pcmBuffer?: Buffer[];
+  pcmBufferSize?: number;
 };
 
 class WebSocket服务 {
@@ -874,7 +882,28 @@ class WebSocket服务 {
     const sampleRate = Number(audioData?.sampleRate || 16000);
     const channels = Number(audioData?.channels || 1);
     const frameDurationMs = Number(audioData?.frameDurationMs || 20);
-    this.audioSessions.set(sessionId, {
+
+    // 获取机器人的角色配置，确定是否使用流式 ASR
+    const robot = this.database.getRobot(robotId);
+    let asrOptions: any = {};
+    let useStreamingASR = false;
+
+    if (robot?.role_id) {
+      const role = this.database.getRole(robot.role_id);
+      if (role?.asr_provider) {
+        asrOptions.provider = role.asr_provider;
+        if (role.asr_model) {
+          asrOptions.model = role.asr_model;
+        }
+        // 只有阿里云 ASR 支持流式处理
+        useStreamingASR = role.asr_provider === 'aliyun';
+      }
+    } else if (配置.asr.provider === 'aliyun') {
+      asrOptions.provider = 'aliyun';
+      useStreamingASR = true;
+    }
+
+    const session: AudioSession = {
       robotId,
       sessionId,
       format: 'opus',
@@ -884,8 +913,64 @@ class WebSocket服务 {
       chunks: [],
       startedAt: Date.now(),
       lastChunkAt: Date.now(),
+      asrOptions,
+    };
+
+    // 如果使用流式 ASR，立即启动连接
+    if (useStreamingASR) {
+      try {
+        this.logger.info('启动流式 ASR 服务', { robotId, sessionId, asrOptions });
+
+        // 创建流式 ASR 实例
+        const streamingASR = new AliyunStreamingASR({
+          model: asrOptions.model,
+          sampleRate,
+          format: 'pcm',
+        });
+
+        // 启动连接（异步，但不阻塞）
+        streamingASR.start().catch((error) => {
+          this.logger.error('流式 ASR 启动失败', error, { robotId, sessionId });
+          this.sendError(robotId, 'ASR_START_ERROR', error.message || '流式 ASR 启动失败', 'business');
+        });
+
+        session.streamingASR = streamingASR;
+
+        // 创建 Opus 解码器用于实时解码
+        const sr = sampleRate === 16000 || sampleRate === 48000 ? sampleRate : 16000;
+        const ch = channels === 2 ? 2 : 1;
+        try {
+          session.opusDecoder = new (OpusScript as any)(
+            sr,
+            ch,
+            (OpusScript as any).Application.VOIP
+          );
+          // 初始化 PCM 缓冲区
+          session.pcmBuffer = [];
+          session.pcmBufferSize = 0;
+          this.logger.debug('Opus 解码器初始化成功', { robotId, sessionId, sampleRate: sr, channels: ch });
+        } catch (error) {
+          this.logger.error('Opus 解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
+            robotId,
+            sessionId,
+            sampleRate: sr,
+            channels: ch,
+          });
+        }
+      } catch (error: any) {
+        this.logger.error('流式 ASR 初始化失败', error, { robotId, sessionId });
+      }
+    }
+
+    this.audioSessions.set(sessionId, session);
+    this.logger.debug('音频会话开始', {
+      robotId,
+      sessionId,
+      sampleRate,
+      channels,
+      frameDurationMs,
+      useStreamingASR,
     });
-    this.logger.debug('音频会话开始', { robotId, sessionId, sampleRate, channels, frameDurationMs });
   }
 
   /**
@@ -923,10 +1008,67 @@ class WebSocket服务 {
           sessionId,
           chunkLength: chunk.length,
           base64Length: buffer.length,
-          totalChunks: session.chunks.length + 1
+          totalChunks: session.chunks.length + 1,
+          hasStreamingASR: !!session.streamingASR,
         });
+
+        // 保存原始音频块（用于降级处理）
         session.chunks.push(chunk);
         session.lastChunkAt = Date.now();
+
+        // 如果启用了流式 ASR，立即解码并累积
+        if (session.streamingASR && session.opusDecoder) {
+          try {
+            const sr = session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000;
+            const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
+            const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
+            const frameSize = Math.floor((sr * fd) / 1000);
+
+            // 解码 Opus 为 PCM（Int16Array）
+            const pcmData = session.opusDecoder.decode(chunk, frameSize);
+            if (pcmData && pcmData.length > 0) {
+              // 正确转换 Int16Array 为 Buffer
+              const pcmBuffer = Buffer.from(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
+
+              // 累积到缓冲区
+              session.pcmBuffer = session.pcmBuffer || [];
+              session.pcmBuffer.push(pcmBuffer);
+              session.pcmBufferSize = (session.pcmBufferSize || 0) + pcmBuffer.length;
+
+              // 当累积到约 100ms（3200 字节）时，批量发送
+              const targetSize = Math.floor((sr * 2 * 100) / 1000); // 100ms 的字节数
+              if (session.pcmBufferSize >= targetSize) {
+                const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
+                session.streamingASR.pushAudio(mergedBuffer);
+                session.pcmBuffer = [];
+                session.pcmBufferSize = 0;
+
+                this.logger.debug('批量推送 PCM 到流式 ASR', {
+                  robotId,
+                  sessionId,
+                  pcmSize: mergedBuffer.length,
+                  framesCount: session.pcmBuffer.length,
+                });
+              }
+
+              this.logger.debug('音频块已解码', {
+                robotId,
+                sessionId,
+                opusSize: chunk.length,
+                pcmSize: pcmBuffer.length,
+                asrStatus: session.streamingASR.getStatus(),
+              });
+            }
+          } catch (error) {
+            this.logger.warn('实时解码音频块失败', {
+              robotId,
+              sessionId,
+              chunkLength: chunk.length,
+              error: String(error),
+            });
+            // 解码失败不影响整体流程，会在 handleAudioEnd 时使用降级方案
+          }
+        }
       } else {
         this.logger.debug('音频块长度为0', { robotId, sessionId });
       }
@@ -965,23 +1107,53 @@ class WebSocket服务 {
 
     const durationMs = session.frameDurationMs * session.chunks.length;
     const asrStart = Date.now();
-    try {
-      const wavBuffer = this.decodeOpusChunksToWav(session);
 
-      // 获取机器人的角色配置，优先使用角色的 ASR 配置
-      const robot = this.database.getRobot(robotId);
-      const asrOptions: any = {};
-      if (robot?.role_id) {
-        const role = this.database.getRole(robot.role_id);
-        if (role?.asr_provider) {
-          asrOptions.provider = role.asr_provider;
-          if (role.asr_model) {
-            asrOptions.model = role.asr_model;
+    try {
+      let text = '';
+
+      // 优先使用流式 ASR 结果
+      if (session.streamingASR) {
+        try {
+          // 发送缓冲区中剩余的 PCM 数据
+          if (session.pcmBuffer && session.pcmBuffer.length > 0) {
+            const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
+            session.streamingASR.pushAudio(mergedBuffer);
+            this.logger.debug('发送剩余 PCM 数据', {
+              robotId,
+              sessionId,
+              pcmSize: mergedBuffer.length,
+            });
+            session.pcmBuffer = [];
+            session.pcmBufferSize = 0;
           }
+
+          text = await session.streamingASR.finish();
+
+          this.logger.info('流式 ASR 识别完成', {
+            robotId,
+            sessionId,
+            text,
+            chunks: session.chunks.length,
+            durationMs,
+          });
+        } catch (error: any) {
+          this.logger.error('流式 ASR 识别失败，降级到批量处理', error, { robotId, sessionId });
+          // 流式 ASR 失败，降级到原来的批量处理方式
+          text = '';
         }
       }
 
-      const text = (await this.asrService.transcribeWav(wavBuffer, asrOptions)) || '';
+      // 如果流式 ASR 没有结果（未启用或失败），使用原来的批量处理方式
+      if (!text.trim()) {
+        this.logger.info('使用批量 ASR 处理', { robotId, sessionId });
+        const wavBuffer = this.decodeOpusChunksToWav(session);
+
+        // 使用配置好的 ASR 选项
+        const asrOptions = session.asrOptions || {};
+
+        text = (await this.asrService.transcribeWav(wavBuffer, asrOptions)) || '';
+      }
+
       const asrTime = Date.now() - asrStart;
 
       if (!text.trim()) {
@@ -1009,6 +1181,15 @@ class WebSocket服务 {
       }
       this.logger.error('音频处理失败', error, { robotId, sessionId });
       this.sendError(robotId, 'ASR_ERROR', message, 'business');
+    } finally {
+      // 清理资源
+      if (session.opusDecoder) {
+        try {
+          session.opusDecoder.delete?.();
+        } catch (e) {
+          // 忽略清理错误
+        }
+      }
     }
   }
 

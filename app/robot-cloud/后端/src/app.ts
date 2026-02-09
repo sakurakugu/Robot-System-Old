@@ -24,7 +24,7 @@ export class 应用程序 {
   public logger: Logger;
   public 应用: express.Application;
   public 数据库: DatabaseService;
-  public 网络套接字服务: WebSocketService;
+  public WebSocket服务: WebSocketService;
 
   // 服务实例
   private 机器人服务: RobotService;
@@ -44,7 +44,7 @@ export class 应用程序 {
     this.应用 = express();
     this.logger = new Logger();
     this.数据库 = new DatabaseService();
-    this.网络套接字服务 = new WebSocketService(this.logger, this.数据库);
+    this.WebSocket服务 = new WebSocketService(this.logger, this.数据库);
 
     // 初始化服务
     this.机器人服务 = new RobotService(this.数据库, this.logger);
@@ -66,11 +66,11 @@ export class 应用程序 {
     this.设置路由();
 
     // 延迟注入 WebSocket 服务到编舞服务
-    this.编舞服务.setWebSocketService(this.网络套接字服务);
+    this.编舞服务.setWebSocketService(this.WebSocket服务);
     // 延迟注入 WebSocket 服务到机器人服务
-    this.机器人服务.setWebSocketService(this.网络套接字服务);
+    this.机器人服务.setWebSocketService(this.WebSocket服务);
     // 延迟注入 RobotService 到 WebSocket 服务
-    this.网络套接字服务.setRobotService(this.机器人服务);
+    this.WebSocket服务.setRobotService(this.机器人服务);
   }
 
   /**
@@ -79,7 +79,7 @@ export class 应用程序 {
   private 加载持久化配置(): void {
     try {
       this.设置服务.loadPersistedConfig();
-      
+
       const 活动LLM = this.设置服务.getActiveLLMConfig();
       this.logger.info(`LLM 配置已加载`, {
         provider: 活动LLM.provider,
@@ -124,7 +124,7 @@ export class 应用程序 {
     路由器.use('/config', createSettingsRoutes(this.设置控制器));
     路由器.use('/roles', createRoleRoutes(this.角色控制器));
     路由器.use('/choreo', createChoreoRoutes(this.编舞控制器));
-    路由器.use('/', createSystemRoutes(this.数据库, this.网络套接字服务));
+    路由器.use('/', createSystemRoutes(this.数据库, this.WebSocket服务));
 
     // 兼容旧路由
     路由器.post('/robot/:robotId/command', (请求, 响应) => {

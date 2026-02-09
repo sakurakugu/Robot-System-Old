@@ -10,15 +10,15 @@ const 音频上传服务器 = createServer();
 const 音频下载服务器 = createServer();
 
 // 初始化WebSocket服务（多端口拆分）
-应用.网络套接字服务.init(控制服务器, { path: 配置.ws.path, channel: 'control' });
-应用.网络套接字服务.init(业务服务器, { path: 配置.ws.path, channel: 'business' });
-应用.网络套接字服务.init(音频上传服务器, { path: 配置.ws.path, channel: 'audio_upload' });
-应用.网络套接字服务.init(音频下载服务器, { path: 配置.ws.path, channel: 'audio_download' });
+应用.WebSocket服务.init(控制服务器, { path: 配置.ws.path, channel: 'control' });
+应用.WebSocket服务.init(业务服务器, { path: 配置.ws.path, channel: 'business' });
+应用.WebSocket服务.init(音频上传服务器, { path: 配置.ws.path, channel: 'audio_upload' });
+应用.WebSocket服务.init(音频下载服务器, { path: 配置.ws.path, channel: 'audio_download' });
 if (配置.ws.path !== '/api/v1/interaction/connect') {
-  应用.网络套接字服务.init(控制服务器, { path: '/api/v1/interaction/connect', channel: 'control' });
-  应用.网络套接字服务.init(业务服务器, { path: '/api/v1/interaction/connect', channel: 'business' });
-  应用.网络套接字服务.init(音频上传服务器, { path: '/api/v1/interaction/connect', channel: 'audio_upload' });
-  应用.网络套接字服务.init(音频下载服务器, { path: '/api/v1/interaction/connect', channel: 'audio_download' });
+  应用.WebSocket服务.init(控制服务器, { path: '/api/v1/interaction/connect', channel: 'control' });
+  应用.WebSocket服务.init(业务服务器, { path: '/api/v1/interaction/connect', channel: 'business' });
+  应用.WebSocket服务.init(音频上传服务器, { path: '/api/v1/interaction/connect', channel: 'audio_upload' });
+  应用.WebSocket服务.init(音频下载服务器, { path: '/api/v1/interaction/connect', channel: 'audio_download' });
 }
 
 // 启动服务器

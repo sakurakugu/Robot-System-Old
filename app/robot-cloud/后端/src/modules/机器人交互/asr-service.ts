@@ -229,13 +229,13 @@ class 语音识别服务 {
     const pcmBuffer = this.extractPcmFromWav(wavBuffer);
     const sampleRate = this.detectSampleRate(wavBuffer) || 16000;
 
-    console.log('[阿里云ASR] 开始识别', {
-      wsUrl,
-      model,
-      wavBufferSize: wavBuffer.length,
-      pcmBufferSize: pcmBuffer.length,
-      sampleRate,
-    });
+    // console.log('[阿里云ASR] 开始识别', {
+    //   wsUrl,
+    //   model,
+    //   wavBufferSize: wavBuffer.length,
+    //   pcmBufferSize: pcmBuffer.length,
+    //   sampleRate,
+    // });
 
     return new Promise<string>((resolve, reject) => {
       const taskId = crypto.randomUUID();
@@ -318,7 +318,7 @@ class 语音识别服务 {
               input: {},
             },
           };
-          console.log('[阿里云ASR] 发送开始消息:', JSON.stringify(startMessage, null, 2));
+          // console.log('[阿里云ASR] 发送开始消息:', JSON.stringify(startMessage, null, 2));
           ws.send(JSON.stringify(startMessage));
         } catch (err) {
           cleanup();
@@ -331,7 +331,7 @@ class 语音识别服务 {
           const msg = JSON.parse(data.toString());
 
           // 添加详细日志用于调试
-          console.log('[阿里云ASR] 收到消息:', JSON.stringify(msg, null, 2));
+          // console.log('[阿里云ASR] 收到消息:', JSON.stringify(msg, null, 2));
 
           // 处理不同的事件类型
           switch (msg.header?.event) {

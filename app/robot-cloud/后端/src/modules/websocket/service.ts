@@ -28,7 +28,7 @@ type AudioSession = {
   lastChunkAt: number;
 };
 
-class 网络套接字服务 {
+class WebSocket服务 {
   private wssMap: Map<Channel, WebSocketServer> = new Map();
   // 机器人客户端连接（按通道）
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
@@ -1968,4 +1968,4 @@ class 网络套接字服务 {
   }
 }
 
-export default 网络套接字服务;
+export default WebSocket服务;

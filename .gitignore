@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 .python-version
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
 
 # 环境与虚拟环境
 .env
@@ -14,9 +17,9 @@ env/
 
 # node相关
 node_modules/
+dist/
 
 # 构建与打包产物
-dist/
 cache/
 build/
 *.egg-info/
@@ -24,9 +27,6 @@ build/
 *.egg
 
 # 测试与覆盖率缓存
-.mypy_cache/
-.ruff_cache/
-.pytest_cache/
 .coverage*
 coverage.xml
 htmlcov/

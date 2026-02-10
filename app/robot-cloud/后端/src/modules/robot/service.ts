@@ -39,12 +39,12 @@ export class 机器人服务 {
   } = {}): Promise<any> {
     const method = options.method || 'GET';
     const url = `http://${ip}:8080${path}`;
-    
+
     try {
       const response = await fetch(url, {
         method,
-        headers: method !== 'GET' && options.body 
-          ? { 'Content-Type': 'application/json' } 
+        headers: method !== 'GET' && options.body
+          ? { 'Content-Type': 'application/json' }
           : undefined,
         body: options.body ? JSON.stringify(options.body) : undefined,
         signal: AbortSignal.timeout(5000), // 5秒超时
@@ -126,7 +126,7 @@ export class 机器人服务 {
     // 如果提供了 IP，尝试 SSH 初始化
     if (ip) {
       const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
-      
+
       const canSsh = await this.测试SSH连接(pythonScript, ip);
       if (!canSsh) {
         throw new Error(`无法通过SSH连接到 ${ip}`);
@@ -153,7 +153,7 @@ export class 机器人服务 {
       if (!uuid) {
         uuid = uuidv7();
         this.logger.info(`生成新UUID: ${uuid}`);
-        
+
         const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
         await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/配置.toml', configToml);
       }
@@ -394,18 +394,53 @@ export class 机器人服务 {
       const p = spawn(this.pythonCommand, [pythonScript, 'copy', ip, localPath, remotePath]);
       let stdout = '';
       let stderr = '';
-      p.stdout.on('data', (d) => { stdout += d.toString(); });
-      p.stderr.on('data', (d) => { stderr += d.toString(); });
-      p.on('error', (err) => resolve({ success: false, error: err.message }));
+      let isResolved = false;
+
+      // 设置 2 分钟超时
+      const timeout = setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          p.kill();
+          this.logger.error(`复制超时 (${ip}): ${stderr}`);
+          resolve({ success: false, error: '复制超时（2分钟）' });
+        }
+      }, 120000);
+
+      p.stdout.on('data', (d) => {
+        const data = d.toString();
+        stdout += data;
+        // 实时输出进度日志
+        if (data.includes('[INFO]') || data.includes('[SUCCESS]') || data.includes('[ERROR]')) {
+          this.logger.debug(data.trim());
+        }
+      });
+
+      p.stderr.on('data', (d) => {
+        stderr += d.toString();
+      });
+
+      p.on('error', (err) => {
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeout);
+          resolve({ success: false, error: err.message });
+        }
+      });
+
       p.on('close', (code) => {
-        if (code === 0) {
-          try {
-            resolve(JSON.parse(stdout));
-          } catch {
-            resolve({ success: false, error: '解析输出失败' });
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeout);
+          if (code === 0) {
+            try {
+              resolve(JSON.parse(stdout));
+            } catch {
+              resolve({ success: false, error: '解析输出失败' });
+            }
+          } else {
+            this.logger.error(`复制失败 (${ip}, code=${code}): ${stderr}`);
+            resolve({ success: false, error: stderr || '复制失败' });
           }
-        } else {
-          resolve({ success: false, error: stderr || '复制失败' });
         }
       });
     });
@@ -426,7 +461,7 @@ export class 机器人服务 {
 
     const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
     const ok = await this.测试SSH连接(pythonScript, robot.ip);
-    
+
     if (!ok) {
       throw new Error('连接失败');
     }
@@ -475,7 +510,7 @@ export class 机器人服务 {
     const localClientPath = path.resolve(__dirname, '../../../../../robot-agent');
     const remoteClientPath = '/home/firefly/sparkrobot';
     const copyResult = await this.复制到机器人(pythonScript, robot.ip, localClientPath, remoteClientPath);
-    
+
     if (!copyResult.success) {
       throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
     }
@@ -500,7 +535,7 @@ export class 机器人服务 {
     try {
       // 通过WebSocket发送获取音量命令并等待响应
       const result = await this.websocketService.请求获取机器人音量(uuid);
-      
+
       if (!result.success || !result.data) {
         throw new Error(result.error || '获取音量失败');
       }
@@ -531,7 +566,7 @@ export class 机器人服务 {
     try {
       // 通过WebSocket发送设置音量命令并等待响应
       const result = await this.websocketService.请求设置机器人音量(uuid, volume);
-      
+
       if (!result.success) {
         throw new Error(result.error || '设置音量失败');
       }
@@ -556,7 +591,7 @@ export class 机器人服务 {
     try {
       // 通过WebSocket发送设置静音命令并等待响应
       const result = await this.websocketService.请求设置机器人静音(uuid, mute);
-      
+
       if (!result.success) {
         throw new Error(result.error || '设置静音失败');
       }
@@ -581,7 +616,7 @@ export class 机器人服务 {
     try {
       // 通过WebSocket发送拍照命令并等待响应
       const result = await this.websocketService.请求机器人拍照(uuid);
-      
+
       if (!result.success || !result.image) {
         throw new Error(result.error || '拍照失败');
       }
@@ -611,7 +646,7 @@ export class 机器人服务 {
     try {
       // 通过WebSocket发送获取配置命令并等待响应
       const result = await this.websocketService.请求获取机器人配置(uuid);
-      
+
       if (!result.success || !result.data) {
         throw new Error(result.error || '获取配置失败');
       }
@@ -638,7 +673,7 @@ export class 机器人服务 {
     try {
       // 通过WebSocket发送更新配置命令并等待响应
       const result = await this.websocketService.请求更新机器人配置(uuid, config);
-      
+
       if (!result.success) {
         throw new Error(result.error || '更新配置失败');
       }

@@ -6,11 +6,17 @@ import sys
 import json
 import paramiko
 import os
+import io
 
 # 默认SSH配置
 SSH_USER = 'firefly'
 SSH_PASSWORD = 'firefly'
 SSH_PORT = 22
+
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
 
 def test_ssh_connection(robot_ip):
     """测试SSH连接"""
@@ -162,13 +168,23 @@ def copy_directory(robot_ip, local_path, remote_path):
                 raise
             
             for item in items:
+                # 尽早跳过不需要的文件和目录
+                if item.startswith('.'):
+                    print(f"[SKIP] 跳过隐藏文件/目录: {item}", file=sys.stderr)
+                    continue
+                
+                # 跳过Python构建产物和不需要的目录
+                if item in ['__pycache__', 'node_modules', '.venv', 'venv', 'logs', 'docs', '.mypy_cache', '.ruff_cache', '.pytest_cache']:
+                    print(f"[SKIP] 跳过目录: {item}", file=sys.stderr)
+                    continue
+                
+                # 跳过 .egg-info 目录（pip安装产物，可能被锁定且不需要复制）
+                if item.endswith('.egg-info'):
+                    print(f"[SKIP] 跳过egg-info目录: {item}", file=sys.stderr)
+                    continue
+                
                 local_item = os.path.join(local_dir, item)
                 remote_item = os.path.join(remote_dir, item).replace('\\', '/')
-                
-                # 跳过特殊文件
-                if item.startswith('.'):
-                    print(f"[SKIP] 跳过隐藏文件: {item}", file=sys.stderr)
-                    continue
                 
                 try:
                     if os.path.isfile(local_item):
@@ -176,14 +192,13 @@ def copy_directory(robot_ip, local_path, remote_path):
                         sftp.put(local_item, remote_item)
                         print(f"[SUCCESS] 上传成功: {item}", file=sys.stderr)
                     elif os.path.isdir(local_item):
-                        # 跳过特定目录
-                        if item in ['__pycache__', '.git', 'node_modules', '.venv', 'venv', 'logs', 'docs']:
-                            print(f"[SKIP] 跳过目录: {item}", file=sys.stderr)
-                            continue
                         print(f"[INFO] 进入目录: {item}", file=sys.stderr)
                         upload_recursive(local_item, remote_item)
                 except PermissionError as e:
                     print(f"[ERROR] 权限错误 {local_item}: {e}", file=sys.stderr)
+                    raise
+                except OSError as e:
+                    print(f"[ERROR] 文件系统错误 {item}: {str(e)}", file=sys.stderr)
                     raise
                 except Exception as e:
                     print(f"[ERROR] 处理失败 {item}: {str(e)}", file=sys.stderr)

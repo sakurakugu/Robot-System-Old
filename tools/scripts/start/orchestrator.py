@@ -9,21 +9,20 @@ from .utils import (
     ROOT,
     LOGS_DIR,
     确保目录存在,
-    ensure_node_modules,
-    copy_env_example_if_missing,
-    run,
+    确保node_modules存在,
+    复制env_example_如果没有,
     spawn,
     write_pid,
     kill_pid_file,
     http_ok,
     pkill_patterns,
     检查运行环境,
-    ensure_ports_available,
+    确保端口可用,
 )
 
 
-CHAT_BACKEND = ROOT / "app" / "robot-cloud" / "后端"
-CHAT_FRONTEND = ROOT / "app" / "robot-cloud" / "前端"
+ROBOT_CLOUD_BACKEND = ROOT / "app" / "robot-cloud" / "后端"
+ROBOT_CLOUD_FRONTEND = ROOT / "app" / "robot-cloud" / "前端"
 
 def _read_text(path: Path) -> str:
     try:
@@ -65,18 +64,18 @@ def _parse_env_value(env_path: Path, key: str, default_port: int) -> int:
     return default_port
 
 
-def _chat_backend_port() -> int:
-    env_path = CHAT_BACKEND / ".env"
+def _robot_cloud_backend_port() -> int:
+    env_path = ROBOT_CLOUD_BACKEND / ".env"
     if env_path.exists():
         return _parse_env_port(env_path, 3001)
-    example = CHAT_BACKEND / ".env.example"
+    example = ROBOT_CLOUD_BACKEND / ".env.example"
     if example.exists():
         return _parse_env_port(example, 3001)
     return 3001
 
-def _chat_backend_ports() -> dict:
-    env_path = CHAT_BACKEND / ".env"
-    example = CHAT_BACKEND / ".env.example"
+def _robot_cloud_backend_ports() -> dict:
+    env_path = ROBOT_CLOUD_BACKEND / ".env"
+    example = ROBOT_CLOUD_BACKEND / ".env.example"
     src = env_path if env_path.exists() else example
 
     defaults = {
@@ -88,50 +87,50 @@ def _chat_backend_ports() -> dict:
         "http": _parse_env_value(src, "PORT", defaults["http"]),
     }
 
-def _chat_frontend_port() -> int:
-    vite_path = CHAT_FRONTEND / "vite.config.ts"
+def _robot_cloud_frontend_port() -> int:
+    vite_path = ROBOT_CLOUD_FRONTEND / "vite.config.ts"
     return _parse_vite_port(vite_path, 5174)
 
 
-def start_chat() -> List[Tuple[str, int]]:
+def start_robot_cloud() -> List[Tuple[str, int]]:
     确保目录存在()
-    if copy_env_example_if_missing(CHAT_BACKEND):
+    if 复制env_example_如果没有(ROBOT_CLOUD_BACKEND):
         # 首次创建 .env 即退出，等待用户配置
         return []
 
-    ports = _chat_backend_ports()
-    if not ensure_ports_available(ports, interactive=True):
+    ports = _robot_cloud_backend_ports()
+    if not 确保端口可用(ports, interactive=True):
         return []
 
-    ensure_node_modules(CHAT_BACKEND)
-    ensure_node_modules(CHAT_FRONTEND)
+    确保node_modules存在(ROBOT_CLOUD_BACKEND)
+    确保node_modules存在(ROBOT_CLOUD_FRONTEND)
 
     procs: List[Tuple[str, int]] = []
 
-    print(f"🚀 启动对话系统后端...  (http://localhost:{ports['http']})")
+    print(f"🚀 启动机器狗管理系统后端...  (http://localhost:{ports['http']})")
     backend_log = LOGS_DIR / "robot-cloud" / "backend.log"
-    p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=CHAT_BACKEND, log_path=backend_log)
-    write_pid("chat-backend", pid_backend)
-    procs.append(("chat-backend", pid_backend))
+    p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=ROBOT_CLOUD_BACKEND, log_path=backend_log)
+    write_pid("robot-cloud-backend", pid_backend)
+    procs.append(("robot-cloud-backend", pid_backend))
 
-    print(f"🚀 启动对话系统前端...  (http://localhost:{_chat_frontend_port()})")
+    print(f"🚀 启动机器狗管理系统前端...  (http://localhost:{_robot_cloud_frontend_port()})")
     frontend_log = LOGS_DIR / "robot-cloud" / "frontend.log"
-    p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", str(_chat_frontend_port())], cwd=CHAT_FRONTEND, log_path=frontend_log)
-    write_pid("chat-frontend", pid_frontend)
-    procs.append(("chat-frontend", pid_frontend))
+    p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", str(_robot_cloud_frontend_port())], cwd=ROBOT_CLOUD_FRONTEND, log_path=frontend_log)
+    write_pid("robot-cloud-frontend", pid_frontend)
+    procs.append(("robot-cloud-frontend", pid_frontend))
 
     return procs
 
 
-def stop_chat() -> bool:
+def stop_robot_cloud() -> bool:
     any_stopped = False
-    any_stopped |= kill_pid_file("chat-backend")
-    any_stopped |= kill_pid_file("chat-frontend")
+    any_stopped |= kill_pid_file("robot-cloud-backend")
+    any_stopped |= kill_pid_file("robot-cloud-frontend")
     return any_stopped
 
 
 def stop_all() -> None:
-    stopped_any = stop_chat()
+    stopped_any = stop_robot_cloud()
 
     pkill_patterns(["vite", "ts-node-dev"])
     if stopped_any:
@@ -147,9 +146,9 @@ def start_all() -> List[Tuple[str, int]]:
     print("========================================")
 
     print("\n----------------------------------------")
-    print("  📦 准备对话系统 (Robot Cloud)")
+    print("  📦 准备机器狗管理系统 (Robot Cloud)")
     print("----------------------------------------")
-    procs = start_chat()
+    procs = start_robot_cloud()
     return procs
 
 
@@ -158,10 +157,10 @@ def test_all() -> bool:
     print("  机器狗控制系统 - 自检")
     print("========================================")
 
-    print("🧪 测试对话系统 (Robot Cloud)...")
-    ports = _chat_backend_ports()
-    cfp = _chat_frontend_port()
+    print("🧪 测试机器狗管理系统 (Robot Cloud)...")
+    ports = _robot_cloud_backend_ports()
+    cfp = _robot_cloud_frontend_port()
     ok = http_ok(f"http://localhost:{ports['http']}/api/v1/health")
     ok &= http_ok(f"http://localhost:{cfp}")
-    print("✅ 对话系统通过" if ok else "❌ 对话系统异常")
+    print("✅ 机器狗管理系统通过" if ok else "❌ 机器狗管理系统异常")
     return ok

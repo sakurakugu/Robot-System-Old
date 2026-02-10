@@ -3,10 +3,78 @@ import path from 'path';
 import winston from 'winston';
 import 配置 from '../../config';
 
+const LEVEL_NAME_CN: Record<string, string> = {
+  debug: '调试',
+  info: '信息',
+  warn: '警告',
+  error: '错误',
+};
+
+const LEVEL_COLOR: Record<string, string> = {
+  debug: '\x1b[36m',
+  info: '\x1b[32m',
+  warn: '\x1b[33m',
+  error: '\x1b[31m',
+};
+
+const RESET_COLOR = '\x1b[0m';
+
+function 获取中文等级(level: string): string {
+  const key = level.toLowerCase();
+  return LEVEL_NAME_CN[key] ?? level;
+}
+
+function 格式化本地时间(date: Date): string {
+  const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  const ms = pad(date.getMilliseconds(), 3);
+  return `${hh}:${mm}:${ss}.${ms}`;
+}
+
+function 格式化文件时间(date: Date): string {
+  const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  const ms = pad(date.getMilliseconds(), 3);
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMinutes);
+  const offH = pad(Math.floor(abs / 60));
+  const offM = pad(abs % 60);
+  let iso = `${year}-${month}-${day}T${hh}:${mm}:${ss}.${ms}${sign}${offH}:${offM}`;
+  if (iso.endsWith('Z') || iso.endsWith('z')) {
+    iso = iso.slice(0, -1) + '+00:00';
+  }
+  return iso;
+}
+
+function 解析控制台输出(): boolean {
+  if (process.env.FORCE_CONSOLE_LOGS === '1') {
+    return true;
+  }
+  return Boolean(process.stdout?.isTTY || process.stderr?.isTTY);
+}
+
+function 构建元数据(rest: Record<string, any>): string {
+  const cleaned = Object.fromEntries(
+    Object.entries(rest).filter(([, value]) => value !== undefined)
+  );
+  if (Object.keys(cleaned).length === 0) {
+    return '';
+  }
+  return ` ${JSON.stringify(cleaned)}`;
+}
+
 /**
  * 日志服务
  */
-class 日志器 {
+class Logger {
   private 日志: winston.Logger;
 
   constructor() {
@@ -17,33 +85,39 @@ class 日志器 {
       fs.mkdirSync(日志目录, { recursive: true });
     }
 
+    const 文件格式 = winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.errors({ stack: true }),
+      winston.format.splat(),
+      winston.format.printf((信息) => {
+        const { timestamp, level, message, service, ...rest } = 信息 as any;
+        const time = 格式化文件时间(new Date(timestamp || Date.now()));
+        const levelCn = 获取中文等级(level);
+        const serviceTag = `[${service ?? ''}]`;
+        const meta = 构建元数据(rest);
+        return `[${time}] [${levelCn}] ${serviceTag} ${message}${meta}`;
+      })
+    );
+
+    const 控制台格式 = winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.errors({ stack: true }),
+      winston.format.splat(),
+      winston.format.printf((信息) => {
+        const { timestamp, level, message, service, ...rest } = 信息 as any;
+        const time = 格式化本地时间(new Date(timestamp || Date.now()));
+        const levelCn = 获取中文等级(level);
+        const color = LEVEL_COLOR[level.toLowerCase()] ?? '';
+        const coloredLevel = color ? `${color}[${levelCn}]${RESET_COLOR}` : `[${levelCn}]`;
+        const serviceTag = `[${service ?? ''}]`;
+        const meta = 构建元数据(rest);
+        return `[${time}] ${coloredLevel} ${serviceTag} ${message}${meta}`;
+      })
+    );
+
     this.日志 = winston.createLogger({
       level: 配置.logging.level,
-      format: winston.format.combine(
-        winston.format.timestamp({
-          format: 'YYYY-MM-DDTHH:mm:ss'
-        }),
-        winston.format.errors({ stack: true }),
-        winston.format.splat(),
-        winston.format.printf((信息) => {
-          const { timestamp, level, message, service, ...rest } = 信息 as any;
-          const 现在 = new Date();
-          const 偏移分钟 = -现在.getTimezoneOffset();
-          const 符号 = 偏移分钟 >= 0 ? '+' : '-';
-          const 绝对值 = Math.abs(偏移分钟);
-          const 小时 = String(Math.floor(绝对值 / 60)).padStart(2, '0');
-          const 分钟 = String(绝对值 % 60).padStart(2, '0');
-          const 时间戳 = `${timestamp}${符号}${小时}:${分钟}`;
-          const 排序后 = {
-            timestamp: 时间戳,
-            level,
-            message,
-            service,
-            ...rest,
-          };
-          return JSON.stringify(排序后);
-        })
-      ),
+      format: 文件格式,
       defaultMeta: { service: 'robot-cloud' },
       transports: [
         new winston.transports.File({
@@ -51,23 +125,21 @@ class 日志器 {
           level: 'error',
           maxsize: 10 * 1024 * 1024,
           maxFiles: 5,
+          format: 文件格式,
         }),
         new winston.transports.File({
           filename: path.join(日志目录, 'combined.log'),
           maxsize: 10 * 1024 * 1024,
           maxFiles: 10,
+          format: 文件格式,
         }),
       ],
     });
 
-    // 开发环境输出到控制台
-    if (配置.nodeEnv !== 'production') {
+    if (解析控制台输出()) {
       this.日志.add(
         new winston.transports.Console({
-          format: winston.format.combine(
-            winston.format.colorize(),
-            winston.format.simple()
-          ),
+          format: 控制台格式,
         })
       );
     }
@@ -125,4 +197,4 @@ class 日志器 {
   }
 }
 
-export default 日志器;
+export default Logger;

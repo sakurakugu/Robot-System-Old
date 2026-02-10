@@ -72,7 +72,8 @@ def _tee_stream(stream, log_file, label: str) -> None:
     for line in iter(stream.readline, ""):
         log_file.write(line)
         log_file.flush()
-        sys.stdout.write(f"[{label}] {line}")
+        # sys.stdout.write(f"[{label}] {line}")
+        sys.stdout.write(line)
         sys.stdout.flush()
 
 
@@ -90,6 +91,9 @@ def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Pop
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "a", buffering=1, encoding="utf-8")
     列表 = 根据平台调整命令(list(cmd))
+    env = os.environ.copy()
+    if sys.stdout.isatty():
+        env["FORCE_CONSOLE_LOGS"] = "1"
     proc = subprocess.Popen(
         列表,
         cwd=str(cwd),
@@ -98,6 +102,7 @@ def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Pop
         text=True,
         encoding="utf-8",
         bufsize=1,
+        env=env,
     )
     if proc.stdout is not None:
         label = _log_label(log_path)
@@ -145,7 +150,7 @@ def kill_pid_file(name: str) -> bool:
         return False
 
 
-def ensure_node_modules(dir_path: Path) -> None:
+def 确保node_modules存在(dir_path: Path) -> None:
     if not (dir_path / "node_modules").exists():
         print(f"📦 安装依赖: {dir_path}")
         run(["npm", "install"], cwd=dir_path)
@@ -153,7 +158,7 @@ def ensure_node_modules(dir_path: Path) -> None:
         print(f"📦 依赖已存在: {dir_path}")
 
 
-def copy_env_example_if_missing(dir_path: Path) -> bool:
+def 复制env_example_如果没有(dir_path: Path) -> bool:
     env = dir_path / ".env"
     example = dir_path / ".env.example"
     if not env.exists() and example.exists():
@@ -196,7 +201,7 @@ def pkill_patterns(patterns: Iterable[str]) -> None:
             continue
 
 
-def is_port_in_use(port: int) -> bool:
+def 检查端口是否被占用(port: int) -> bool:
     """检查本机端口是否被占用（监听）"""
     for host, family in (("127.0.0.1", socket.AF_INET), ("::1", socket.AF_INET6)):
         try:
@@ -344,7 +349,7 @@ def is_managed_process(pid: int, cmdline: str) -> bool:
     return any(m in cmdline for m in markers)
 
 
-def ensure_ports_available(ports: dict, interactive: bool = True) -> bool:
+def 确保端口可用(ports: dict, interactive: bool = True) -> bool:
     """确保端口可用。若为本项目进程则自动清理；否则询问确认。"""
     blocked = []
     for name, port in ports.items():

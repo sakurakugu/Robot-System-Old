@@ -9,6 +9,9 @@ import './style.css'
 // 导入编舞系统样式
 import './modules/choreo/styles/index.css'
 import { useThemeStore } from './stores/theme'
+import { setupConsole } from './utils/logger'
+
+setupConsole()
 
 const app = createApp(App)
 const pinia = createPinia()

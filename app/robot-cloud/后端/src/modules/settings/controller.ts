@@ -66,10 +66,10 @@ export class 设置控制器 {
         }
       };
 
-      const wsControlUrl = data.wsControlUrl || resolveWsBaseUrl(serverUrl, 配置.ports.control);
-      const wsBusinessUrl = data.wsBusinessUrl || resolveWsBaseUrl(serverUrl, 配置.ports.business);
-      const wsAudioUploadUrl = data.wsAudioUploadUrl || resolveWsBaseUrl(serverUrl, 配置.ports.audioUpload);
-      const wsAudioDownloadUrl = data.wsAudioDownloadUrl || resolveWsBaseUrl(serverUrl, 配置.ports.audioDownload);
+      const wsControlUrl = data.wsControlUrl || resolveWsBaseUrl(serverUrl, 配置.port);
+      const wsBusinessUrl = data.wsBusinessUrl || resolveWsBaseUrl(serverUrl, 配置.port);
+      const wsAudioUploadUrl = data.wsAudioUploadUrl || resolveWsBaseUrl(serverUrl, 配置.port);
+      const wsAudioDownloadUrl = data.wsAudioDownloadUrl || resolveWsBaseUrl(serverUrl, 配置.port);
 
       res.json({
         success: true,

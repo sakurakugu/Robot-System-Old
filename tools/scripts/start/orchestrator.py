@@ -80,20 +80,12 @@ def _chat_backend_ports() -> dict:
     src = env_path if env_path.exists() else example
 
     defaults = {
-        "http": 9004,
-        "control": 9000,
-        "business": 9001,
-        "audio_upload": 9002,
-        "audio_download": 9003,
+        "http": 9000,
     }
     if not src or not src.exists():
         return defaults
     return {
         "http": _parse_env_value(src, "PORT", defaults["http"]),
-        "control": _parse_env_value(src, "CONTROL_PORT", defaults["control"]),
-        "business": _parse_env_value(src, "BUSINESS_PORT", defaults["business"]),
-        "audio_upload": _parse_env_value(src, "AUDIO_UPLOAD_PORT", defaults["audio_upload"]),
-        "audio_download": _parse_env_value(src, "AUDIO_DOWNLOAD_PORT", defaults["audio_download"]),
     }
 
 def _chat_frontend_port() -> int:

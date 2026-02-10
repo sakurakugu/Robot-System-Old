@@ -38,6 +38,8 @@ type AudioSession = {
 
 class WebSocket服务 {
   private wssMap: Map<Channel, WebSocketServer> = new Map();
+  private pathToChannelMap: Map<string, Channel> = new Map();
+  private upgradeHandlerInstalled = false;
   // 机器人客户端连接（按通道）
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
   // UI 控制端连接（按通道，可多）
@@ -87,8 +89,7 @@ class WebSocket服务 {
   init(server: Server, options: { path: string; channel: Channel }): void {
     const { path, channel } = options;
     const wss = new WebSocketServer({
-      server,
-      path,
+      noServer: true,
     });
 
     wss.on('connection', (ws: WebSocket, req) => {
@@ -96,6 +97,32 @@ class WebSocket服务 {
     });
 
     this.wssMap.set(channel, wss);
+    this.pathToChannelMap.set(path, channel);
+
+    // 只在第一次调用时安装 upgrade 处理器
+    if (!this.upgradeHandlerInstalled) {
+      this.upgradeHandlerInstalled = true;
+      server.on('upgrade', (request, socket, head) => {
+        const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
+        const targetChannel = this.pathToChannelMap.get(pathname);
+
+        if (targetChannel) {
+          const targetWss = this.wssMap.get(targetChannel);
+          if (targetWss) {
+            targetWss.handleUpgrade(request, socket, head, (ws) => {
+              targetWss.emit('connection', ws, request);
+            });
+          } else {
+            socket.destroy();
+          }
+        } else {
+          // 路径不匹配，拒绝连接
+          socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+          socket.destroy();
+        }
+      });
+    }
+
     this.logger.info('WebSocket服务已启动', { path, channel });
   }
 

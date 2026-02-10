@@ -38,7 +38,7 @@ npm run dev
 ### 步骤 1: 通过 API 创建角色
 
 ```bash
-curl -X POST http://localhost:9004/api/v1/roles \
+curl -X POST http://localhost:9000/api/v1/roles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "阿里云语音助手",
@@ -56,7 +56,7 @@ curl -X POST http://localhost:9004/api/v1/roles \
 ### 步骤 2: 将机器狗绑定到该角色
 
 ```bash
-curl -X PATCH http://localhost:9004/api/v1/robots/{robotId} \
+curl -X PATCH http://localhost:9000/api/v1/robots/{robotId} \
   -H "Content-Type: application/json" \
   -d '{
     "role_id": "角色UUID"
@@ -80,7 +80,7 @@ curl -X PATCH http://localhost:9004/api/v1/robots/{robotId} \
 ### 创建会议记录角色
 
 ```bash
-curl -X POST http://localhost:9004/api/v1/roles \
+curl -X POST http://localhost:9000/api/v1/roles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "会议记录助手",
@@ -95,7 +95,7 @@ curl -X POST http://localhost:9004/api/v1/roles \
 ### 创建快速交互角色
 
 ```bash
-curl -X POST http://localhost:9004/api/v1/roles \
+curl -X POST http://localhost:9000/api/v1/roles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "快速交互助手",
@@ -110,7 +110,7 @@ curl -X POST http://localhost:9004/api/v1/roles \
 ### 创建多语种角色
 
 ```bash
-curl -X POST http://localhost:9004/api/v1/roles \
+curl -X POST http://localhost:9000/api/v1/roles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "多语种助手",
@@ -129,7 +129,7 @@ curl -X POST http://localhost:9004/api/v1/roles \
 假设你已经有一个角色，现在想改用阿里云 ASR：
 
 ```bash
-curl -X PATCH http://localhost:9004/api/v1/roles/{roleId} \
+curl -X PATCH http://localhost:9000/api/v1/roles/{roleId} \
   -H "Content-Type: application/json" \
   -d '{
     "asr_provider": "aliyun",

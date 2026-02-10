@@ -24,3 +24,9 @@
 添加我没电了需要去充电，并支持开关
 
 支持询问来获取电量信息
+
+https://grpc.org.cn/docs/what-is-grpc/introduction/
+让机器人端通过grpc连接到后端的python服务，然后把结果返回给nodejs服务
+
+让大模型调用工具而不是通过提示词来行动
+https://bailian.console.aliyun.com/cn-beijing/?spm=5176.29597918.J_SEsSjsNv72yRuRFS2VknO.2.55ed7b08Zvf6Yi&tab=doc#/doc/?type=model&url=2862208

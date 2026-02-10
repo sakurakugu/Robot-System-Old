@@ -3,7 +3,10 @@ import {
   WS_AUDIO_UPLOAD_BASE_URL,
   WS_BIZ_BASE_URL,
   WS_CONTROL_BASE_URL,
-  WS_PATH,
+  WS_CONTROL_PATH,
+  WS_BUSINESS_PATH,
+  WS_AUDIO_UPLOAD_PATH,
+  WS_AUDIO_DOWNLOAD_PATH,
 } from '@/constants'
 import { v7 as uuidv7 } from 'uuid'
 import { ref } from 'vue'
@@ -29,7 +32,7 @@ export function useWebSocket() {
   const generateUUID = (): string => uuidv7() // 统一使用 UUIDv7 生成 robotId
 
   const buildWsUrl = (server: string, wsPath: string) => {
-    const path = wsPath || WS_PATH
+    const path = wsPath
     const raw = (server || '').trim()
     if (raw) {
       if (/^wss?:\/\//i.test(raw) || /^https?:\/\//i.test(raw)) {
@@ -47,7 +50,6 @@ export function useWebSocket() {
   // 函数：获取 UI 配置
   const fetchUiConfig = async (): Promise<{
     serverUrl?: string
-    wsPath?: string
     wsControlUrl?: string
     wsBusinessUrl?: string
     wsAudioUploadUrl?: string
@@ -57,18 +59,16 @@ export function useWebSocket() {
       const res = await fetch('/api/v1/config/ui').then(r => r.json())
       if (res?.success && res.data) {
         const serverUrl: string = res.data.serverUrl || ''
-        const wsPath: string = res.data.wsPath || WS_PATH
         const wsControlUrl: string = res.data.wsControlUrl || ''
         const wsBusinessUrl: string = res.data.wsBusinessUrl || ''
         const wsAudioUploadUrl: string = res.data.wsAudioUploadUrl || ''
         const wsAudioDownloadUrl: string = res.data.wsAudioDownloadUrl || ''
         localStorage.setItem('rc_server_url', serverUrl)
-        localStorage.setItem('rc_ws_path', wsPath)
         if (wsControlUrl) localStorage.setItem('rc_ws_control_url', wsControlUrl)
         if (wsBusinessUrl) localStorage.setItem('rc_ws_business_url', wsBusinessUrl)
         if (wsAudioUploadUrl) localStorage.setItem('rc_ws_audio_upload_url', wsAudioUploadUrl)
         if (wsAudioDownloadUrl) localStorage.setItem('rc_ws_audio_download_url', wsAudioDownloadUrl)
-        return { serverUrl, wsPath, wsControlUrl, wsBusinessUrl, wsAudioUploadUrl, wsAudioDownloadUrl }
+        return { serverUrl, wsControlUrl, wsBusinessUrl, wsAudioUploadUrl, wsAudioDownloadUrl }
       }
     } catch {}
     return null
@@ -156,17 +156,15 @@ export function useWebSocket() {
         }
 
         let savedServer = localStorage.getItem('rc_server_url') || ''
-        let savedPath = localStorage.getItem('rc_ws_path') || WS_PATH
         let savedControlUrl = localStorage.getItem('rc_ws_control_url') || ''
         let savedBusinessUrl = localStorage.getItem('rc_ws_business_url') || ''
         let savedAudioUploadUrl = localStorage.getItem('rc_ws_audio_upload_url') || ''
         let savedAudioDownloadUrl = localStorage.getItem('rc_ws_audio_download_url') || ''
 
-        if (!savedServer || !localStorage.getItem('rc_ws_path') || !savedBusinessUrl || !savedControlUrl) {
+        if (!savedServer || !savedBusinessUrl || !savedControlUrl) {
           const cfg = await fetchUiConfig()
           if (cfg) {
             savedServer = cfg.serverUrl || savedServer
-            savedPath = cfg.wsPath || savedPath
             savedControlUrl = cfg.wsControlUrl || savedControlUrl
             savedBusinessUrl = cfg.wsBusinessUrl || savedBusinessUrl
             savedAudioUploadUrl = cfg.wsAudioUploadUrl || savedAudioUploadUrl
@@ -174,21 +172,21 @@ export function useWebSocket() {
           }
         }
 
-        const candidates: string[] = []
-        const p = (savedPath || '').trim()
-        if (p) candidates.push(p)
-        if (!candidates.includes('/api/v1/interaction/connect')) candidates.push('/api/v1/interaction/connect')
-        if (!candidates.includes('/api/interaction/connect')) candidates.push('/api/interaction/connect')
+        // 不同通道使用不同的路径
+        const businessPaths: string[] = [WS_BUSINESS_PATH]
+        const controlPaths: string[] = [WS_CONTROL_PATH]
+        const audioUploadPaths: string[] = [WS_AUDIO_UPLOAD_PATH]
+        const audioDownloadPaths: string[] = [WS_AUDIO_DOWNLOAD_PATH]
 
         const businessBase = savedBusinessUrl || WS_BIZ_BASE_URL
         const controlBase = savedControlUrl || WS_CONTROL_BASE_URL
         const audioUploadBase = savedAudioUploadUrl || WS_AUDIO_UPLOAD_BASE_URL
         const audioDownloadBase = savedAudioDownloadUrl || WS_AUDIO_DOWNLOAD_BASE_URL
 
-        await connectSocket(businessBase, candidates, wsBusiness, isConnected)
-        connectSocket(controlBase, candidates, wsControl, isControlConnected).catch(() => {})
-        connectSocket(audioUploadBase, candidates, wsAudioUpload, isAudioUploadConnected).catch(() => {})
-        connectSocket(audioDownloadBase, candidates, wsAudioDownload, isAudioDownloadConnected).catch(() => {})
+        await connectSocket(businessBase, businessPaths, wsBusiness, isConnected)
+        connectSocket(controlBase, controlPaths, wsControl, isControlConnected).catch(() => {})
+        connectSocket(audioUploadBase, audioUploadPaths, wsAudioUpload, isAudioUploadConnected).catch(() => {})
+        connectSocket(audioDownloadBase, audioDownloadPaths, wsAudioDownload, isAudioDownloadConnected).catch(() => {})
         resolve()
       } catch (error) {
         reject(error)

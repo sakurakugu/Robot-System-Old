@@ -13,13 +13,6 @@ export interface LLM供应商配置 {
 export interface 配置 {
   // 服务配置
   port: number;
-  ports: {
-    http: number;
-    control: number;
-    business: number;
-    audioUpload: number;
-    audioDownload: number;
-  };
   nodeEnv: string;
 
   // WebSocket配置
@@ -111,14 +104,7 @@ const 默认供应商: Record<LLMProvider, LLM供应商配置> = {
 };
 
 const 配置: 配置 = {
-  port: parseInt(process.env.PORT || '9004', 10),
-  ports: {
-    http: parseInt(process.env.PORT || '9004', 10),
-    control: parseInt(process.env.CONTROL_PORT || '9000', 10),
-    business: parseInt(process.env.BUSINESS_PORT || '9001', 10),
-    audioUpload: parseInt(process.env.AUDIO_UPLOAD_PORT || '9002', 10),
-    audioDownload: parseInt(process.env.AUDIO_DOWNLOAD_PORT || '9003', 10),
-  },
+  port: parseInt(process.env.PORT || '9000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   ws: {

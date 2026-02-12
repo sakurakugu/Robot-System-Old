@@ -107,37 +107,37 @@ const 配置: 配置 = {
   },
 
   llm: {
-    provider: (process.env.LLM_PROVIDER as LLM供应商枚举) || 'aliyun',
+    provider: 'aliyun',
     providers: { ...默认供应商 },
   },
 
   asr: {
-    provider: (process.env.ASR_PROVIDER as any) || 'xunfei',
+    provider: 'aliyun',
     xunfei: {
-      appId: process.env.XUNFEI_ASR_APP_ID || '',
-      apiKey: process.env.XUNFEI_ASR_API_KEY || '',
-      apiSecret: process.env.XUNFEI_ASR_API_SECRET || '',
+      appId: '',
+      apiKey: '',
+      apiSecret: '',
     },
     openai: {
-      apiKey: process.env.OPENAI_ASR_API_KEY || '',
-      model: process.env.OPENAI_ASR_MODEL || 'whisper-1',
-      baseUrl: process.env.OPENAI_ASR_BASE_URL || 'https://api.openai.com/v1',
-      language: process.env.OPENAI_ASR_LANGUAGE || 'zh',
-      prompt: process.env.OPENAI_ASR_PROMPT || '',
+      apiKey: '',
+      model: 'whisper-1',
+      baseUrl: 'https://api.openai.com/v1',
+      language: 'zh',
+      prompt: '',
     },
     aliyun: {
-      apiKey: process.env.ALIYUN_ASR_API_KEY || '',
-      model: process.env.ALIYUN_ASR_MODEL || 'fun-asr-realtime',
-      baseUrl: process.env.ALIYUN_ASR_BASE_URL || 'wss://dashscope.aliyuncs.com/api-ws/v1/inference',
+      apiKey: '',
+      model: 'fun-asr-realtime',
+      baseUrl: 'wss://dashscope.aliyuncs.com/api-ws/v1/inference',
     },
   },
 
   tts: {
-    provider: (process.env.TTS_PROVIDER as any) || 'edge',
+    provider: 'edge',
     xunfei: {
-      appId: process.env.XUNFEI_TTS_APP_ID || '',
-      apiKey: process.env.XUNFEI_TTS_API_KEY || '',
-      apiSecret: process.env.XUNFEI_TTS_API_SECRET || '',
+      appId: '',
+      apiKey: '',
+      apiSecret: '',
     },
   },
 

@@ -122,13 +122,6 @@ export class 大模型配置服务 {
       if (model !== undefined && 验证模型(p, model)) cfg.model = model;
       if (baseUrl !== undefined) cfg.baseUrl = baseUrl || undefined;
 
-      // 允许从环境变量初始化（不再通过 llm.providers.*.apiKey 作为运行时入口）
-      if (apiKey === undefined && p === 'openai' && 配置.asr.openai?.apiKey) {
-        apiKeyManager.set(p, 配置.asr.openai.apiKey);
-      }
-      if (apiKey === undefined && p === 'aliyun' && 配置.asr.aliyun?.apiKey) {
-        apiKeyManager.set(p, 配置.asr.aliyun.apiKey);
-      }
     }
   }
 

@@ -84,6 +84,7 @@ export class 应用程序 {
    */
   private 加载持久化配置(): void {
     try {
+      this.设置服务.loadPersistedAIConfig();
       this.大模型配置服务.loadPersistedConfig();
 
       const 活跃LLM = this.大模型配置服务.getActiveLLMConfig();

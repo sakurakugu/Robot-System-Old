@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import type { SettingsController } from './controller';
+import type { 设置控制器 } from './controller';
 
-export function createSettingsRoutes(controller: SettingsController): Router {
+export function createSettingsRoutes(controller: 设置控制器): Router {
   const router = Router();
 
   // UI 配置

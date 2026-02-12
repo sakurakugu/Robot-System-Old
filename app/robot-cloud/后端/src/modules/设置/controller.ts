@@ -65,5 +65,3 @@ export class 设置控制器 {
   };
 }
 
-export { 设置控制器 as SettingsController };
-

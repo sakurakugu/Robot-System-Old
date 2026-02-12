@@ -25,6 +25,8 @@ export class AliyunStreamingASR {
 
   private resolveCallback: ((text: string) => void) | null = null;
   private rejectCallback: ((error: Error) => void) | null = null;
+  private startTimeout?: NodeJS.Timeout;
+  private finishTimeout?: NodeJS.Timeout;
 
   constructor(options?: StreamingASROptions) {
     this.taskId = crypto.randomUUID();
@@ -33,6 +35,32 @@ export class AliyunStreamingASR {
       sampleRate: options?.sampleRate || 16000,
       format: options?.format || 'pcm',
     };
+  }
+
+  private settleSuccess(text: string): void {
+    if (this.finishTimeout) {
+      clearTimeout(this.finishTimeout);
+      this.finishTimeout = undefined;
+    }
+    if (this.resolveCallback) {
+      const resolve = this.resolveCallback;
+      this.resolveCallback = null;
+      this.rejectCallback = null;
+      resolve(text);
+    }
+  }
+
+  private settleError(error: Error): void {
+    if (this.finishTimeout) {
+      clearTimeout(this.finishTimeout);
+      this.finishTimeout = undefined;
+    }
+    if (this.rejectCallback) {
+      const reject = this.rejectCallback;
+      this.resolveCallback = null;
+      this.rejectCallback = null;
+      reject(error);
+    }
   }
 
   /**
@@ -47,6 +75,12 @@ export class AliyunStreamingASR {
     const wsUrl = aliyun.baseUrl || 'wss://dashscope.aliyuncs.com/api-ws/v1/inference';
 
     return new Promise((resolve, reject) => {
+      const timeoutMs = 1_5000;
+      this.startTimeout = setTimeout(() => {
+        this.cleanup();
+        reject(new Error(`阿里云ASR连接超时（${timeoutMs}ms）`));
+      }, timeoutMs);
+
       this.ws = new WebSocket(wsUrl, {
         headers: {
           'Authorization': `Bearer ${aliyun.apiKey}`,
@@ -77,6 +111,10 @@ export class AliyunStreamingASR {
           };
           this.ws!.send(JSON.stringify(startMessage));
           logger.info('[流式ASR] 已发送开始消息');
+          if (this.startTimeout) {
+            clearTimeout(this.startTimeout);
+            this.startTimeout = undefined;
+          }
           resolve();
         } catch (err) {
           this.cleanup();
@@ -91,9 +129,7 @@ export class AliyunStreamingASR {
       this.ws.on('error', (err) => {
         logger.error('[流式ASR] WebSocket 错误', err as Error);
         this.cleanup();
-        if (this.rejectCallback) {
-          this.rejectCallback(new Error(`阿里云ASR连接错误: ${err.message}`));
-        }
+        this.settleError(new Error(`阿里云ASR连接错误: ${err.message}`));
         reject(new Error(`阿里云ASR连接错误: ${err.message}`));
       });
 
@@ -103,13 +139,11 @@ export class AliyunStreamingASR {
           this.closed = true;
           if (!this.taskStarted) {
             const error = new Error('阿里云ASR任务未启动就关闭了连接');
-            if (this.rejectCallback) {
-              this.rejectCallback(error);
-            }
+            this.settleError(error);
             reject(error);
           } else if (this.resolveCallback) {
             // 正常关闭，返回已收集的结果
-            this.resolveCallback(this.finalText.trim());
+            this.settleSuccess(this.finalText.trim());
           }
         }
       });
@@ -145,6 +179,11 @@ export class AliyunStreamingASR {
     return new Promise((resolve, reject) => {
       this.resolveCallback = resolve;
       this.rejectCallback = reject;
+      const timeoutMs = 6_0000;
+      this.finishTimeout = setTimeout(() => {
+        this.cleanup();
+        this.settleError(new Error(`阿里云ASR完成超时（${timeoutMs}ms）`));
+      }, timeoutMs);
 
       // 等待队列处理完成
       const waitForQueue = () => {
@@ -191,9 +230,7 @@ export class AliyunStreamingASR {
         case 'task-finished':
           logger.info('[流式ASR] 任务完成，最终文本', { finalText: this.finalText });
           this.cleanup();
-          if (this.resolveCallback) {
-            this.resolveCallback(this.finalText.trim());
-          }
+          this.settleSuccess(this.finalText.trim());
           break;
 
         case 'task-failed':
@@ -201,9 +238,7 @@ export class AliyunStreamingASR {
           const errorCode = msg.header?.error_code || 'UNKNOWN';
           logger.error('[流式ASR] 任务失败', { errorCode, errorMsg });
           this.cleanup();
-          if (this.rejectCallback) {
-            this.rejectCallback(new Error(`阿里云ASR失败 [${errorCode}]: ${errorMsg}`));
-          }
+          this.settleError(new Error(`阿里云ASR失败 [${errorCode}]: ${errorMsg}`));
           break;
 
         default:
@@ -212,9 +247,7 @@ export class AliyunStreamingASR {
     } catch (err) {
       logger.error('[流式ASR] 消息处理错误', err as Error);
       this.cleanup();
-      if (this.rejectCallback) {
-        this.rejectCallback(err as Error);
-      }
+      this.settleError(err as Error);
     }
   }
 
@@ -240,9 +273,7 @@ export class AliyunStreamingASR {
       } catch (err) {
         logger.error('[流式ASR] 发送音频块失败', err as Error);
         this.cleanup();
-        if (this.rejectCallback) {
-          this.rejectCallback(err as Error);
-        }
+        this.settleError(err as Error);
         break;
       }
     }
@@ -256,9 +287,7 @@ export class AliyunStreamingASR {
   private sendFinishMessage(): void {
     if (!this.ws || this.closed) {
       logger.warn('[流式ASR] 无法发送结束消息，连接已关闭');
-      if (this.resolveCallback) {
-        this.resolveCallback(this.finalText.trim());
-      }
+      this.settleSuccess(this.finalText.trim());
       return;
     }
 
@@ -278,9 +307,7 @@ export class AliyunStreamingASR {
     } catch (err) {
       logger.error('[流式ASR] 发送结束消息失败', err as Error);
       this.cleanup();
-      if (this.rejectCallback) {
-        this.rejectCallback(err as Error);
-      }
+      this.settleError(err as Error);
     }
   }
 
@@ -290,6 +317,10 @@ export class AliyunStreamingASR {
   private cleanup(): void {
     if (this.closed) return;
     this.closed = true;
+    if (this.startTimeout) {
+      clearTimeout(this.startTimeout);
+      this.startTimeout = undefined;
+    }
     try {
       if (this.ws) {
         this.ws.close();

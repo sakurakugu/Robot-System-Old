@@ -13,21 +13,21 @@ export interface ASROptions {
 }
 
 class 语音识别服务 {
-  async transcribeWav(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
+  async 转录Wav(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
     const provider = options?.provider || 配置.asr.provider;
     switch (provider) {
       case 'xunfei':
-        return this.transcribeXunfei(wavBuffer, options);
+        return this.转录讯飞(wavBuffer, options);
       case 'openai':
-        return this.transcribeOpenAI(wavBuffer, options);
+        return this.转录OpenAI(wavBuffer, options);
       case 'aliyun':
-        return this.transcribeAliyun(wavBuffer, options);
+        return this.转录阿里云(wavBuffer, options);
       default:
         throw new Error(`不支持的ASR提供商: ${provider}`);
     }
   }
 
-  private async transcribeXunfei(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
+  private async 转录讯飞(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
     const xunfei = 配置.asr.xunfei;
     if (!xunfei?.appId || !xunfei.apiKey || !xunfei.apiSecret) {
       throw new Error('讯飞ASR密钥未配置');
@@ -46,15 +46,21 @@ class 语音识别服务 {
 
     return new Promise<string>((resolve, reject) => {
       const ws = new WebSocket(url);
+      const timeoutMs = 4_5000;
       let closed = false;
       let finalText = '';
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error(`讯飞ASR超时（${timeoutMs}ms）`));
+      }, timeoutMs);
 
       const cleanup = () => {
         if (closed) return;
         closed = true;
+        clearTimeout(timeout);
         try {
           ws.close();
-        } catch {}
+        } catch { }
       };
 
       ws.on('open', async () => {
@@ -108,6 +114,7 @@ class 语音识别服务 {
             const textPart = wsResults
               .map((w: any) => w?.cw?.[0]?.w || '')
               .join('');
+            // “我吃了一串串串”这种如果用去重会有问题
             finalText += textPart;
           }
 
@@ -129,6 +136,7 @@ class 语音识别服务 {
       ws.on('close', () => {
         if (!closed) {
           closed = true;
+          clearTimeout(timeout);
           resolve(finalText.trim());
         }
       });
@@ -177,7 +185,7 @@ class 语音识别服务 {
     return wavBuffer.readUInt32LE(24);
   }
 
-  private async transcribeOpenAI(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
+  private async 转录OpenAI(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
     const openai = 配置.asr.openai;
     if (!openai?.apiKey) {
       throw new Error('OpenAI ASR API密钥未配置');
@@ -218,7 +226,7 @@ class 语音识别服务 {
     }
   }
 
-  private async transcribeAliyun(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
+  private async 转录阿里云(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
     const aliyun = 配置.asr.aliyun;
     if (!aliyun?.apiKey) {
       throw new Error('阿里云 ASR API密钥未配置');
@@ -240,6 +248,7 @@ class 语音识别服务 {
 
     return new Promise<string>((resolve, reject) => {
       const taskId = crypto.randomUUID();
+      const timeoutMs = 9_0000;
       const ws = new WebSocket(wsUrl, {
         headers: {
           'Authorization': `Bearer ${aliyun.apiKey}`,
@@ -251,13 +260,18 @@ class 语音识别服务 {
       let finalText = '';
       const chunkSize = 3200; // 每次发送 3200 字节（约 100ms 的 16kHz 16bit PCM 音频）
       let currentOffset = 0;
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error(`阿里云ASR超时（${timeoutMs}ms）`));
+      }, timeoutMs);
 
       const cleanup = () => {
         if (closed) return;
         closed = true;
+        clearTimeout(timeout);
         try {
           ws.close();
-        } catch {}
+        } catch { }
       };
 
       // 分块发送音频数据（二进制格式）
@@ -389,6 +403,7 @@ class 语音识别服务 {
         logger.info('[阿里云ASR] WebSocket 关闭', { code, reason: reason.toString() });
         if (!closed) {
           closed = true;
+          clearTimeout(timeout);
           if (!taskStarted) {
             reject(new Error('阿里云ASR任务未启动就关闭了连接'));
           } else {

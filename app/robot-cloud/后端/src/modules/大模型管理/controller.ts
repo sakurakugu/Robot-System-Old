@@ -27,7 +27,7 @@ export class 大模型管理控制器 {
       const data = this.llmConfigService.updateLLMConfig(req.body || {});
       res.json({ success: true, data });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: error.message });
     }
   };
 
@@ -40,4 +40,3 @@ export class 大模型管理控制器 {
     }
   };
 }
-

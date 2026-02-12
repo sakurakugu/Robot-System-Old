@@ -3,12 +3,12 @@ import express from 'express';
 import DatabaseService from './core/database';
 import { logger } from './core/logger';
 import WebSocketService from './modules/websocket/service';
+import { 对话控制器 } from './modules/大模型交互/controller';
+import { createConversationRoutes } from './modules/大模型交互/routes';
+import { 对话服务 } from './modules/大模型交互/service';
 import { 大模型管理控制器 } from './modules/大模型管理/controller';
 import { createLLMRoutes } from './modules/大模型管理/routes';
 import { 大模型配置服务 } from './modules/大模型管理/service';
-import { ConversationController } from './modules/机器人交互/controller';
-import { createConversationRoutes } from './modules/机器人交互/routes';
-import { ConversationService } from './modules/机器人交互/service';
 import { 机器人控制器 } from './modules/机器人管理/controller';
 import { createRobotRoutes } from './modules/机器人管理/routes';
 import { 机器人服务 } from './modules/机器人管理/service';
@@ -19,7 +19,7 @@ import { ChoreoService } from './modules/编舞系统/service';
 import { 角色控制器 } from './modules/角色管理/controller';
 import { createRoleRoutes } from './modules/角色管理/routes';
 import { 角色服务 } from './modules/角色管理/service';
-import { SettingsController } from './modules/设置/controller';
+import { 设置控制器 } from './modules/设置/controller';
 import { createSettingsRoutes } from './modules/设置/routes';
 import { 设置服务 } from './modules/设置/service';
 
@@ -30,7 +30,7 @@ export class 应用程序 {
 
   // 服务实例
   private 机器人服务: 机器人服务;
-  private 对话服务: ConversationService;
+  private 对话服务: 对话服务;
   private 大模型配置服务: 大模型配置服务;
   private 设置服务: 设置服务;
   private 角色服务: 角色服务;
@@ -38,9 +38,9 @@ export class 应用程序 {
 
   // 控制器实例
   private 机器人控制器: 机器人控制器;
-  private 对话控制器: ConversationController;
+  private 对话控制器: 对话控制器;
   private 大模型控制器: 大模型管理控制器;
-  private 设置控制器: SettingsController;
+  private 设置控制器: 设置控制器;
   private 角色控制器: 角色控制器;
   private 编舞控制器: ChoreoController;
 
@@ -51,7 +51,7 @@ export class 应用程序 {
 
     // 初始化服务
     this.机器人服务 = new 机器人服务(this.数据库);
-    this.对话服务 = new ConversationService(this.数据库);
+    this.对话服务 = new 对话服务(this.数据库);
     this.大模型配置服务 = new 大模型配置服务(this.数据库);
     this.设置服务 = new 设置服务(this.数据库);
     this.角色服务 = new 角色服务(this.数据库);
@@ -59,9 +59,9 @@ export class 应用程序 {
 
     // 初始化控制器
     this.机器人控制器 = new 机器人控制器(this.机器人服务);
-    this.对话控制器 = new ConversationController(this.对话服务, this.数据库);
+    this.对话控制器 = new 对话控制器(this.对话服务, this.数据库);
     this.大模型控制器 = new 大模型管理控制器(this.大模型配置服务);
-    this.设置控制器 = new SettingsController(this.设置服务);
+    this.设置控制器 = new 设置控制器(this.设置服务);
     this.角色控制器 = new 角色控制器(this.角色服务);
     this.编舞控制器 = new ChoreoController(this.编舞服务);
 
@@ -74,8 +74,9 @@ export class 应用程序 {
     this.编舞服务.setWebSocketService(this.WebSocket服务);
     // 延迟注入 WebSocket 服务到机器人服务
     this.机器人服务.setWebSocketService(this.WebSocket服务);
-    // 延迟注入 机器人服务 到 WebSocket 服务
+    // 延迟注入机器人服务和对话服务到WebSocket服务
     this.WebSocket服务.set机器人服务(this.机器人服务);
+    this.WebSocket服务.set对话服务(this.对话服务);
   }
 
   /**
@@ -85,14 +86,14 @@ export class 应用程序 {
     try {
       this.大模型配置服务.loadPersistedConfig();
 
-      const 活动LLM = this.大模型配置服务.getActiveLLMConfig();
+      const 活跃LLM = this.大模型配置服务.getActiveLLMConfig();
       logger.info(`LLM 配置已加载`, {
-        provider: 活动LLM.provider,
-        model: 活动LLM.model,
-        hasApiKey: !!活动LLM.apiKey,
+        provider: 活跃LLM.provider,
+        model: 活跃LLM.model,
+        hasApiKey: 活跃LLM.hasApiKey,
       });
 
-      if (!活动LLM.apiKey) {
+      if (!活跃LLM.hasApiKey) {
         logger.warn('⚠️ 当前 LLM 供应商未配置 API Key，请访问前端设置页面进行配置');
       }
     } catch (e: any) {

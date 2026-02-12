@@ -4,7 +4,41 @@ import { logger } from '../../core/logger';
 import type { LLMMessage, LLMOptions, LLMResponse } from '../大模型管理/types';
 
 export class LLM服务 {
-  constructor() {}
+  private static readonly 默认超时毫秒 = 3_0000;
+
+  constructor() { }
+
+  private 解析错误信息(error: any): string {
+    const errorData = error?.response?.data;
+    if (errorData?.error) {
+      return errorData.error.message || errorData.error.code || JSON.stringify(errorData.error);
+    }
+    if (typeof errorData === 'string') {
+      return errorData;
+    }
+    if (errorData?.message) {
+      return errorData.message;
+    }
+    return error?.message || '未知错误';
+  }
+
+  private async 执行带重试<T>(task: () => Promise<T>, retries = 1): Promise<T> {
+    let lastError: any;
+    for (let i = 0; i <= retries; i += 1) {
+      try {
+        return await task();
+      } catch (error: any) {
+        lastError = error;
+        const status = error?.response?.status;
+        const retryable = status === 429 || (typeof status === 'number' && status >= 500);
+        if (!retryable || i === retries) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300 * (i + 1)));
+      }
+    }
+    throw lastError;
+  }
 
   /**
    * 调用LLM进行对话
@@ -49,7 +83,7 @@ export class LLM服务 {
 3. 重点关注用户问题相关的内容`;
 
     try {
-      const response = await axios.post(
+      const response = await this.执行带重试(() => axios.post(
         url,
         {
           model: 'qwen-vl-plus',
@@ -82,13 +116,14 @@ export class LLM服务 {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cfg.apiKey}`,
           },
-          timeout: 30000,
+          timeout: LLM服务.默认超时毫秒,
         }
-      );
+      ));
 
       const choice = response.data?.choices?.[0];
       return {
         content: choice?.message?.content || '',
+        model: response.data?.model || 'qwen-vl-plus',
         finishReason: choice?.finish_reason || 'stop',
         usage: {
           promptTokens: response.data?.usage?.prompt_tokens || 0,
@@ -105,16 +140,7 @@ export class LLM服务 {
         message: error.message,
       });
 
-      let errorMessage = error.message;
-      if (errorData?.error) {
-        errorMessage = errorData.error.message || errorData.error.code || JSON.stringify(errorData.error);
-      } else if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else if (errorData?.message) {
-        errorMessage = errorData.message;
-      }
-
-      throw new Error(`视觉模型调用失败: ${errorMessage}`);
+      throw new Error(`视觉模型调用失败: ${this.解析错误信息(error)}`);
     }
   }
 
@@ -131,7 +157,7 @@ export class LLM服务 {
     const url = `${baseUrl}/chat/completions`;
 
     try {
-      const response = await axios.post(
+      const response = await this.执行带重试(() => axios.post(
         url,
         {
           model: options?.model || cfg.model || 'gpt-4o-mini',
@@ -139,7 +165,7 @@ export class LLM服务 {
             role: m.role,
             content: m.content,
           })),
-          temperature: options?.temperature || 0.7,
+          temperature: options?.temperature ?? 0.7,
           max_tokens: options?.maxTokens || 1000,
         },
         {
@@ -147,13 +173,14 @@ export class LLM服务 {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cfg.apiKey}`,
           },
-          timeout: 30000,
+          timeout: LLM服务.默认超时毫秒,
         }
-      );
+      ));
 
       const choice = response.data.choices[0];
       return {
         content: choice.message.content,
+        model: response.data?.model || options?.model || cfg.model || 'gpt-4o-mini',
         finishReason: choice.finish_reason,
         usage: {
           promptTokens: response.data.usage.prompt_tokens,
@@ -166,7 +193,7 @@ export class LLM服务 {
         data: error.response?.data,
         message: error.message,
       });
-      throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
+      throw new Error(`LLM调用失败: ${this.解析错误信息(error)}`);
     }
   }
 
@@ -181,7 +208,7 @@ export class LLM服务 {
     const baseUrl = cfg.baseUrl || 'https://open.bigmodel.cn/api/paas/v4';
     const url = `${baseUrl}/chat/completions`;
     try {
-      const response = await axios.post(
+      const response = await this.执行带重试(() => axios.post(
         url,
         {
           model: options?.model || cfg.model || 'glm-4-flash',
@@ -193,13 +220,14 @@ export class LLM服务 {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cfg.apiKey}`,
           },
-          timeout: 30000,
+          timeout: LLM服务.默认超时毫秒,
         }
-      );
+      ));
       const choice = response.data?.choices?.[0];
       const msg = choice?.message || response.data?.data?.choices?.[0]?.message;
       return {
         content: msg?.content || '',
+        model: response.data?.model || options?.model || cfg.model || 'glm-4-flash',
         finishReason: choice?.finish_reason || 'stop',
         usage: {
           promptTokens: response.data?.usage?.prompt_tokens || 0,
@@ -208,25 +236,13 @@ export class LLM服务 {
         },
       };
     } catch (error: any) {
-      const errorData = error.response?.data;
       logger.error('BigModel API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: errorData,
+        data: error.response?.data,
         message: error.message
       });
-
-      // 提取错误信息
-      let errorMessage = error.message;
-      if (errorData?.error) {
-        errorMessage = errorData.error.message || errorData.error.code || JSON.stringify(errorData.error);
-      } else if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else if (errorData?.message) {
-        errorMessage = errorData.message;
-      }
-
-      throw new Error(`LLM调用失败: ${errorMessage}`);
+      throw new Error(`LLM调用失败: ${this.解析错误信息(error)}`);
     }
   }
 
@@ -241,7 +257,7 @@ export class LLM服务 {
     const baseUrl = cfg.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     const url = `${baseUrl}/chat/completions`;
     try {
-      const response = await axios.post(
+      const response = await this.执行带重试(() => axios.post(
         url,
         {
           model: options?.model || cfg.model || 'qwen-flash',
@@ -254,13 +270,14 @@ export class LLM服务 {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cfg.apiKey}`,
           },
-          timeout: 30000,
+          timeout: LLM服务.默认超时毫秒,
         }
-      );
+      ));
 
       const choice = response.data?.choices?.[0];
       return {
         content: choice?.message?.content || '',
+        model: response.data?.model || options?.model || cfg.model || 'qwen-flash',
         finishReason: choice?.finish_reason || 'stop',
         usage: {
           promptTokens: response.data?.usage?.prompt_tokens || 0,
@@ -269,25 +286,13 @@ export class LLM服务 {
         },
       };
     } catch (error: any) {
-      const errorData = error.response?.data;
       logger.error('Tongyi API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: errorData,
+        data: error.response?.data,
         message: error.message
       });
-
-      // 提取错误信息
-      let errorMessage = error.message;
-      if (errorData?.error) {
-        errorMessage = errorData.error.message || errorData.error.code || JSON.stringify(errorData.error);
-      } else if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else if (errorData?.message) {
-        errorMessage = errorData.message;
-      }
-
-      throw new Error(`LLM调用失败: ${errorMessage}`);
+      throw new Error(`LLM调用失败: ${this.解析错误信息(error)}`);
     }
   }
 
@@ -307,7 +312,7 @@ export class LLM服务 {
     const otherMessages = messages.filter(m => m.role !== 'system');
 
     try {
-      const response = await axios.post(
+      const response = await this.执行带重试(() => axios.post(
         url,
         {
           model: options?.model || cfg.model || 'claude-3-5-sonnet-20241022',
@@ -321,12 +326,13 @@ export class LLM服务 {
             'x-api-key': cfg.apiKey,
             'anthropic-version': '2023-06-01',
           },
-          timeout: 30000,
+          timeout: LLM服务.默认超时毫秒,
         }
-      );
+      ));
 
       return {
         content: response.data.content[0]?.text || '',
+        model: response.data?.model || options?.model || cfg.model || 'claude-3-5-sonnet-20241022',
         finishReason: response.data.stop_reason || 'stop',
         usage: {
           promptTokens: response.data.usage?.input_tokens || 0,
@@ -339,7 +345,7 @@ export class LLM服务 {
         data: error.response?.data,
         message: error.message,
       });
-      throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
+      throw new Error(`LLM调用失败: ${this.解析错误信息(error)}`);
     }
   }
 
@@ -355,7 +361,7 @@ export class LLM服务 {
     const url = `${baseUrl}/chat/completions`;
 
     try {
-      const response = await axios.post(
+      const response = await this.执行带重试(() => axios.post(
         url,
         {
           model: options?.model || cfg.model || 'deepseek-chat',
@@ -368,13 +374,14 @@ export class LLM服务 {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cfg.apiKey}`,
           },
-          timeout: 30000,
+          timeout: LLM服务.默认超时毫秒,
         }
-      );
+      ));
 
       const choice = response.data?.choices?.[0];
       return {
         content: choice?.message?.content || '',
+        model: response.data?.model || options?.model || cfg.model || 'deepseek-chat',
         finishReason: choice?.finish_reason || 'stop',
         usage: {
           promptTokens: response.data?.usage?.prompt_tokens || 0,
@@ -387,7 +394,7 @@ export class LLM服务 {
         data: error.response?.data,
         message: error.message,
       });
-      throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
+      throw new Error(`LLM调用失败: ${this.解析错误信息(error)}`);
     }
   }
 
@@ -395,9 +402,9 @@ export class LLM服务 {
    * 构建系统提示词
    */
   获取系统提示(): string {
-// 这两个暂时不加进去，太危险了
-// - front_jump: 向前跳
-// - backflip: 后空翻
+    // 这两个暂时不加进去，太危险了
+    // - front_jump: 向前跳
+    // - backflip: 后空翻
     return `你是一只可爱的机器狗AI助手。你可以：
 1. 与用户进行自然对话
 2. 执行一些基本动作来配合对话

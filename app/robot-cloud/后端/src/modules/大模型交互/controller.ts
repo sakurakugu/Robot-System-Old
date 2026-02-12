@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
 import type DatabaseService from '../../core/database';
-import type { ConversationService } from './service';
+import type { 对话服务 } from './service';
 
 export class 对话控制器 {
   constructor(
-    private conversationService: ConversationService,
+    private conversationService: 对话服务,
     private database: DatabaseService
   ) {}
 
@@ -68,5 +68,3 @@ export class 对话控制器 {
     }
   };
 }
-
-export { 对话控制器 as ConversationController };

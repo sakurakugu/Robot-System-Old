@@ -45,7 +45,7 @@ export interface Message {
   timestamp: Date;
 }
 
-export interface AIResponse {
+export interface AI响应 {
   text: string;
   actions: Action[];
   emotions?: string[];
@@ -53,6 +53,7 @@ export interface AIResponse {
     model: string;
     tokensUsed: number;
     responseTime: number;
+    vision?: boolean;      // 是否包含视觉识别
   };
 }
 

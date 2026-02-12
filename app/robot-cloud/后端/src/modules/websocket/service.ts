@@ -9,7 +9,7 @@ import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import 语音识别服务 from '../大模型交互/asr-service';
-import 对话引擎 from '../大模型交互/conversation-engine';
+import 对话服务 from '../大模型交互/service';
 import TTSService from '../大模型交互/tts-service';
 import { VideoStreamManager } from '../机器人交互/视频流';
 import type { 机器人服务 } from '../机器人管理/service';
@@ -44,8 +44,8 @@ class WebSocket服务 {
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
   // UI 控制端连接（按通道，可多）
   private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
-  private conversationEngine: 对话引擎;
   private database: DatabaseService;
+  private 对话服务?: 对话服务;
   private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
   private videoStreamManager: VideoStreamManager;
@@ -68,7 +68,6 @@ class WebSocket服务 {
 
   constructor(database: DatabaseService) {
     this.database = database;
-    this.conversationEngine = new 对话引擎();
     this.ttsService = new TTSService();
     this.videoStreamManager = new VideoStreamManager();
     this.asrService = new 语音识别服务();
@@ -79,6 +78,10 @@ class WebSocket服务 {
    */
   set机器人服务(机器人服务: 机器人服务): void {
     this.机器人服务 = 机器人服务;
+  }
+
+  set对话服务(对话服务: 对话服务): void {
+    this.对话服务 = 对话服务;
   }
 
   /**
@@ -454,7 +457,7 @@ class WebSocket服务 {
         return;
       }
 
-      // 使用对话引擎处理
+      // 使用对话服务处理
       let systemPrompt: string | undefined = undefined;
       let temperature: number | undefined = undefined;
       let model: string | undefined = undefined;
@@ -490,8 +493,12 @@ class WebSocket服务 {
         }
       }
 
+      if(!this.对话服务) {
+        throw new Error('对话服务 未初始化');
+      }
+
       // 第一步：调用LLM判断是否需要视觉识别
-      const response = await this.conversationEngine.处理消息(robotId, text, {
+      const response = await this.对话服务.处理消息(robotId, text, {
         history: [],
         maxHistory,
         systemPrompt,
@@ -546,10 +553,11 @@ class WebSocket服务 {
           // const cleanedText = removeVisionTags(response.text);
 
           // 使用用户原始问题和图片调用视觉模型
-          const visionResponse = await this.conversationEngine.处理视觉消息(
+          const visionResponse = await this.对话服务.处理视觉消息(
             robotId,
             text, // 用户的原始问题
-            photoResult.image
+            photoResult.image,
+            maxHistory,
           );
 
           finalResponse = visionResponse;
@@ -1176,7 +1184,7 @@ class WebSocket服务 {
         // 使用配置好的 ASR 选项
         const asrOptions = session.asrOptions || {};
 
-        text = (await this.asrService.transcribeWav(wavBuffer, asrOptions)) || '';
+        text = (await this.asrService.转录Wav(wavBuffer, asrOptions)) || '';
       }
 
       const asrTime = Date.now() - asrStart;

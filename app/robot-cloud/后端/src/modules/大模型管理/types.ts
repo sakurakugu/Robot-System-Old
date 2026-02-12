@@ -34,6 +34,7 @@ export interface Tool {
 
 export interface LLMResponse {
   content: string;
+  model?: string;
   finishReason: string;
   usage: {
     promptTokens: number;
@@ -63,6 +64,16 @@ export interface LLMConfigView {
     hasApiKey: boolean;
     apiKeyLength: number;
   }>;
+}
+
+/**
+ * 当前生效的 LLM 配置（脱敏）
+ */
+export interface LLMActiveConfigView {
+  provider: LLM供应商枚举;
+  model: string;
+  baseUrl: string;
+  hasApiKey: boolean;
 }
 
 /**

@@ -3,6 +3,9 @@ import express from 'express';
 import DatabaseService from './core/database';
 import { logger } from './core/logger';
 import WebSocketService from './modules/websocket/service';
+import { 大模型管理控制器 } from './modules/大模型管理/controller';
+import { createLLMRoutes } from './modules/大模型管理/routes';
+import { 大模型配置服务 } from './modules/大模型管理/service';
 import { ConversationController } from './modules/机器人交互/controller';
 import { createConversationRoutes } from './modules/机器人交互/routes';
 import { ConversationService } from './modules/机器人交互/service';
@@ -16,9 +19,6 @@ import { ChoreoService } from './modules/编舞系统/service';
 import { 角色控制器 } from './modules/角色管理/controller';
 import { createRoleRoutes } from './modules/角色管理/routes';
 import { 角色服务 } from './modules/角色管理/service';
-import { LLMController } from './modules/大模型管理/controller';
-import { LLMConfigService } from './modules/大模型管理/config-service';
-import { createLLMRoutes } from './modules/大模型管理/routes';
 import { SettingsController } from './modules/设置/controller';
 import { createSettingsRoutes } from './modules/设置/routes';
 import { 设置服务 } from './modules/设置/service';
@@ -31,7 +31,7 @@ export class 应用程序 {
   // 服务实例
   private 机器人服务: 机器人服务;
   private 对话服务: ConversationService;
-  private 大模型配置服务: LLMConfigService;
+  private 大模型配置服务: 大模型配置服务;
   private 设置服务: 设置服务;
   private 角色服务: 角色服务;
   private 编舞服务: ChoreoService;
@@ -39,7 +39,7 @@ export class 应用程序 {
   // 控制器实例
   private 机器人控制器: 机器人控制器;
   private 对话控制器: ConversationController;
-  private 大模型控制器: LLMController;
+  private 大模型控制器: 大模型管理控制器;
   private 设置控制器: SettingsController;
   private 角色控制器: 角色控制器;
   private 编舞控制器: ChoreoController;
@@ -52,7 +52,7 @@ export class 应用程序 {
     // 初始化服务
     this.机器人服务 = new 机器人服务(this.数据库);
     this.对话服务 = new ConversationService(this.数据库);
-    this.大模型配置服务 = new LLMConfigService(this.数据库);
+    this.大模型配置服务 = new 大模型配置服务(this.数据库);
     this.设置服务 = new 设置服务(this.数据库);
     this.角色服务 = new 角色服务(this.数据库);
     this.编舞服务 = new ChoreoService(this.数据库);
@@ -60,7 +60,7 @@ export class 应用程序 {
     // 初始化控制器
     this.机器人控制器 = new 机器人控制器(this.机器人服务);
     this.对话控制器 = new ConversationController(this.对话服务, this.数据库);
-    this.大模型控制器 = new LLMController(this.大模型配置服务);
+    this.大模型控制器 = new 大模型管理控制器(this.大模型配置服务);
     this.设置控制器 = new SettingsController(this.设置服务);
     this.角色控制器 = new 角色控制器(this.角色服务);
     this.编舞控制器 = new ChoreoController(this.编舞服务);

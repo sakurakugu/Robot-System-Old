@@ -403,5 +403,4 @@ class 语音识别服务 {
 
 export default 语音识别服务;
 
-export { 语音识别服务 as ASRService };
 

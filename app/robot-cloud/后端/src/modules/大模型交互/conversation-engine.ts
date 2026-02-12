@@ -1,16 +1,16 @@
 import { logger } from "../../core/logger";
 import { parseActions } from "../../core/utils/helpers";
-import LLMService from "../大模型管理/llm-service";
-import ActionController from "./action-controller";
-import { AIResponse, ConversationContext, Message } from "./types";
+import ActionController from "../机器人交互/action-controller";
+import { AIResponse, ConversationContext, Message } from "../机器人交互/types";
+import LLM服务 from "./llm-service";
 
-class ConversationEngine {
-  private llmService: LLMService;
+class 对话引擎 {
+  private llmService: LLM服务;
   private actionController: ActionController;
   private conversationHistory: Map<string, Message[]>;
 
   constructor() {
-    this.llmService = new LLMService();
+    this.llmService = new LLM服务();
     this.actionController = new ActionController();
     this.conversationHistory = new Map();
   }
@@ -197,4 +197,4 @@ class ConversationEngine {
   }
 }
 
-export default ConversationEngine;
+export default 对话引擎;

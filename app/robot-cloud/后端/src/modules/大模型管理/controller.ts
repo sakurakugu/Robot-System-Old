@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import type { 大模型配置服务 } from './config-service';
+import type { 大模型配置服务 } from './service';
 
 export class 大模型管理控制器 {
   constructor(private llmConfigService: 大模型配置服务) { }
@@ -41,4 +41,3 @@ export class 大模型管理控制器 {
   };
 }
 
-export { 大模型管理控制器 as LLMController };

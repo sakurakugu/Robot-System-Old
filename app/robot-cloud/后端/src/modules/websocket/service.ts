@@ -7,10 +7,10 @@ import { logger } from '../../core/logger';
 import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
-import { AliyunStreamingASR } from '../机器人交互/aliyun-streaming-asr';
-import ASRService from '../机器人交互/ASR服务';
-import ConversationEngine from '../机器人交互/conversation-engine';
-import TTSService from '../机器人交互/TTS服务';
+import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
+import 语音识别服务 from '../大模型交互/asr-service';
+import 对话引擎 from '../大模型交互/conversation-engine';
+import TTSService from '../大模型交互/tts-service';
 import { VideoStreamManager } from '../机器人交互/视频流';
 import type { 机器人服务 } from '../机器人管理/service';
 
@@ -44,12 +44,12 @@ class WebSocket服务 {
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
   // UI 控制端连接（按通道，可多）
   private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
-  private conversationEngine: ConversationEngine;
+  private conversationEngine: 对话引擎;
   private database: DatabaseService;
   private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
   private videoStreamManager: VideoStreamManager;
-  private asrService: ASRService;
+  private asrService: 语音识别服务;
   private audioSessions: Map<string, AudioSession> = new Map();
   private inputMergeTimers: Map<string, NodeJS.Timeout> = new Map();
   private pendingInputs: Map<
@@ -68,10 +68,10 @@ class WebSocket服务 {
 
   constructor(database: DatabaseService) {
     this.database = database;
-    this.conversationEngine = new ConversationEngine();
+    this.conversationEngine = new 对话引擎();
     this.ttsService = new TTSService();
     this.videoStreamManager = new VideoStreamManager();
-    this.asrService = new ASRService();
+    this.asrService = new 语音识别服务();
   }
 
   /**
@@ -2175,3 +2175,4 @@ class WebSocket服务 {
 }
 
 export default WebSocket服务;
+

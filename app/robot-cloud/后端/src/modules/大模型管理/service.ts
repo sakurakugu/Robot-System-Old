@@ -91,5 +91,3 @@ export class 大模型配置服务 {
     };
   }
 }
-
-export { 大模型配置服务 as LLMConfigService };

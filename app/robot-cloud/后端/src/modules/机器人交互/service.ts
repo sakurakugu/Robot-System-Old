@@ -1,16 +1,16 @@
 import type DatabaseService from '../../core/database';
 import { parseActions, removeActionTags } from '../../core/utils/helpers';
-import { LLMService } from '../大模型管理/llm-service';
+import { LLM服务 } from '../大模型交互/llm-service';
 import { ActionController } from './action-controller';
 import type { AIResponse, ConversationContext, Message } from './types';
 
 export class 对话服务 {
-  private llmService: LLMService;
+  private llmService: LLM服务;
   private actionController: ActionController;
   private conversationHistory: Map<string, Message[]>;
 
   constructor(private database: DatabaseService) {
-    this.llmService = new LLMService();
+    this.llmService = new LLM服务();
     this.actionController = new ActionController();
     this.conversationHistory = new Map();
   }
@@ -194,4 +194,5 @@ export class 对话服务 {
 }
 
 export { 对话服务 as ConversationService };
+
 

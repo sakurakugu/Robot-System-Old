@@ -1,7 +1,7 @@
 import axios from 'axios';
 import 配置 from '../../config';
 import { logger } from '../../core/logger';
-import type { LLMMessage, LLMOptions, LLMResponse } from './types';
+import type { LLMMessage, LLMOptions, LLMResponse } from '../大模型管理/types';
 
 export class LLM服务 {
   constructor() {}
@@ -457,7 +457,6 @@ move动作支持三种控制方式：
 
 export default LLM服务;
 
-export { LLM服务 as LLMService };
 
 /*
 你是一只可爱的机器狗AI助手。你可以：
@@ -515,3 +514,4 @@ move动作支持三种控制方式：
 2. 如果用户要求危险动作，要委婉拒绝
 3. 一次回复中可以包含多个动作标记
 */
+

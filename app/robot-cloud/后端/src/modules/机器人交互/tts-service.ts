@@ -1,5 +1,6 @@
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import path from 'path';
+import { logger } from '../../core/logger';
 import { uuidv7 } from '../../core/utils/helpers';
 import { AudioResponse, TTSOptions } from '../../types';
 
@@ -85,7 +86,7 @@ class 语音合成服务 {
     try {
       this.stdoutBuffer += data.toString('utf8');
     } catch (error) {
-      console.error('[TTS] UTF-8 解码错误:', error);
+      logger.error('[TTS] UTF-8 解码错误:', error);
       return;
     }
     let index = this.stdoutBuffer.indexOf('\n');
@@ -153,3 +154,4 @@ class 语音合成服务 {
 export default 语音合成服务;
 
 export { 语音合成服务 as TTSService };
+

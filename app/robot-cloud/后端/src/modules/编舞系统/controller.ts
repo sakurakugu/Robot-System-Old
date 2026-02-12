@@ -4,6 +4,7 @@
 
 import type { Request, Response } from 'express';
 import fs from 'fs';
+import { logger } from '../../core/logger';
 import type { ChoreoService } from './service';
 import type {
   AddProjectRobotDirectDto,
@@ -526,14 +527,14 @@ export class 编舞控制器 {
   exportProject = async (req: Request, res: Response): Promise<void> => {
     try {
       const { exportPath, fileName } = await this.service.exportProject(getParam(req.params.uuid));
-      
+
       res.download(exportPath, fileName, (err) => {
         // 下载完成后删除临时文件
         if (fs.existsSync(exportPath)) {
           fs.unlinkSync(exportPath);
         }
         if (err) {
-          console.error('下载文件时出错:', err);
+          logger.error('下载文件时出错', err as Error);
         }
       });
     } catch (error: any) {
@@ -556,12 +557,12 @@ export class 编舞控制器 {
       }
 
       const project = await this.service.importProject(req.file.path, req.file.originalname);
-      
+
       // 清理临时文件
       if (fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      
+
       res.json({ success: true, data: project });
     } catch (error: any) {
       // 清理临时文件

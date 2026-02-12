@@ -4,7 +4,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import 配置 from '../../config';
 import { LLM供应商列表 } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
-import type Logger from '../../core/logger';
+import { logger } from '../../core/logger';
 import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import type { RobotService } from '../robot/service';
@@ -44,7 +44,6 @@ class WebSocket服务 {
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
   // UI 控制端连接（按通道，可多）
   private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
-  private logger: Logger;
   private conversationEngine: ConversationEngine;
   private database: DatabaseService;
   private robotService?: RobotService;
@@ -67,8 +66,7 @@ class WebSocket服务 {
   private ttsRateLimiter = new RateLimiter(5, 5000);
   private inputMergeWindowMs = 500;
 
-  constructor(logger: Logger, database: DatabaseService) {
-    this.logger = logger;
+  constructor(database: DatabaseService) {
     this.database = database;
     this.conversationEngine = new ConversationEngine();
     this.ttsService = new TTSService();
@@ -123,7 +121,7 @@ class WebSocket服务 {
       });
     }
 
-    this.logger.info('WebSocket服务已启动', { path, channel });
+    logger.info('WebSocket服务已启动', { path, channel });
   }
 
   /**
@@ -137,7 +135,7 @@ class WebSocket服务 {
 
     if (!robotId || !isValidRobotId(robotId)) {
       robotId = uuidv7();
-      this.logger.info('生成新的机器狗ID', { robotId });
+      logger.info('生成新的机器狗ID', { robotId });
     }
 
     // UI 连接：不占用机器人连接槽位，加入 UI 订阅集合
@@ -150,7 +148,7 @@ class WebSocket服务 {
         byChannel.set(channel, new Set());
       }
       byChannel.get(channel)!.add(ws);
-      this.logger.info('UI连接建立', {
+      logger.info('UI连接建立', {
         robotId,
         channel,
         uiCount: byChannel.get(channel)!.size,
@@ -160,10 +158,10 @@ class WebSocket服务 {
       const existingConnections = this.robotConnections.get(robotId);
       const existingConnection = existingConnections?.get(channel);
       if (existingConnection && existingConnection.websocket !== ws) {
-        this.logger.info('关闭旧的机器人连接', { robotId, channel });
+        logger.info('关闭旧的机器人连接', { robotId, channel });
         try {
           existingConnection.websocket.close(1000, '新连接已建立');
-        } catch (e) {
+        } catch (error) {
           // 忽略关闭错误
         }
       }
@@ -193,7 +191,7 @@ class WebSocket服务 {
       });
     }
 
-    this.logger.info('机器人连接建立', {
+    logger.info('机器人连接建立', {
       robotId,
       channel,
       ip: req.socket.remoteAddress,
@@ -234,7 +232,7 @@ class WebSocket服务 {
             this.uiConnections.delete(robotId);
           }
         }
-        this.logger.info('UI连接关闭', { robotId, channel });
+        logger.info('UI连接关闭', { robotId, channel });
       } else {
         this.handleDisconnection(robotId, channel);
       }
@@ -242,7 +240,7 @@ class WebSocket服务 {
 
     // 设置错误处理器
     ws.on('error', (error) => {
-      this.logger.error('WebSocket错误', error, { robotId });
+      logger.error('WebSocket错误', error, { robotId });
     });
 
     // 设置心跳检测
@@ -257,7 +255,7 @@ class WebSocket服务 {
       const message: ClientMessage = JSON.parse(data.toString());
 
       if (!this.isAllowedMessageType(channel, (message as any).type)) {
-        this.logger.warn('消息通道不匹配', { robotId, channel, type: (message as any).type });
+        logger.warn('消息通道不匹配', { robotId, channel, type: (message as any).type });
         this.sendError(robotId, 'CHANNEL_MISMATCH', '消息通道不匹配', channel);
         return;
       }
@@ -345,10 +343,10 @@ class WebSocket服务 {
           break;
 
         default:
-          this.logger.warn('未知的消息类型', { robotId, type: (message as any).type });
+          logger.warn('未知的消息类型', { robotId, type: (message as any).type });
       }
     } catch (error: any) {
-      this.logger.error('处理消息失败', error, { robotId });
+      logger.error('处理消息失败', error, { robotId });
       this.sendError(robotId, 'MESSAGE_PARSE_ERROR', '消息解析失败', channel);
     }
   }
@@ -428,7 +426,7 @@ class WebSocket服务 {
     const traceId = conversationId || uuidv7();
 
     try {
-      this.logger.info('收到文本输入', { robotId, text, inputType });
+      logger.info('收到文本输入', { robotId, text, inputType });
 
       // 检查机器人是否存在
       const robot = this.database.getRobot(robotId);
@@ -439,7 +437,7 @@ class WebSocket服务 {
       // 检查机器人是否配置了角色
       if (!robot.role_id) {
         const errorMsg = '该机器人未配置角色，无法进行对话。请在管理界面为机器人分配一个角色。';
-        this.logger.warn('机器人未配置角色', { robotId });
+        logger.warn('机器人未配置角色', { robotId });
 
         // 发送错误消息到UI
         this.sendToUI(robotId, {
@@ -507,7 +505,7 @@ class WebSocket服务 {
       let finalResponse = response;
 
       if (needsVision) {
-        this.logger.info('检测到视觉识别需求，开始拍照', { robotId });
+        logger.info('检测到视觉识别需求，开始拍照', { robotId });
 
         try {
           // 检查是否有 robotService
@@ -530,7 +528,7 @@ class WebSocket服务 {
           // 调用拍照功能
           const photoResult = await this.robotService.拍照(robotId);
 
-          this.logger.info('拍照成功，开始视觉分析', { robotId });
+          logger.info('拍照成功，开始视觉分析', { robotId });
 
           // 发送状态消息
           this.sendToUI(robotId, {
@@ -544,8 +542,8 @@ class WebSocket服务 {
             },
           }, 'business');
 
-          // 移除视觉标记，得到纯净的LLM回复
-          const cleanedText = removeVisionTags(response.text);
+          // 移除视觉标记，得到纯净的LLM回复（暂且先注释掉）
+          // const cleanedText = removeVisionTags(response.text);
 
           // 使用用户原始问题和图片调用视觉模型
           const visionResponse = await this.conversationEngine.处理视觉消息(
@@ -556,9 +554,9 @@ class WebSocket服务 {
 
           finalResponse = visionResponse;
 
-          this.logger.info('视觉分析完成', { robotId });
+          logger.info('视觉分析完成', { robotId });
         } catch (error: any) {
-          this.logger.error('视觉识别失败', error, { robotId });
+          logger.error('视觉识别失败', error, { robotId });
 
           // 发送错误状态
           this.sendToUI(robotId, {
@@ -654,10 +652,10 @@ class WebSocket服务 {
             }, 'audio_download');
           }
         } else {
-          this.logger.info('TTS跳过：回复文本为空或仅包含表情', { robotId });
+          logger.info('TTS跳过：回复文本为空或仅包含表情', { robotId });
         }
       } catch (e: any) {
-        this.logger.error('TTS生成失败', e, { robotId });
+        logger.error('TTS生成失败', e, { robotId });
       }
 
       // 发送动作指令
@@ -696,7 +694,7 @@ class WebSocket服务 {
         },
       });
 
-      this.logger.记录对话({
+      logger.记录对话({
         robotId,
         input: text,
         output: response.text,
@@ -704,7 +702,7 @@ class WebSocket服务 {
         actions: response.actions,
       });
     } catch (error: any) {
-      this.logger.error('处理文本输入失败', error, { robotId });
+      logger.error('处理文本输入失败', error, { robotId });
       this.sendError(robotId, 'PROCESSING_ERROR', error.message, 'business');
     }
   }
@@ -718,7 +716,7 @@ class WebSocket服务 {
   ): Promise<void> {
     try {
       if (!this.ttsRateLimiter.check(robotId)) {
-        this.logger.warn('TTS请求过于频繁', { robotId });
+        logger.warn('TTS请求过于频繁', { robotId });
         this.sendError(robotId, 'RATE_LIMITED', '请求过于频繁，请稍后再试', 'business');
         return;
       }
@@ -726,7 +724,7 @@ class WebSocket服务 {
       // 对TTS文本进行清理，移除不应该被朗读的标记
       const sanitizedText = this.sanitizeTtsText(text);
       if (!sanitizedText) {
-        this.logger.info('TTS跳过：清理后文本为空', { robotId });
+        logger.info('TTS跳过：清理后文本为空', { robotId });
         return;
       }
 
@@ -784,7 +782,7 @@ class WebSocket服务 {
         }, 'audio_download');
       }
     } catch (e: any) {
-      this.logger.error('TTS生成失败', e, { robotId });
+      logger.error('TTS生成失败', e, { robotId });
       this.sendError(robotId, 'TTS_ERROR', e?.message || 'TTS失败', 'business');
     }
   }
@@ -794,7 +792,7 @@ class WebSocket服务 {
    */
   private async handleActionInput(robotId: string, action: string, parameters?: Record<string, any>): Promise<void> {
     try {
-      this.logger.info('收到动作输入', { robotId, action, parameters });
+      logger.info('收到动作输入', { robotId, action, parameters });
 
       // 验证动作名称
       if (!action || typeof action !== 'string') {
@@ -828,9 +826,9 @@ class WebSocket服务 {
         },
       }, 'business');
 
-      this.logger.info('动作指令已发送，不生成TTS', { robotId, action });
+      logger.info('动作指令已发送，不生成TTS', { robotId, action });
     } catch (error: any) {
-      this.logger.error('处理动作输入失败', error, { robotId, action });
+      logger.error('处理动作输入失败', error, { robotId, action });
       this.sendError(robotId, 'ACTION_ERROR', error.message || '动作处理失败', 'business');
     }
   }
@@ -871,7 +869,7 @@ class WebSocket服务 {
         this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'control');
       }
     } catch (error: any) {
-      this.logger.error('处理控制输入失败', error, { robotId });
+      logger.error('处理控制输入失败', error, { robotId });
       this.sendError(robotId, 'CONTROL_ERROR', error.message || '控制处理失败', 'control');
     }
   }
@@ -892,7 +890,7 @@ class WebSocket服务 {
         this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
       }
     } catch (error: any) {
-      this.logger.error('处理音频控制失败', error, { robotId });
+      logger.error('处理音频控制失败', error, { robotId });
       this.sendError(robotId, 'AUDIO_CONTROL_ERROR', error.message || '音频控制失败', 'business');
     }
   }
@@ -903,7 +901,7 @@ class WebSocket服务 {
   private async handleAudioStart(robotId: string, audioData: any): Promise<void> {
     const sessionId = String(audioData?.sessionId || '');
     if (!sessionId) {
-      this.logger.warn('音频开始缺少sessionId', { robotId });
+      logger.warn('音频开始缺少sessionId', { robotId });
       return;
     }
     const sampleRate = Number(audioData?.sampleRate || 16000);
@@ -946,7 +944,7 @@ class WebSocket服务 {
     // 如果使用流式 ASR，立即启动连接
     if (useStreamingASR) {
       try {
-        this.logger.info('启动流式 ASR 服务', { robotId, sessionId, asrOptions });
+        logger.info('启动流式 ASR 服务', { robotId, sessionId, asrOptions });
 
         // 创建流式 ASR 实例
         const streamingASR = new AliyunStreamingASR({
@@ -957,7 +955,7 @@ class WebSocket服务 {
 
         // 启动连接（异步，但不阻塞）
         streamingASR.start().catch((error) => {
-          this.logger.error('流式 ASR 启动失败', error, { robotId, sessionId });
+          logger.error('流式 ASR 启动失败', error, { robotId, sessionId });
           this.sendError(robotId, 'ASR_START_ERROR', error.message || '流式 ASR 启动失败', 'business');
         });
 
@@ -975,9 +973,9 @@ class WebSocket服务 {
           // 初始化 PCM 缓冲区
           session.pcmBuffer = [];
           session.pcmBufferSize = 0;
-          this.logger.debug('Opus 解码器初始化成功', { robotId, sessionId, sampleRate: sr, channels: ch });
+          logger.debug('Opus 解码器初始化成功', { robotId, sessionId, sampleRate: sr, channels: ch });
         } catch (error) {
-          this.logger.error('Opus 解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
+          logger.error('Opus 解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
             robotId,
             sessionId,
             sampleRate: sr,
@@ -985,12 +983,12 @@ class WebSocket服务 {
           });
         }
       } catch (error: any) {
-        this.logger.error('流式 ASR 初始化失败', error, { robotId, sessionId });
+        logger.error('流式 ASR 初始化失败', error, { robotId, sessionId });
       }
     }
 
     this.audioSessions.set(sessionId, session);
-    this.logger.debug('音频会话开始', {
+    logger.debug('音频会话开始', {
       robotId,
       sessionId,
       sampleRate,
@@ -1007,7 +1005,7 @@ class WebSocket服务 {
     const sessionId = String(audioData?.sessionId || '');
     const buffer = audioData?.buffer;
     if (!buffer) {
-      this.logger.debug('音频块数据为空', { robotId, sessionId });
+      logger.debug('音频块数据为空', { robotId, sessionId });
       return;
     }
     let session = sessionId ? this.audioSessions.get(sessionId) : undefined;
@@ -1030,7 +1028,7 @@ class WebSocket服务 {
     try {
       const chunk = Buffer.from(buffer, 'base64');
       if (chunk.length > 0) {
-        this.logger.debug('接收音频块', {
+        logger.debug('接收音频块', {
           robotId,
           sessionId,
           chunkLength: chunk.length,
@@ -1070,7 +1068,7 @@ class WebSocket服务 {
                 session.pcmBuffer = [];
                 session.pcmBufferSize = 0;
 
-                this.logger.debug('批量推送 PCM 到流式 ASR', {
+                logger.debug('批量推送 PCM 到流式 ASR', {
                   robotId,
                   sessionId,
                   pcmSize: mergedBuffer.length,
@@ -1078,7 +1076,7 @@ class WebSocket服务 {
                 });
               }
 
-              this.logger.debug('音频块已解码', {
+              logger.debug('音频块已解码', {
                 robotId,
                 sessionId,
                 opusSize: chunk.length,
@@ -1087,7 +1085,7 @@ class WebSocket服务 {
               });
             }
           } catch (error) {
-            this.logger.warn('实时解码音频块失败', {
+            logger.warn('实时解码音频块失败', {
               robotId,
               sessionId,
               chunkLength: chunk.length,
@@ -1097,10 +1095,10 @@ class WebSocket服务 {
           }
         }
       } else {
-        this.logger.debug('音频块长度为0', { robotId, sessionId });
+        logger.debug('音频块长度为0', { robotId, sessionId });
       }
     } catch (e) {
-      this.logger.warn('音频块解码失败', { robotId, sessionId, error: String(e), bufferType: typeof buffer });
+      logger.warn('音频块解码失败', { robotId, sessionId, error: String(e), bufferType: typeof buffer });
     }
   }
 
@@ -1110,25 +1108,25 @@ class WebSocket服务 {
   private async handleAudioEnd(robotId: string, audioData: any): Promise<void> {
     const sessionId = String(audioData?.sessionId || '');
     if (!sessionId) {
-      this.logger.warn('音频结束缺少sessionId', { robotId });
+      logger.warn('音频结束缺少sessionId', { robotId });
       return;
     }
     const session = this.audioSessions.get(sessionId);
     if (!session) {
-      this.logger.warn('音频会话不存在', { robotId, sessionId });
+      logger.warn('音频会话不存在', { robotId, sessionId });
       return;
     }
     this.audioSessions.delete(sessionId);
 
     if (!session.chunks || session.chunks.length === 0) {
-      this.logger.warn('音频会话无有效数据', { robotId, sessionId });
+      logger.warn('音频会话无有效数据', { robotId, sessionId });
       return;
     }
 
     // 检查是否所有 chunks 都是空的
     const validChunks = session.chunks.filter(chunk => chunk && chunk.length > 0);
     if (validChunks.length === 0) {
-      this.logger.warn('音频会话所有数据块都为空', { robotId, sessionId, totalChunks: session.chunks.length });
+      logger.warn('音频会话所有数据块都为空', { robotId, sessionId, totalChunks: session.chunks.length });
       return;
     }
 
@@ -1145,7 +1143,7 @@ class WebSocket服务 {
           if (session.pcmBuffer && session.pcmBuffer.length > 0) {
             const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
             session.streamingASR.pushAudio(mergedBuffer);
-            this.logger.debug('发送剩余 PCM 数据', {
+            logger.debug('发送剩余 PCM 数据', {
               robotId,
               sessionId,
               pcmSize: mergedBuffer.length,
@@ -1156,7 +1154,7 @@ class WebSocket服务 {
 
           text = await session.streamingASR.finish();
 
-          this.logger.info('流式 ASR 识别完成', {
+          logger.info('流式 ASR 识别完成', {
             robotId,
             sessionId,
             text,
@@ -1164,7 +1162,7 @@ class WebSocket服务 {
             durationMs,
           });
         } catch (error: any) {
-          this.logger.error('流式 ASR 识别失败，降级到批量处理', error, { robotId, sessionId });
+          logger.error('流式 ASR 识别失败，降级到批量处理', error, { robotId, sessionId });
           // 流式 ASR 失败，降级到原来的批量处理方式
           text = '';
         }
@@ -1172,7 +1170,7 @@ class WebSocket服务 {
 
       // 如果流式 ASR 没有结果（未启用或失败），使用原来的批量处理方式
       if (!text.trim()) {
-        this.logger.info('使用批量 ASR 处理', { robotId, sessionId });
+        logger.info('使用批量 ASR 处理', { robotId, sessionId });
         const wavBuffer = this.decodeOpusChunksToWav(session);
 
         // 使用配置好的 ASR 选项
@@ -1184,7 +1182,7 @@ class WebSocket服务 {
       const asrTime = Date.now() - asrStart;
 
       if (!text.trim()) {
-        this.logger.info('ASR结果为空', { robotId, sessionId });
+        logger.info('ASR结果为空', { robotId, sessionId });
         return;
       }
 
@@ -1196,7 +1194,7 @@ class WebSocket服务 {
     } catch (error: any) {
       const message = error?.message || '语音识别失败';
       if (String(message).includes('Opus解码失败')) {
-        this.logger.warn('Opus解码失败', {
+        logger.warn('Opus解码失败', {
           robotId,
           sessionId,
           chunks: session.chunks.length,
@@ -1206,7 +1204,7 @@ class WebSocket服务 {
         });
         return;
       }
-      this.logger.error('音频处理失败', error, { robotId, sessionId });
+      logger.error('音频处理失败', error, { robotId, sessionId });
       this.sendError(robotId, 'ASR_ERROR', message, 'business');
     } finally {
       // 清理资源
@@ -1235,7 +1233,7 @@ class WebSocket服务 {
         (OpusScript as any).Application.VOIP
       );
     } catch (error) {
-      this.logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
+      logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
         sampleRate: sr,
         channels: ch,
         sessionId: session.sessionId
@@ -1256,12 +1254,12 @@ class WebSocket服务 {
       for (let i = 0; i < session.chunks.length; i++) {
         const chunk = session.chunks[i];
         if (!chunk || chunk.length === 0) {
-          this.logger.debug('跳过空音频块', { sessionId: session.sessionId, index: i });
+          logger.debug('跳过空音频块', { sessionId: session.sessionId, index: i });
           continue;
         }
         try {
           // 记录音频块的详细信息
-          this.logger.debug('尝试解码音频块', {
+          logger.debug('尝试解码音频块', {
             sessionId: session.sessionId,
             index: i,
             chunkLength: chunk.length,
@@ -1274,7 +1272,7 @@ class WebSocket服务 {
           if (decoded && decoded.length > 0) {
             pcmBuffers.push(toUint8Array(decoded));
             successCount++;
-            this.logger.debug('音频块解码成功', {
+            logger.debug('音频块解码成功', {
               sessionId: session.sessionId,
               index: i,
               decodedLength: decoded.length
@@ -1282,7 +1280,7 @@ class WebSocket服务 {
           }
         } catch (error) {
           failCount++;
-          this.logger.warn('音频块解码失败', {
+          logger.warn('音频块解码失败', {
             sessionId: session.sessionId,
             index: i,
             chunkLength: chunk.length,
@@ -1294,7 +1292,7 @@ class WebSocket服务 {
       }
 
       if (pcmBuffers.length === 0) {
-        this.logger.warn('Opus解码失败：所有音频块解码失败', {
+        logger.warn('Opus解码失败：所有音频块解码失败', {
           sessionId: session.sessionId,
           totalChunks: session.chunks.length,
           failCount,
@@ -1307,7 +1305,7 @@ class WebSocket服务 {
       }
 
       if (failCount > 0) {
-        this.logger.debug('部分音频块解码失败', {
+        logger.debug('部分音频块解码失败', {
           sessionId: session.sessionId,
           successCount,
           failCount,
@@ -1322,7 +1320,7 @@ class WebSocket服务 {
         try {
           decoder.delete();
         } catch (e) {
-          this.logger.error('Opus解码器释放失败', e instanceof Error ? e : new Error(String(e)));
+          logger.error('Opus解码器释放失败', e instanceof Error ? e : new Error(String(e)));
         }
       }
     }
@@ -1423,7 +1421,7 @@ class WebSocket服务 {
       this.inputMergeTimers.delete(robotId);
     }
     if (!this.inputRateLimiter.check(robotId)) {
-      this.logger.warn('输入过于频繁', { robotId });
+      logger.warn('输入过于频繁', { robotId });
       this.sendError(robotId, 'RATE_LIMITED', '请求过于频繁，请稍后再试', 'business');
       return;
     }
@@ -1441,7 +1439,7 @@ class WebSocket服务 {
    * 处理心跳
    */
   private handleHeartbeat(robotId: string): void {
-    this.logger.debug('收到心跳', { robotId });
+    logger.debug('收到心跳', { robotId });
     // 心跳响应已经通过更新lastActiveAt实现
   }
 
@@ -1455,7 +1453,7 @@ class WebSocket服务 {
       timestamp: msg?.timestamp,
       data: msg?.data ?? msg,
     };
-    this.logger.debug('收到状态更新', { robotId, payload });
+    logger.debug('收到状态更新', { robotId, payload });
 
     // 由于新数据库结构不再使用 metadata 存储状态，这里仅广播到 UI
     // TODO: 如果需要持久化状态，可以添加专门的状态表
@@ -1475,7 +1473,7 @@ class WebSocket服务 {
         }, 'control');
       }
     } catch (err: any) {
-      this.logger.error('广播电量状态失败', err, { robotId });
+      logger.error('广播电量状态失败', err, { robotId });
     }
 
     // 同步广播完整状态到UI（便于前端冗余处理）
@@ -1487,7 +1485,7 @@ class WebSocket服务 {
         data: payload.data || {},
       }, 'control');
     } catch (err: any) {
-      this.logger.error('广播状态更新失败', err, { robotId });
+      logger.error('广播状态更新失败', err, { robotId });
     }
   }
 
@@ -1495,7 +1493,7 @@ class WebSocket服务 {
    * 处理机器人注册
    */
   private async handleRobotRegister(robotId: string, data: any): Promise<void> {
-    this.logger.info('收到机器人注册', { robotId, data });
+    logger.info('收到机器人注册', { robotId, data });
 
     try {
       const { name, model, version } = data;
@@ -1519,7 +1517,7 @@ class WebSocket服务 {
         };
       }
 
-      this.logger.info('客户端注册成功', { robotId, name, model });
+      logger.info('客户端注册成功', { robotId, name, model });
 
       // 发送注册确认 - 仅发送到 business 通道，不要广播到其他通道
       this.sendToRobot(robotId, {
@@ -1541,7 +1539,7 @@ class WebSocket服务 {
       //   },
       // }, 'business');
     } catch (error: any) {
-      this.logger.error('处理客户端注册失败', error, { robotId });
+      logger.error('处理客户端注册失败', error, { robotId });
       this.sendError(robotId, 'REGISTER_ERROR', error.message, 'business');
     }
   }
@@ -1574,9 +1572,9 @@ class WebSocket服务 {
         }, 'business');
       });
 
-      this.logger.info('视频流订阅成功', { robotId, rtspUrl });
+      logger.info('视频流订阅成功', { robotId, rtspUrl });
     } catch (error: any) {
-      this.logger.error('视频流订阅失败', error, { robotId });
+      logger.error('视频流订阅失败', error, { robotId });
       this.sendError(robotId, 'VIDEO_SUBSCRIBE_ERROR', '视频流订阅失败', 'business');
     }
   }
@@ -1587,9 +1585,9 @@ class WebSocket服务 {
   private async handleVideoUnsubscribe(robotId: string): Promise<void> {
     try {
       this.videoStreamManager.unsubscribe(robotId, robotId);
-      this.logger.info('视频流取消订阅', { robotId });
+      logger.info('视频流取消订阅', { robotId });
     } catch (error: any) {
-      this.logger.error('视频流取消订阅失败', error, { robotId });
+      logger.error('视频流取消订阅失败', error, { robotId });
     }
   }
 
@@ -1603,7 +1601,7 @@ class WebSocket服务 {
       if (connections.size === 0) {
         this.robotConnections.delete(robotId);
         this.database.updateRobot(robotId, { status: 'offline' });
-        this.logger.info('机器人连接断开', { robotId, channel });
+        logger.info('机器人连接断开', { robotId, channel });
       }
     }
   }
@@ -1622,7 +1620,7 @@ class WebSocket服务 {
         try {
           uiWs.send(JSON.stringify(message));
         } catch (error: any) {
-          this.logger.error('发送消息到UI失败', error, { robotId });
+          logger.error('发送消息到UI失败', error, { robotId });
         }
       }
     }
@@ -1639,7 +1637,7 @@ class WebSocket服务 {
         try {
           uiWs.send(JSON.stringify(message));
         } catch (error: any) {
-          this.logger.error('发送消息到UI失败', error, { robotId });
+          logger.error('发送消息到UI失败', error, { robotId });
         }
       }
     }
@@ -1675,7 +1673,7 @@ class WebSocket服务 {
       const now = Date.now();
       const lastActive = connection.lastActiveAt.getTime();
       if (now - lastActive > 5 * 60 * 1000) {
-        this.logger.warn('连接超时，自动断开', { robotId });
+        logger.warn('连接超时，自动断开', { robotId });
         connection.websocket.close();
         clearInterval(interval);
       }
@@ -1710,7 +1708,7 @@ class WebSocket服务 {
     for (const wss of this.wssMap.values()) {
       wss.close();
     }
-    this.logger.info('WebSocket服务已关闭');
+    logger.info('WebSocket服务已关闭');
   }
 
   /**
@@ -1719,14 +1717,14 @@ class WebSocket服务 {
   sendToRobot(robotId: string, message: ServerMessage, channel: Channel = 'business'): boolean {
     const connection = this.robotConnections.get(robotId)?.get(channel);
     if (!connection) {
-      this.logger.warn('机器人未连接，无法发送', { robotId, channel });
+      logger.warn('机器人未连接，无法发送', { robotId, channel });
       return false;
     }
     try {
       connection.websocket.send(JSON.stringify(message));
       return true;
     } catch (error: any) {
-      this.logger.error('发送到机器人失败', error, { robotId });
+      logger.error('发送到机器人失败', error, { robotId });
       return false;
     }
   }
@@ -1742,7 +1740,7 @@ class WebSocket服务 {
           try {
             uiWs.send(JSON.stringify(message));
           } catch (error: any) {
-            this.logger.error('广播消息到UI失败', error, { robotId });
+            logger.error('广播消息到UI失败', error, { robotId });
           }
         }
       }
@@ -2023,7 +2021,7 @@ class WebSocket服务 {
   private async handleSdkModeSet(robotId: string, data: any): Promise<void> {
     try {
       const sdkMode = data?.sdkMode;
-      this.logger.info('收到SDK模式设置请求', { robotId, sdkMode });
+      logger.info('收到SDK模式设置请求', { robotId, sdkMode });
 
       // 转发给机器人客户端
       const requestId = uuidv7();
@@ -2038,7 +2036,7 @@ class WebSocket服务 {
         this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
       }
     } catch (error: any) {
-      this.logger.error('处理SDK模式设置失败', error, { robotId });
+      logger.error('处理SDK模式设置失败', error, { robotId });
       this.sendError(robotId, 'SDK_MODE_ERROR', error.message || 'SDK模式设置失败', 'business');
     }
   }
@@ -2048,7 +2046,7 @@ class WebSocket服务 {
    */
   private async handleSdkModeGet(robotId: string): Promise<void> {
     try {
-      this.logger.info('收到SDK模式获取请求', { robotId });
+      logger.info('收到SDK模式获取请求', { robotId });
 
       // 转发给机器人客户端
       const requestId = uuidv7();
@@ -2063,7 +2061,7 @@ class WebSocket服务 {
         this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
       }
     } catch (error: any) {
-      this.logger.error('处理SDK模式获取失败', error, { robotId });
+      logger.error('处理SDK模式获取失败', error, { robotId });
       this.sendError(robotId, 'SDK_MODE_ERROR', error.message || 'SDK模式获取失败', 'business');
     }
   }
@@ -2073,7 +2071,7 @@ class WebSocket服务 {
    */
   private async handleSdkModeResponse(robotId: string, data: any): Promise<void> {
     try {
-      this.logger.info('收到SDK模式响应，转发到UI', { robotId, data });
+      logger.info('收到SDK模式响应，转发到UI', { robotId, data });
 
       // 广播到所有UI客户端
       this.sendToUI(robotId, {
@@ -2083,7 +2081,7 @@ class WebSocket服务 {
         data,
       }, 'business');
     } catch (error: any) {
-      this.logger.error('处理SDK模式响应失败', error, { robotId });
+      logger.error('处理SDK模式响应失败', error, { robotId });
     }
   }
 

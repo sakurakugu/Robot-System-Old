@@ -1,5 +1,6 @@
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
+import { logger } from '../../core/logger';
 
 export interface VideoStreamOptions {
   rtspUrl: string;
@@ -105,24 +106,24 @@ export class VideoStreamService extends EventEmitter {
       const msg = data.toString();
       // 只记录错误，忽略调试信息
       if (msg.includes('ERROR') || msg.includes('WARNING')) {
-        console.error('[视频流] GStreamer:', msg);
+        logger.error('[视频流] GStreamer', { message: msg.trim() });
       }
     });
 
     this.gstProcess.on('error', (err) => {
-      console.error('[视频流] 进程错误:', err);
+      logger.error('[视频流] 进程错误', err as Error);
       this.emit('error', err);
       this.isRunning = false;
     });
 
     this.gstProcess.on('exit', (code) => {
-      console.log('[视频流] 进程退出码:', code);
+      logger.info('[视频流] 进程退出', { code });
       this.isRunning = false;
       this.gstProcess = null;
       this.emit('exit', code);
     });
 
-    console.log('[视频流] 开始从', rtspUrl, '流视频');
+    logger.info(`[视频流] 开始从 ${rtspUrl} 流视频`);
   }
 
   stop(): void {
@@ -132,7 +133,7 @@ export class VideoStreamService extends EventEmitter {
     }
     this.isRunning = false;
     this.frameBuffer = [];
-    console.log('[视频流] 已停止');
+    logger.info('[视频流] 已停止');
   }
 
   getStatus(): boolean {

@@ -1,3 +1,4 @@
+import { logger } from "../../core/logger";
 import { parseActions } from "../../core/utils/helpers";
 import { AIResponse, ConversationContext, Message } from "../../types";
 import ActionController from "./action-controller";
@@ -105,7 +106,7 @@ class ConversationEngine {
         },
       };
     } catch (error: any) {
-      console.error("处理消息失败:", error);
+      logger.error("处理消息失败:", error);
       throw error;
     }
   }
@@ -190,7 +191,7 @@ class ConversationEngine {
         } as any,
       };
     } catch (error: any) {
-      console.error('视觉识别处理失败:', error);
+      logger.error('视觉识别处理失败:', error);
       throw error;
     }
   }

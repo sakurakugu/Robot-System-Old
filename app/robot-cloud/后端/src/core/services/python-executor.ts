@@ -7,6 +7,7 @@ import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../logger';
 
 export interface RobotConfig {
   name: string;
@@ -239,8 +240,8 @@ export class Python执行器 extends EventEmitter {
         // 清理临时文件
         try {
           fs.unlinkSync(scriptPath);
-        } catch (e) {
-          console.error('清理临时文件失败:', e);
+        } catch (error) {
+          logger.error('清理临时文件失败:', error);
         }
 
         this.processes.delete(executionId);
@@ -307,15 +308,15 @@ import sys
 try:
     # 初始化机器人
     ${robotInits}
-    
+
     print("[PROGRESS:0] 开始执行动作序列")
-    
+
     # 执行动作序列
     ${actionCalls}
-    
+
     print("[PROGRESS:100] 动作序列执行完成")
     sys.exit(0)
-    
+
 except Exception as e:
     print(f"执行失败: {e}", file=sys.stderr)
     sys.exit(1)
@@ -394,3 +395,4 @@ export const pythonExecutor = new Python执行器();
 export default Python执行器;
 
 export { Python执行器 as PythonExecutor };
+

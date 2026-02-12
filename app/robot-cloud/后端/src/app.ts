@@ -1,7 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import DatabaseService from './core/database';
-import Logger from './core/logger';
+import { logger } from './core/logger';
 import { RobotController } from './modules/robot/controller';
 import { createRobotRoutes } from './modules/robot/routes';
 import { RobotService } from './modules/robot/service';
@@ -21,7 +21,6 @@ import { createChoreoRoutes } from './modules/编舞系统/routes';
 import { ChoreoService } from './modules/编舞系统/service';
 
 export class 应用程序 {
-  public logger: Logger;
   public 应用: express.Application;
   public 数据库: DatabaseService;
   public WebSocket服务: WebSocketService;
@@ -42,16 +41,15 @@ export class 应用程序 {
 
   constructor() {
     this.应用 = express();
-    this.logger = new Logger();
     this.数据库 = new DatabaseService();
-    this.WebSocket服务 = new WebSocketService(this.logger, this.数据库);
+    this.WebSocket服务 = new WebSocketService(this.数据库);
 
     // 初始化服务
-    this.机器人服务 = new RobotService(this.数据库, this.logger);
+    this.机器人服务 = new RobotService(this.数据库);
     this.对话服务 = new ConversationService(this.数据库);
     this.设置服务 = new SettingsService(this.数据库);
-    this.角色服务 = new RoleService(this.数据库, this.logger);
-    this.编舞服务 = new ChoreoService(this.数据库, this.logger);
+    this.角色服务 = new RoleService(this.数据库);
+    this.编舞服务 = new ChoreoService(this.数据库);
 
     // 初始化控制器
     this.机器人控制器 = new RobotController(this.机器人服务);
@@ -81,17 +79,17 @@ export class 应用程序 {
       this.设置服务.loadPersistedConfig();
 
       const 活动LLM = this.设置服务.getActiveLLMConfig();
-      this.logger.info(`LLM 配置已加载`, {
+      logger.info(`LLM 配置已加载`, {
         provider: 活动LLM.provider,
         model: 活动LLM.model,
         hasApiKey: !!活动LLM.apiKey,
       });
 
       if (!活动LLM.apiKey) {
-        this.logger.warn('⚠️ 当前 LLM 供应商未配置 API Key，请访问前端设置页面进行配置');
+        logger.warn('⚠️ 当前 LLM 供应商未配置 API Key，请访问前端设置页面进行配置');
       }
     } catch (e: any) {
-      this.logger.error('加载持久化配置失败', e);
+      logger.error('加载持久化配置失败', e);
     }
   }
 
@@ -104,7 +102,7 @@ export class 应用程序 {
 
     // 请求日志
     this.应用.use((请求, 响应, 下一步) => {
-      this.logger.info(`${请求.method} ${请求.path}`, {
+      logger.info(`${请求.method} ${请求.path}`, {
         ip: 请求.ip,
         query: 请求.query,
       });
@@ -136,7 +134,7 @@ export class 应用程序 {
 
     // 错误处理
     this.应用.use((错误: any, 请求: express.Request, 响应: express.Response, 下一步: express.NextFunction) => {
-      this.logger.error('未处理的错误', 错误);
+      logger.error('未处理的错误', 错误);
       响应.status(500).json({
         success: false,
         error: 错误.message || '服务器内部错误',

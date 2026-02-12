@@ -11,7 +11,7 @@ import os from 'os';
 import path from 'path';
 import { v7 as uuidv7 } from 'uuid';
 import type DatabaseService from '../../core/database';
-import type Logger from '../../core/logger';
+import { logger } from '../../core/logger';
 import { PythonExecutor } from '../../core/services/python-executor';
 import type WebSocketService from '../websocket/service';
 import type {
@@ -61,30 +61,29 @@ export class 编舞服务 {
 
   constructor(
     private database: DatabaseService,
-    private logger: Logger,
     private wsService?: WebSocketService
   ) {
     this.ensureDirectories();
     this.loadProjectIndex();
-    
+
     // 初始化 Python 执行器
     this.pythonExecutor = new PythonExecutor(
       path.join(__dirname, '../../../../../dance-choreo/robot-control')
     );
-    
+
     // 监听 Python 执行器事件
     this.pythonExecutor.on('output', ({ executionId, data }) => {
-      this.logger.info(`[${executionId}] ${data}`);
+      logger.info(`[${executionId}] ${data}`);
       // TODO: 扩展 WebSocket 服务支持编舞相关消息类型后启用广播
     });
-    
+
     this.pythonExecutor.on('error', ({ executionId, error }) => {
-      this.logger.error(`[${executionId}] ${error}`);
+      logger.error(`[${executionId}] ${error}`);
       // TODO: 扩展 WebSocket 服务支持编舞相关消息类型后启用广播
     });
-    
+
     this.pythonExecutor.on('complete', ({ executionId, code }) => {
-      this.logger.info(`[${executionId}] 执行完成，退出码: ${code}`);
+      logger.info(`[${executionId}] 执行完成，退出码: ${code}`);
       // TODO: 扩展 WebSocket 服务支持编舞相关消息类型后启用广播
     });
   }
@@ -103,7 +102,7 @@ export class 编舞服务 {
     [DATA_DIR, PROJECTS_DIR].forEach((dir) => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        this.logger.info(`创建目录: ${dir}`);
+        logger.info(`创建目录: ${dir}`);
       }
     });
   }
@@ -119,9 +118,9 @@ export class 编舞服务 {
         if (Array.isArray(data)) {
           data.forEach((p: ChoreoProject) => this.projects.set(p.uuid, p));
         }
-        this.logger.info(`加载了 ${this.projects.size} 个编舞项目`);
+        logger.info(`加载了 ${this.projects.size} 个编舞项目`);
       } catch (e) {
-        this.logger.error('加载项目索引失败', e as Error);
+        logger.error('加载项目索引失败', e as Error);
       }
     }
   }
@@ -205,7 +204,7 @@ export class 编舞服务 {
     this.projects.set(uuid, project);
     this.saveProjectIndex();
 
-    this.logger.info(`创建编舞项目: ${dto.name}`, { uuid });
+    logger.info(`创建编舞项目: ${dto.name}`, { uuid });
     return project;
   }
 
@@ -249,7 +248,7 @@ export class 编舞服务 {
     this.projects.delete(uuid);
     this.saveProjectIndex();
 
-    this.logger.info(`删除编舞项目: ${project.name}`, { uuid });
+    logger.info(`删除编舞项目: ${project.name}`, { uuid });
   }
 
   /**
@@ -305,7 +304,7 @@ export class 编舞服务 {
     }
 
     const robots = this.getProjectRobots(projectUuid);
-    
+
     // 检查是否已添加
     if (robots.find((r) => r.robot_id === dto.robot_id)) {
       throw new Error('机器人已在项目中');
@@ -409,7 +408,7 @@ export class 编舞服务 {
     project.updated_at = new Date().toISOString();
     this.saveProjectIndex();
 
-    this.logger.info(`保存时间轴数据`, { projectUuid, tracksCount: dto.tracks.length });
+    logger.info(`保存时间轴数据`, { projectUuid, tracksCount: dto.tracks.length });
   }
 
   // ==================== 自定义动作管理 ====================
@@ -449,7 +448,7 @@ export class 编舞服务 {
 
     const actions = this.getCustomActions(projectUuid);
     const now = new Date().toISOString();
-    
+
     const action: CustomAction = {
       uuid: uuidv7(),
       name: data.name,
@@ -554,7 +553,7 @@ export class 编舞服务 {
       }
     });
 
-    this.logger.info(`开始执行动作序列`, {
+    logger.info(`开始执行动作序列`, {
       executionId,
       robotCount: robotIds.length,
       actionCount: actions.length,
@@ -661,7 +660,7 @@ export class 编舞服务 {
   private broadcastExecutionProgress(executionId: string, status: ExecutionStatus): void {
     // 编舞系统的执行进度广播暂时使用日志记录
     // TODO: 需要扩展 WebSocket 服务支持编舞相关消息类型
-    this.logger.info('执行进度', {
+    logger.info('执行进度', {
       executionId,
       status: status.status,
       progress: status.progress,
@@ -744,7 +743,7 @@ export class 编舞服务 {
           }
         }
       } catch (error) {
-        this.logger.error(`读取目录失败: ${dirPath}`, error as Error);
+        logger.error(`读取目录失败: ${dirPath}`, error);
       }
 
       // 排序：文件夹在前，文件在后，同类按名称排序
@@ -817,7 +816,7 @@ export class 编舞服务 {
     }
 
     fs.writeFileSync(fullPath, content, 'utf-8');
-    
+
     // 更新项目时间
     project.updated_at = new Date().toISOString();
     this.saveProjectIndex();
@@ -919,7 +918,7 @@ export class 编舞服务 {
 
     // 更新项目元数据
     project.updated_at = new Date().toISOString();
-    
+
     // 写入 project.json
     fs.writeFileSync(
       path.join(project.folder_path, 'project.json'),
@@ -927,7 +926,7 @@ export class 编舞服务 {
     );
 
     this.saveProjectIndex();
-    this.logger.info(`保存项目: ${project.name}`, { uuid: projectUuid });
+    logger.info(`保存项目: ${project.name}`, { uuid: projectUuid });
   }
 
   /**
@@ -955,9 +954,9 @@ export class 编舞服务 {
       const archive = archiver('zip', { zlib: { level: 9 } });
 
       output.on('close', () => {
-        this.logger.info(`项目已导出: ${exportFileName}`, { 
-          uuid: projectUuid, 
-          size: archive.pointer() 
+        logger.info(`项目已导出: ${exportFileName}`, {
+          uuid: projectUuid,
+          size: archive.pointer()
         });
         resolve({ exportPath, fileName: exportFileName });
       });
@@ -971,18 +970,18 @@ export class 编舞服务 {
       // 添加项目文件夹中的所有文件到压缩包（排除 exports 和隐藏文件）
       const addFilesToArchive = (dirPath: string, basePath: string = '') => {
         const items = fs.readdirSync(dirPath);
-        
+
         for (const item of items) {
           const fullPath = path.join(dirPath, item);
           const relativePath = basePath ? path.join(basePath, item) : item;
-          
+
           // 跳过 exports 目录和隐藏文件
           if (item === 'exports' || item.startsWith('.')) {
             continue;
           }
-          
+
           const stat = fs.statSync(fullPath);
-          
+
           if (stat.isDirectory()) {
             addFilesToArchive(fullPath, relativePath);
           } else {
@@ -1001,7 +1000,7 @@ export class 编舞服务 {
    */
   async importProject(filePath: string, originalName: string): Promise<ChoreoProject> {
     const tempExtractDir = path.join(os.tmpdir(), 'robot-dog-extracts', `extract_${Date.now()}`);
-    
+
     try {
       // 解压文件
       await extractZip(filePath, { dir: tempExtractDir });
@@ -1012,22 +1011,22 @@ export class 编舞服务 {
 
       const findProjectJson = (dir: string): string | null => {
         const items = fs.readdirSync(dir);
-        
+
         // 首先在当前目录查找
         if (items.includes('project.json')) {
           return path.join(dir, 'project.json');
         }
-        
+
         // 如果有且仅有一个子目录，递归查找
         const subdirs = items.filter(item => {
           const itemPath = path.join(dir, item);
           return fs.statSync(itemPath).isDirectory() && !item.startsWith('.');
         });
-        
+
         if (subdirs.length === 1) {
           return findProjectJson(path.join(dir, subdirs[0]));
         }
-        
+
         return null;
       };
 
@@ -1042,7 +1041,7 @@ export class 编舞服务 {
 
       // 读取 project.json
       const projectMeta = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
-      
+
       if (!projectMeta.name) {
         throw new Error('project.json 格式不正确，缺少 name 字段');
       }
@@ -1076,7 +1075,7 @@ export class 编舞服务 {
       this.projects.set(newUuid, project);
       this.saveProjectIndex();
 
-      this.logger.info(`导入项目成功: ${project.name}`, { uuid: newUuid });
+      logger.info(`导入项目成功: ${project.name}`, { uuid: newUuid });
       return project;
     } finally {
       // 清理临时文件
@@ -1098,7 +1097,7 @@ export class 编舞服务 {
     }
 
     const robots = this.getProjectRobotsConfig(projectUuid);
-    
+
     const now = new Date().toISOString();
     const robot: ProjectRobotConfig = {
       uuid: uuidv7(),
@@ -1210,7 +1209,7 @@ export class 编舞服务 {
       throw new Error('机器人不存在');
     }
 
-    this.logger.info('测试机器人连接', { projectUuid, robotUuid, ip: robot.robot_ip });
+    logger.info('测试机器人连接', { projectUuid, robotUuid, ip: robot.robot_ip });
 
     return new Promise((resolve) => {
       const args = [
@@ -1224,14 +1223,14 @@ export class 编舞服务 {
 
       const proc = spawn('ssh', args);
       let stderr = '';
-      
-      proc.stderr.on('data', (d) => { 
-        stderr += d.toString(); 
+
+      proc.stderr.on('data', (d) => {
+        stderr += d.toString();
       });
-      
+
       proc.on('close', (code) => {
         let result: ConnectionTestResult;
-        
+
         if (code === 0) {
           result = { success: true, connected: true, message: 'SSH 测试成功' };
         } else if (stderr.includes('Permission denied')) {
@@ -1242,10 +1241,10 @@ export class 编舞服务 {
           result = { success: false, connected: false, message: stderr || 'SSH 测试失败' };
         }
 
-        this.logger.info('测试连接结果', { projectUuid, robotUuid, ...result });
+        logger.info('测试连接结果', { projectUuid, robotUuid, ...result });
         resolve(result);
       });
-      
+
       proc.on('error', () => {
         resolve({ success: false, connected: false, message: '无法执行ssh命令' });
       });
@@ -1276,10 +1275,10 @@ export class 编舞服务 {
     if (!sshResult.success) {
       // 更新状态为 offline
       this.updateProjectRobot(projectUuid, robotUuid, { status: 'offline' });
-      return { 
-        success: false, 
-        connected: false, 
-        message: sshResult.message 
+      return {
+        success: false,
+        connected: false,
+        message: sshResult.message
       };
     }
 
@@ -1338,10 +1337,10 @@ export class 编舞服务 {
 
     // 读取时间轴数据
     const timelineData = this.getTimeline(projectUuid);
-    
+
     // 获取项目机器人配置
     const robots = this.getProjectRobotsConfig(projectUuid);
-    
+
     // 创建 build 目录
     const buildDir = path.join(project.folder_path, 'build');
     if (!fs.existsSync(buildDir)) {
@@ -1351,7 +1350,7 @@ export class 编舞服务 {
     // 复制 lib 库到 build 目录
     const libSourcePath = path.join(__dirname, '../../../../../dance-choreo/robot-control/lib');
     const libTargetPath = path.join(buildDir, 'lib');
-    
+
     if (fs.existsSync(libSourcePath)) {
       if (fs.existsSync(libTargetPath)) {
         fs.rmSync(libTargetPath, { recursive: true, force: true });
@@ -1361,13 +1360,13 @@ export class 编舞服务 {
 
     // 生成 Python 代码
     const pythonCode = this.generatePythonFromTimeline(timelineData, project.name, robots);
-    
+
     // 写入 Python 文件
     const pythonFileName = `${this.sanitizeFilename(project.name)}.py`;
     const pythonFilePath = path.join(buildDir, pythonFileName);
     fs.writeFileSync(pythonFilePath, pythonCode, 'utf-8');
 
-    this.logger.info(`封装项目成功: ${project.name}`, { uuid: projectUuid, pythonFile: pythonFileName });
+    logger.info(`封装项目成功: ${project.name}`, { uuid: projectUuid, pythonFile: pythonFileName });
 
     return {
       pythonFile: pythonFileName,
@@ -1393,8 +1392,8 @@ export class 编舞服务 {
     }
 
     const result = this.pythonExecutor.execute(pythonFilePath, buildDir);
-    
-    this.logger.info(`运行项目: ${project.name}`, { uuid: projectUuid, executionId: result.executionId });
+
+    logger.info(`运行项目: ${project.name}`, { uuid: projectUuid, executionId: result.executionId });
 
     return result;
   }
@@ -1419,7 +1418,7 @@ export class 编舞服务 {
     for (const file of files) {
       const sourcePath = path.join(source, file);
       const targetPath = path.join(target, file);
-      
+
       if (fs.statSync(sourcePath).isDirectory()) {
         this.copyDirectory(sourcePath, targetPath);
       } else {
@@ -1439,33 +1438,33 @@ export class 编舞服务 {
    * 从时间轴生成 Python 代码
    */
   private generatePythonFromTimeline(
-    timelineData: TimelineData, 
-    projectName: string, 
+    timelineData: TimelineData,
+    projectName: string,
     robots: ProjectRobotConfig[]
   ): string {
     const { tracks } = timelineData;
-    
-    this.logger.info('开始生成 Python 代码', {
+
+    logger.info('开始生成 Python 代码', {
       tracksCount: tracks?.length || 0,
       robotsCount: robots.length,
     });
-    
+
     // 构建机器人映射
     const robotsMap = new Map<string, ProjectRobotConfig>();
     robots.forEach(robot => {
       robotsMap.set(robot.uuid, robot);
     });
-    
+
     // 提取动作
     const actions: Array<{ time: number; robot: string; action: string; params: any }> = [];
-    
+
     tracks.forEach((track, index) => {
       if (track.type === 'action' && track.robotId) {
         if (!robotsMap.has(track.robotId)) {
-          this.logger.warn(`轨道 ${index} 绑定的机器狗 ${track.robotId} 不存在，跳过处理`);
+          logger.warn(`轨道 ${index} 绑定的机器狗 ${track.robotId} 不存在，跳过处理`);
           return;
         }
-        
+
         // 处理 clips
         if (track.clips && Array.isArray(track.clips)) {
           track.clips.forEach((clip) => {
@@ -1481,10 +1480,10 @@ export class 编舞服务 {
         }
       }
     });
-    
+
     // 按时间排序
     actions.sort((a, b) => a.time - b.time);
-    
+
     // 生成 Python 代码
     let code = `#!/usr/bin/env python3\n`;
     code += `# -*- coding: utf-8 -*-\n`;
@@ -1492,10 +1491,10 @@ export class 编舞服务 {
     code += `# 自动生成于 ${new Date().toISOString()}\n\n`;
     code += `from lib.api import CrazyRobotDog\n`;
     code += `import time\n\n`;
-    
+
     // 创建机器人变量映射
     const robotVarMap = new Map<string, string>();
-    
+
     // 生成机器人配置
     if (robotsMap.size > 0) {
       code += `# 机器人配置\n`;
@@ -1504,11 +1503,11 @@ export class 编舞服务 {
         code += `    "${config.name}": ("${config.robot_ip}", ${config.local_port}),\n`;
       });
       code += `}\n\n`;
-      
+
       // 使用第一个机器人的 local_ip
       const firstRobot = Array.from(robotsMap.values())[0];
       code += `LOCAL_IP = "${firstRobot.local_ip}"\n\n`;
-      
+
       // 创建机器人实例
       code += `# 创建机器人实例\n`;
       let robotIndex = 1;
@@ -1537,7 +1536,7 @@ export class 编舞服务 {
       code += `    local_port=DOGS_CONFIG["131"][1],\n`;
       code += `)\n\n`;
     }
-    
+
     // 生成动作序列
     code += `# 动作序列\n`;
     if (actions.length > 0) {
@@ -1548,11 +1547,11 @@ export class 编舞服务 {
           const delay = action.time - lastTime;
           code += `time.sleep(${delay.toFixed(2)})\n`;
         }
-        
+
         // 添加动作
         const robotVar = robotVarMap.get(action.robot) || 'dog1';
         const params: string[] = [];
-        
+
         if (action.params.duration !== undefined) {
           params.push(String(action.params.duration));
         }
@@ -1562,10 +1561,10 @@ export class 编舞服务 {
         if (action.params.direction) {
           params.push(`direction='${action.params.direction}'`);
         }
-        
+
         const paramsStr = params.join(', ');
         code += `${robotVar}.${action.action}(${paramsStr})\n`;
-        
+
         lastTime = action.time;
       });
     } else {
@@ -1574,7 +1573,7 @@ export class 编舞服务 {
       code += `time.sleep(1)\n`;
       code += `dog1.attitude_rest()\n`;
     }
-    
+
     return code;
   }
 }
@@ -1582,3 +1581,4 @@ export class 编舞服务 {
 export default 编舞服务;
 
 export { 编舞服务 as ChoreoService };
+

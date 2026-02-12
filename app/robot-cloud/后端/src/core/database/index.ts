@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import 配置 from '../../config';
+import { logger } from '../logger';
 import type {
   ActionStatus,
   ConversationRecord,
@@ -134,7 +135,7 @@ class 数据库服务 {
     // 初始化默认角色
     this.initializeDefaultRole();
 
-    console.log('数据库初始化完成');
+    logger.info('数据库初始化完成');
   }
 
   /**
@@ -148,23 +149,23 @@ class 数据库服务 {
     const hasAsrModel = tableInfo.some(col => col.name === 'asr_model');
 
     if (!hasIsDefault) {
-      console.log('正在迁移数据库：添加 is_default 列...');
+      logger.info('正在迁移数据库：添加 is_default 列...');
       this.数据库.exec('ALTER TABLE roles ADD COLUMN is_default INTEGER DEFAULT 0');
-      console.log('数据库迁移完成');
+      logger.info('数据库迁移完成');
     }
 
     if (!hasAsrProvider) {
-      console.log('正在迁移数据库：添加 asr_provider 列...');
+      logger.info('正在迁移数据库：添加 asr_provider 列...');
       this.数据库.exec('ALTER TABLE roles ADD COLUMN asr_provider TEXT');
     }
 
     if (!hasAsrModel) {
-      console.log('正在迁移数据库：添加 asr_model 列...');
+      logger.info('正在迁移数据库：添加 asr_model 列...');
       this.数据库.exec('ALTER TABLE roles ADD COLUMN asr_model TEXT');
     }
 
     if (!hasIsDefault || !hasAsrProvider || !hasAsrModel) {
-      console.log('数据库迁移完成');
+      logger.info('数据库迁移完成');
     }
   }
 
@@ -246,7 +247,7 @@ move动作支持三种控制方式：
         10
       );
 
-      console.log('已创建默认角色');
+      logger.info('已创建默认角色');
     }
   }
 

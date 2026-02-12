@@ -1,5 +1,6 @@
 import axios from 'axios';
 import 配置 from '../../config';
+import { logger } from '../../core/logger';
 import type { LLMOptions, LLMResponse, Message } from '../../types';
 
 export class LLM服务 {
@@ -97,7 +98,7 @@ export class LLM服务 {
       };
     } catch (error: any) {
       const errorData = error.response?.data;
-      console.error('Tongyi Vision API调用失败:', {
+      logger.error('Tongyi Vision API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: errorData,
@@ -161,7 +162,10 @@ export class LLM服务 {
         },
       };
     } catch (error: any) {
-      console.error('OpenAI API调用失败:', error.response?.data || error.message);
+      logger.error('OpenAI API调用失败', error, {
+        data: error.response?.data,
+        message: error.message,
+      });
       throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
     }
   }
@@ -205,7 +209,7 @@ export class LLM服务 {
       };
     } catch (error: any) {
       const errorData = error.response?.data;
-      console.error('BigModel API调用失败:', {
+      logger.error('BigModel API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: errorData,
@@ -266,7 +270,7 @@ export class LLM服务 {
       };
     } catch (error: any) {
       const errorData = error.response?.data;
-      console.error('Tongyi API调用失败:', {
+      logger.error('Tongyi API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: errorData,
@@ -331,7 +335,10 @@ export class LLM服务 {
         },
       };
     } catch (error: any) {
-      console.error('Anthropic API调用失败:', error.response?.data || error.message);
+      logger.error('Anthropic API调用失败', error, {
+        data: error.response?.data,
+        message: error.message,
+      });
       throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
     }
   }
@@ -376,7 +383,10 @@ export class LLM服务 {
         },
       };
     } catch (error: any) {
-      console.error('DeepSeek API调用失败:', error.response?.data || error.message);
+      logger.error('DeepSeek API调用失败', error, {
+        data: error.response?.data,
+        message: error.message,
+      });
       throw new Error(`LLM调用失败: ${error.response?.data?.error?.message || error.message}`);
     }
   }

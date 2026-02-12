@@ -3,7 +3,7 @@ import net from 'net';
 import path from 'path';
 import { v7 as uuidv7 } from 'uuid';
 import type DatabaseService from '../../core/database';
-import type Logger from '../../core/logger';
+import { logger } from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
 import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from '../../types';
 import type WebSocketService from '../websocket/service';
@@ -15,10 +15,7 @@ export class 机器人服务 {
   private pythonCommand: string = 'python'; // 默认使用 python
   private websocketService?: WebSocketService;
 
-  constructor(
-    private database: DatabaseService,
-    private logger: Logger
-  ) {
+  constructor(private database: DatabaseService) {
     // Windows 上通常是 python，Linux/Mac 上通常是 python3
     this.pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   }
@@ -144,15 +141,15 @@ export class 机器人服务 {
         const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (remoteUuid && uuidPattern.test(remoteUuid)) {
           uuid = remoteUuid;
-          this.logger.info(`从机器人读取到UUID: ${uuid}`);
+          logger.info(`从机器人读取到UUID: ${uuid}`);
         }
       } catch (e) {
-        this.logger.warn('读取远程UUID失败，将生成新的');
+        logger.warn('读取远程UUID失败，将生成新的');
       }
 
       if (!uuid) {
         uuid = uuidv7();
-        this.logger.info(`生成新UUID: ${uuid}`);
+        logger.info(`生成新UUID: ${uuid}`);
 
         const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
         await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/配置.toml', configToml);
@@ -166,7 +163,7 @@ export class 机器人服务 {
         throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
       }
 
-      this.logger.info(`机器人 ${ip} 初始化完成，UUID: ${uuid}`);
+      logger.info(`机器人 ${ip} 初始化完成，UUID: ${uuid}`);
     }
 
     // 创建数据库记录
@@ -401,7 +398,7 @@ export class 机器人服务 {
         if (!isResolved) {
           isResolved = true;
           p.kill();
-          this.logger.error(`复制超时 (${ip}): ${stderr}`);
+          logger.error(`复制超时 (${ip}): ${stderr}`);
           resolve({ success: false, error: '复制超时（2分钟）' });
         }
       }, 120000);
@@ -411,7 +408,7 @@ export class 机器人服务 {
         stdout += data;
         // 实时输出进度日志
         if (data.includes('[INFO]') || data.includes('[SUCCESS]') || data.includes('[ERROR]')) {
-          this.logger.debug(data.trim());
+          logger.debug(data.trim());
         }
       });
 
@@ -438,7 +435,7 @@ export class 机器人服务 {
               resolve({ success: false, error: '解析输出失败' });
             }
           } else {
-            this.logger.error(`复制失败 (${ip}, code=${code}): ${stderr}`);
+            logger.error(`复制失败 (${ip}, code=${code}): ${stderr}`);
             resolve({ success: false, error: stderr || '复制失败' });
           }
         }
@@ -490,14 +487,14 @@ export class 机器人服务 {
     const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
 
     // 测试连接
-    this.logger.info(`测试连接到 ${robot.ip}...`);
+    logger.info(`测试连接到 ${robot.ip}...`);
     const canConnect = await this.测试SSH连接(pythonScript, robot.ip);
     if (!canConnect) {
       throw new Error(`无法连接到机器人 ${robot.ip}`);
     }
 
     // 创建远程目录
-    this.logger.info('创建远程目录...');
+    logger.info('创建远程目录...');
     const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-agent && mkdir -p /home/firefly/sparkrobot/config';
     try {
       await this.执行SSH命令(pythonScript, robot.ip, mkdirCmd);
@@ -506,7 +503,7 @@ export class 机器人服务 {
     }
 
     // 复制客户端代码
-    this.logger.info('开始复制客户端代码...');
+    logger.info('开始复制客户端代码...');
     const localClientPath = path.resolve(__dirname, '../../../../../robot-agent');
     const remoteClientPath = '/home/firefly/sparkrobot';
     const copyResult = await this.复制到机器人(pythonScript, robot.ip, localClientPath, remoteClientPath);
@@ -515,7 +512,7 @@ export class 机器人服务 {
       throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
     }
 
-    this.logger.info('固件更新成功');
+    logger.info('固件更新成功');
     return { robotIp: robot.ip };
   }
 

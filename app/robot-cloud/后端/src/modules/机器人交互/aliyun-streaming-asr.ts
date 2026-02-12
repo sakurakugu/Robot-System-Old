@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import WebSocket from 'ws';
 import 配置 from '../../config';
+import { logger } from '../../core/logger';
 
 export interface StreamingASROptions {
   model?: string;
@@ -53,7 +54,7 @@ export class AliyunStreamingASR {
       });
 
       this.ws.on('open', () => {
-        console.log('[流式ASR] WebSocket 连接成功');
+        logger.info('[流式ASR] WebSocket 连接成功');
         try {
           // 发送开始消息
           const startMessage = {
@@ -75,7 +76,7 @@ export class AliyunStreamingASR {
             },
           };
           this.ws!.send(JSON.stringify(startMessage));
-          console.log('[流式ASR] 已发送开始消息');
+          logger.info('[流式ASR] 已发送开始消息');
           resolve();
         } catch (err) {
           this.cleanup();
@@ -88,7 +89,7 @@ export class AliyunStreamingASR {
       });
 
       this.ws.on('error', (err) => {
-        console.error('[流式ASR] WebSocket 错误:', err);
+        logger.error('[流式ASR] WebSocket 错误', err as Error);
         this.cleanup();
         if (this.rejectCallback) {
           this.rejectCallback(new Error(`阿里云ASR连接错误: ${err.message}`));
@@ -97,7 +98,7 @@ export class AliyunStreamingASR {
       });
 
       this.ws.on('close', (code, reason) => {
-        console.log('[流式ASR] WebSocket 关闭:', { code, reason: reason.toString() });
+        logger.info('[流式ASR] WebSocket 关闭', { code, reason: reason.toString() });
         if (!this.closed) {
           this.closed = true;
           if (!this.taskStarted) {
@@ -121,13 +122,13 @@ export class AliyunStreamingASR {
    */
   pushAudio(pcmChunk: Buffer): void {
     if (this.closed) {
-      console.warn('[流式ASR] 已关闭，忽略音频数据');
+      logger.warn('[流式ASR] 已关闭，忽略音频数据');
       return;
     }
 
     // 将音频块加入队列
     this.audioQueue.push(pcmChunk);
-    // console.log('[流式ASR] 音频块入队，队列长度:', this.audioQueue.length, 'chunk大小:', pcmChunk.length);
+    // logger.log('[流式ASR] 音频块入队，队列长度:', this.audioQueue.length, 'chunk大小:', pcmChunk.length);
 
     // 如果任务已启动且没有正在处理队列，则开始处理
     if (this.taskStarted && !this.isProcessingQueue) {
@@ -139,7 +140,7 @@ export class AliyunStreamingASR {
    * 结束音频输入，等待识别完成
    */
   async finish(): Promise<string> {
-    console.log('[流式ASR] 开始结束流程');
+    logger.info('[流式ASR] 开始结束流程');
 
     return new Promise((resolve, reject) => {
       this.resolveCallback = resolve;
@@ -148,7 +149,7 @@ export class AliyunStreamingASR {
       // 等待队列处理完成
       const waitForQueue = () => {
         if (this.audioQueue.length > 0 || this.isProcessingQueue) {
-          console.log('[流式ASR] 等待队列处理完成，剩余:', this.audioQueue.length);
+          logger.info('[流式ASR] 等待队列处理完成', { remaining: this.audioQueue.length });
           setTimeout(waitForQueue, 100);
         } else {
           this.sendFinishMessage();
@@ -168,7 +169,7 @@ export class AliyunStreamingASR {
 
       switch (msg.header?.event) {
         case 'task-started':
-          console.log('[流式ASR] 任务已启动，开始处理队列');
+          logger.info('[流式ASR] 任务已启动，开始处理队列');
           this.taskStarted = true;
           // 任务启动后，开始处理队列中的音频数据
           this.processQueue();
@@ -178,17 +179,17 @@ export class AliyunStreamingASR {
           // 提取识别结果
           if (msg.payload?.output?.sentence?.text) {
             const text = msg.payload.output.sentence.text;
-            console.log('[流式ASR] 识别结果:', text);
+            logger.info('[流式ASR] 识别结果', { text });
             // 如果是句子结束，更新最终文本
             if (msg.payload.output.sentence.sentence_end) {
               this.finalText = text;
-              console.log('[流式ASR] 句子结束，更新最终文本:', this.finalText);
+              logger.info('[流式ASR] 句子结束，更新最终文本', { finalText: this.finalText });
             }
           }
           break;
 
         case 'task-finished':
-          console.log('[流式ASR] 任务完成，最终文本:', this.finalText);
+          logger.info('[流式ASR] 任务完成，最终文本', { finalText: this.finalText });
           this.cleanup();
           if (this.resolveCallback) {
             this.resolveCallback(this.finalText.trim());
@@ -198,7 +199,7 @@ export class AliyunStreamingASR {
         case 'task-failed':
           const errorMsg = msg.header?.error_message || '未知错误';
           const errorCode = msg.header?.error_code || 'UNKNOWN';
-          console.error('[流式ASR] 任务失败:', errorCode, errorMsg);
+          logger.error('[流式ASR] 任务失败', { errorCode, errorMsg });
           this.cleanup();
           if (this.rejectCallback) {
             this.rejectCallback(new Error(`阿里云ASR失败 [${errorCode}]: ${errorMsg}`));
@@ -206,10 +207,10 @@ export class AliyunStreamingASR {
           break;
 
         default:
-          console.log('[流式ASR] 未知事件:', msg.header?.event);
+          logger.warn('[流式ASR] 未知事件', { event: msg.header?.event });
       }
     } catch (err) {
-      console.error('[流式ASR] 消息处理错误:', err);
+      logger.error('[流式ASR] 消息处理错误', err as Error);
       this.cleanup();
       if (this.rejectCallback) {
         this.rejectCallback(err as Error);
@@ -232,12 +233,12 @@ export class AliyunStreamingASR {
       try {
         // 发送音频数据（二进制格式）
         this.ws.send(chunk);
-        // console.log('[流式ASR] 发送音频块，大小:', chunk.length, '剩余队列:', this.audioQueue.length);
+        // logger.log('[流式ASR] 发送音频块，大小:', chunk.length, '剩余队列:', this.audioQueue.length);
 
         // 控制发送速率（每 100ms 约 3200 字节，因此延迟约 20ms）
         await new Promise(resolve => setTimeout(resolve, 20));
       } catch (err) {
-        console.error('[流式ASR] 发送音频块失败:', err);
+        logger.error('[流式ASR] 发送音频块失败', err as Error);
         this.cleanup();
         if (this.rejectCallback) {
           this.rejectCallback(err as Error);
@@ -254,7 +255,7 @@ export class AliyunStreamingASR {
    */
   private sendFinishMessage(): void {
     if (!this.ws || this.closed) {
-      console.warn('[流式ASR] 无法发送结束消息，连接已关闭');
+      logger.warn('[流式ASR] 无法发送结束消息，连接已关闭');
       if (this.resolveCallback) {
         this.resolveCallback(this.finalText.trim());
       }
@@ -272,10 +273,10 @@ export class AliyunStreamingASR {
           input: {},
         },
       };
-      console.log('[流式ASR] 发送结束消息');
+      logger.info('[流式ASR] 发送结束消息');
       this.ws.send(JSON.stringify(endMessage));
     } catch (err) {
-      console.error('[流式ASR] 发送结束消息失败:', err);
+      logger.error('[流式ASR] 发送结束消息失败', err as Error);
       this.cleanup();
       if (this.rejectCallback) {
         this.rejectCallback(err as Error);
@@ -295,7 +296,7 @@ export class AliyunStreamingASR {
         this.ws = null;
       }
     } catch (err) {
-      console.error('[流式ASR] 清理资源失败:', err);
+      logger.error('[流式ASR] 清理资源失败', err as Error);
     }
   }
 

@@ -1,11 +1,12 @@
 import { v7 as uuidv7 } from 'uuid';
+import { logger } from "../logger";
 
 export { uuidv7 };
 
 /**
  * 解析动作指令
  * 格式：
- * - {{action=action_name}} 
+ * - {{action=action_name}}
  * - {{action=action_name,param=value}}
  * - {{action=action_name,another_action}} - 会解析为两个单独的动作
  */
@@ -17,21 +18,21 @@ export function parseActions(text: string): Array<{ name: string; parameters: Re
 
   while ((match = actionRegex.exec(text)) !== null) {
     const content = match[1].trim();
-    
+
     try {
       // 按逗号分割内容
       const parts = content.split(',').map(s => s.trim()).filter(Boolean);
-      
+
       if (parts.length === 0) continue;
-      
+
       // 第一个部分总是动作名
       const actionName = parts[0];
       const parameters: Record<string, any> = {};
-      
+
       // 处理后续部分
       for (let i = 1; i < parts.length; i++) {
         const part = parts[i];
-        
+
         if (part.includes('=')) {
           // 这是一个参数 (key=value)
           const [key, value] = part.split('=').map(s => s.trim());
@@ -47,7 +48,7 @@ export function parseActions(text: string): Array<{ name: string; parameters: Re
       // 添加主动作
       actions.push({ name: actionName, parameters });
     } catch (error) {
-      console.error(`解析动作失败: ${match[0]}`, error);
+      logger.error(`解析动作失败: ${match[0]}`, error);
     }
   }
 
@@ -130,14 +131,14 @@ export class RateLimiter {
   check(key: string): boolean {
     const now = Date.now();
     const timestamps = this.requests.get(key) || [];
-    
+
     // 移除过期的请求
     const validTimestamps = timestamps.filter(t => now - t < this.windowMs);
-    
+
     if (validTimestamps.length >= this.maxRequests) {
       return false;
     }
-    
+
     validTimestamps.push(now);
     this.requests.set(key, validTimestamps);
     return true;

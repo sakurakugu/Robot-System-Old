@@ -92,10 +92,10 @@ class Logger {
       winston.format.printf((信息) => {
         const { timestamp, level, message, service, ...rest } = 信息 as any;
         const time = 格式化文件时间(new Date(timestamp || Date.now()));
-        const levelCn = 获取中文等级(level);
-        const serviceTag = `[${service ?? ''}]`;
+        const levelCN = 获取中文等级(level);
+        const serviceTag = `${service ?? ''}`;
         const meta = 构建元数据(rest);
-        return `[${time}] [${levelCn}] ${serviceTag} ${message}${meta}`;
+        return `[${time}] [${levelCN}] [${serviceTag}] ${message}${meta}`;
       })
     );
 
@@ -106,12 +106,12 @@ class Logger {
       winston.format.printf((信息) => {
         const { timestamp, level, message, service, ...rest } = 信息 as any;
         const time = 格式化本地时间(new Date(timestamp || Date.now()));
-        const levelCn = 获取中文等级(level);
+        const levelCN = 获取中文等级(level);
         const color = LEVEL_COLOR[level.toLowerCase()] ?? '';
-        const coloredLevel = color ? `${color}[${levelCn}]${RESET_COLOR}` : `[${levelCn}]`;
-        const serviceTag = `[${service ?? ''}]`;
+        const coloredLevel = color ? `${color}${levelCN}${RESET_COLOR}` : `${levelCN}`;
+        const serviceTag = `${service ?? ''}`;
         const meta = 构建元数据(rest);
-        return `[${time}] ${coloredLevel} ${serviceTag} ${message}${meta}`;
+        return `[${time}] [${coloredLevel}] [${serviceTag}] ${message}${meta}`;
       })
     );
 
@@ -153,13 +153,37 @@ class Logger {
     this.日志.warn(消息, 元数据);
   }
 
-  error(消息: string, 错误?: Error, 元数据?: any): void {
+  error(消息: string): void;
+  error(消息: string, 错误: Error): void;
+  error(消息: string, 错误: unknown): void;
+  error(消息: string, 元数据: Record<string, any>): void;
+  error(消息: string, 错误: Error, 元数据: Record<string, any>): void;
+  error(
+    消息: string,
+    第二个?: Error | Record<string, any> | unknown,
+    第三个?: Record<string, any>
+  ): void {
+    let 错误: Error | undefined;
+    let 元数据: Record<string, any> | undefined;
+
+    if (第二个 instanceof Error) {
+      错误 = 第二个;
+      元数据 = 第三个;
+    } else if (第二个 && typeof 第二个 === 'object') {
+      元数据 = 第二个 as Record<string, any>;
+    } else if (第二个 !== undefined) {
+      错误 = new Error(String(第二个));
+    }
+
     this.日志.error(消息, {
-      error: 错误?.message,
-      stack: 错误?.stack,
+      ...(错误 && {
+        error: 错误.message,
+        stack: 错误.stack,
+      }),
       ...元数据,
     });
   }
+
 
   debug(消息: string, 元数据?: any): void {
     this.日志.debug(消息, 元数据);
@@ -196,5 +220,7 @@ class Logger {
     });
   }
 }
+
+export const logger = new Logger();
 
 export default Logger;

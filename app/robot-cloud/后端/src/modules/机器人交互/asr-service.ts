@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import FormData from 'form-data';
 import WebSocket from 'ws';
 import 配置 from '../../config';
+import { logger } from '../../core/logger';
 
 export interface ASROptions {
   language?: string;
@@ -229,7 +230,7 @@ class 语音识别服务 {
     const pcmBuffer = this.extractPcmFromWav(wavBuffer);
     const sampleRate = this.detectSampleRate(wavBuffer) || 16000;
 
-    // console.log('[阿里云ASR] 开始识别', {
+    // logger.log('[阿里云ASR] 开始识别', {
     //   wsUrl,
     //   model,
     //   wavBufferSize: wavBuffer.length,
@@ -274,7 +275,7 @@ class 语音识别服务 {
                 input: {},
               },
             };
-            console.log('[阿里云ASR] 音频发送完成，发送结束消息');
+            logger.info('[阿里云ASR] 音频发送完成，发送结束消息');
             ws.send(JSON.stringify(endMessage));
             return;
           }
@@ -286,7 +287,7 @@ class 语音识别服务 {
           ws.send(chunk);
 
           if (currentOffset % (chunkSize * 10) === 0) {
-            console.log('[阿里云ASR] 音频发送进度:', Math.round((currentOffset / pcmBuffer.length) * 100) + '%');
+            logger.info('[阿里云ASR] 音频发送进度', { progress: Math.round((currentOffset / pcmBuffer.length) * 100) + '%' });
           }
 
           // 控制发送速率，避免过快（每 100ms 发送一次）
@@ -297,7 +298,7 @@ class 语音识别服务 {
       };
 
       ws.on('open', () => {
-        console.log('[阿里云ASR] WebSocket 连接成功');
+        logger.info('[阿里云ASR] WebSocket 连接成功');
         try {
           // 发送开始消息（必须包含 payload.input 和 task_group）
           const startMessage = {
@@ -318,7 +319,7 @@ class 语音识别服务 {
               input: {},
             },
           };
-          // console.log('[阿里云ASR] 发送开始消息:', JSON.stringify(startMessage, null, 2));
+          // logger.log('[阿里云ASR] 发送开始消息:', JSON.stringify(startMessage, null, 2));
           ws.send(JSON.stringify(startMessage));
         } catch (err) {
           cleanup();
@@ -331,12 +332,12 @@ class 语音识别服务 {
           const msg = JSON.parse(data.toString());
 
           // 添加详细日志用于调试
-          // console.log('[阿里云ASR] 收到消息:', JSON.stringify(msg, null, 2));
+          // logger.log('[阿里云ASR] 收到消息:', JSON.stringify(msg, null, 2));
 
           // 处理不同的事件类型
           switch (msg.header?.event) {
             case 'task-started':
-              console.log('[阿里云ASR] 任务已启动，开始发送音频');
+              logger.info('[阿里云ASR] 任务已启动，开始发送音频');
               taskStarted = true;
               sendAudioChunks();
               break;
@@ -345,17 +346,17 @@ class 语音识别服务 {
               // 提取识别结果
               if (msg.payload?.output?.sentence?.text) {
                 const text = msg.payload.output.sentence.text;
-                console.log('[阿里云ASR] 识别结果:', text);
+                logger.info('[阿里云ASR] 识别结果', { text });
                 // 如果是句子结束（sentence_end 为 true），更新 finalText
                 if (msg.payload.output.sentence.sentence_end) {
                   finalText = text;
-                  console.log('[阿里云ASR] 句子结束，更新最终文本:', finalText);
+                  logger.info('[阿里云ASR] 句子结束，更新最终文本', { finalText });
                 }
               }
               break;
 
             case 'task-finished':
-              console.log('[阿里云ASR] 任务完成，最终文本:', finalText);
+              logger.info('[阿里云ASR] 任务完成，最终文本', { finalText });
               cleanup();
               resolve(finalText.trim());
               break;
@@ -363,29 +364,29 @@ class 语音识别服务 {
             case 'task-failed':
               const errorMsg = msg.header?.error_message || '未知错误';
               const errorCode = msg.header?.error_code || 'UNKNOWN';
-              console.error('[阿里云ASR] 任务失败:', errorCode, errorMsg);
+              logger.error('[阿里云ASR] 任务失败', { errorCode, errorMsg });
               cleanup();
               reject(new Error(`阿里云ASR失败 [${errorCode}]: ${errorMsg}`));
               break;
 
             default:
-              console.log('[阿里云ASR] 未知事件:', msg.header?.event);
+              logger.warn('[阿里云ASR] 未知事件', { event: msg.header?.event });
           }
         } catch (err) {
-          console.error('[阿里云ASR] 消息处理错误:', err);
+          logger.error('[阿里云ASR] 消息处理错误', err as Error);
           cleanup();
           reject(err);
         }
       });
 
       ws.on('error', (err) => {
-        console.error('[阿里云ASR] WebSocket 错误:', err);
+        logger.error('[阿里云ASR] WebSocket 错误', err as Error);
         cleanup();
         reject(new Error(`阿里云ASR连接错误: ${err.message}`));
       });
 
       ws.on('close', (code, reason) => {
-        console.log('[阿里云ASR] WebSocket 关闭:', { code, reason: reason.toString() });
+        logger.info('[阿里云ASR] WebSocket 关闭', { code, reason: reason.toString() });
         if (!closed) {
           closed = true;
           if (!taskStarted) {

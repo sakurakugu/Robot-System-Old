@@ -1,16 +1,13 @@
 import { v7 as uuidv7 } from 'uuid';
 import type DatabaseService from '../../core/database';
-import type Logger from '../../core/logger';
+import { logger } from '../../core/logger';
 import type { CreateRoleDto, RoleRecord, UpdateRoleDto } from '../../types';
 
 /**
  * 角色服务
  */
 export class 角色服务 {
-  constructor(
-    private database: DatabaseService,
-    private logger: Logger
-  ) {}
+  constructor(private database: DatabaseService) {}
 
   /**
    * 获取所有角色
@@ -31,7 +28,7 @@ export class 角色服务 {
    */
   createRole(data: CreateRoleDto): RoleRecord {
     const uuid = uuidv7();
-    
+
     const role = this.database.createRole({
       uuid,
       name: data.name,
@@ -46,12 +43,12 @@ export class 角色服务 {
       intent_strategy: data.intent_strategy,
       max_history: data.max_history ?? 10,
     });
-    
+
     if (!role) {
       throw new Error('创建角色失败');
     }
-    
-    this.logger.info(`角色创建成功: ${uuid}`, { name: data.name });
+
+    logger.info(`角色创建成功: ${uuid}`, { name: data.name });
     return role;
   }
 
@@ -82,7 +79,7 @@ export class 角色服务 {
       throw new Error('更新角色失败');
     }
 
-    this.logger.info(`角色更新成功: ${uuid}`);
+    logger.info(`角色更新成功: ${uuid}`);
     return role;
   }
 
@@ -106,7 +103,7 @@ export class 角色服务 {
     }
 
     this.database.deleteRole(uuid);
-    this.logger.info(`角色删除成功: ${uuid}`);
+    logger.info(`角色删除成功: ${uuid}`);
   }
 
   /**

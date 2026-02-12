@@ -1,7 +1,7 @@
 import axios from 'axios';
 import 配置 from '../../config';
 import { logger } from '../../core/logger';
-import type { LLMOptions, LLMResponse, Message } from '../../types';
+import type { LLMOptions, LLMResponse, Message } from './types';
 
 export class LLM服务 {
   constructor() {}

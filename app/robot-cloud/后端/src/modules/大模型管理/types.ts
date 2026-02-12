@@ -1,4 +1,28 @@
-import type { LLMProvider } from '../types';
+
+// ============ LLM 相关类型 ============
+
+export const 所有LLM供应商 = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'] as const;
+
+export type LLM供应商枚举 = typeof 所有LLM供应商[number];
+
+export interface LLM供应商配置 {
+  apiKey: string;
+  model: string;
+  baseUrl?: string;
+}
+
+/**
+ * LLM 配置视图（不暴露完整 API Key）
+ */
+export interface LLMConfigView {
+  provider: LLM供应商枚举;
+  providers: Record<LLM供应商枚举, {
+    model: string;
+    baseUrl: string;
+    hasApiKey: boolean;
+    apiKeyLength: number;
+  }>;
+}
 
 /**
  * 模型选项
@@ -12,7 +36,7 @@ export interface 模型选项 {
  * LLM 供应商配置
  */
 export interface LLM供应商选项 {
-  value: LLMProvider;
+  value: LLM供应商枚举;
   label: string;
   baseUrl: string;
   models: 模型选项[];
@@ -79,14 +103,14 @@ export const LLM供应商列表: LLM供应商选项[] = [
 /**
  * 获取供应商配置
  */
-export function 获取供应商配置(供应商: LLMProvider): LLM供应商选项 | undefined {
+export function 获取供应商配置(供应商: LLM供应商枚举): LLM供应商选项 | undefined {
   return LLM供应商列表.find((项) => 项.value === 供应商);
 }
 
 /**
  * 获取供应商的默认模型
  */
-export function 获取默认模型(供应商: LLMProvider): string {
+export function 获取默认模型(供应商: LLM供应商枚举): string {
   const 配置 = 获取供应商配置(供应商);
   return 配置?.models[0]?.value || '';
 }
@@ -94,7 +118,8 @@ export function 获取默认模型(供应商: LLMProvider): string {
 /**
  * 验证模型是否属于供应商
  */
-export function 验证模型(供应商: LLMProvider, 模型: string): boolean {
+export function 验证模型(供应商: LLM供应商枚举, 模型: string): boolean {
   const 配置 = 获取供应商配置(供应商);
   return 配置?.models.some((项) => 项.value === 模型) || false;
 }
+

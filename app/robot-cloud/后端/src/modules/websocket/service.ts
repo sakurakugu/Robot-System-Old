@@ -2,15 +2,15 @@ import { Server } from 'http';
 import OpusScript from 'opusscript';
 import { WebSocket, WebSocketServer } from 'ws';
 import 配置 from '../../config';
-import { LLM供应商列表 } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
+import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import { AliyunStreamingASR } from '../机器人交互/aliyun-streaming-asr';
-import ASRService from '../机器人交互/asr-service';
+import ASRService from '../机器人交互/ASR服务';
 import ConversationEngine from '../机器人交互/conversation-engine';
-import TTSService from '../机器人交互/tts-service';
+import TTSService from '../机器人交互/TTS服务';
 import { VideoStreamManager } from '../机器人交互/视频流';
 import type { 机器人服务 } from '../机器人管理/service';
 

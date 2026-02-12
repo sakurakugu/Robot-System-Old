@@ -1,41 +1,14 @@
 import 配置 from '../../config';
-import { LLM供应商列表, type LLM供应商选项 } from '../../config/llm-providers';
 import type DatabaseService from '../../core/database';
-import type { LLMProvider } from '../../types';
-
-/**
- * LLM 配置视图（不暴露完整 API Key）
- */
-interface LLMConfigView {
-  provider: LLMProvider;
-  providers: Record<LLMProvider, {
-    model: string;
-    baseUrl: string;
-    hasApiKey: boolean;
-    apiKeyLength: number;
-  }>;
-}
-
-/**
- * UI 配置
- */
-interface UIConfig {
-  serverUrl: string;
-  wsPath: string;
-  wsControlUrl: string;
-  wsBusinessUrl: string;
-  wsAudioUploadUrl: string;
-  wsAudioDownloadUrl: string;
-  maxHistory: number;
-  controlLayout: Record<string, { x: number; y: number }> | null;
-}
+import { LLM供应商列表, 所有LLM供应商, type LLMConfigView, type LLM供应商枚举, type LLM供应商选项 } from '../大模型管理/types';
+import type { UIConfig } from './types';
 
 /**
  * 设置服务
  * 统一管理所有系统配置
  */
 export class 设置服务 {
-  constructor(private database: DatabaseService) {}
+  constructor(private database: DatabaseService) { }
 
   /**
    * 获取 LLM 配置（用于前端显示）
@@ -44,9 +17,7 @@ export class 设置服务 {
     const provider = 配置.llm.provider;
     const providers = {} as LLMConfigView['providers'];
 
-    const allProviders: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
-    
-    for (const p of allProviders) {
+    for (const p of 所有LLM供应商) {
       const cfg = 配置.llm.providers[p];
       providers[p] = {
         model: cfg.model,
@@ -70,7 +41,7 @@ export class 设置服务 {
    * 更新 LLM 配置
    */
   updateLLMConfig(data: {
-    provider?: LLMProvider;
+    provider?: LLM供应商枚举;
     openai?: { apiKey?: string; model?: string; baseUrl?: string };
     anthropic?: { apiKey?: string; model?: string; baseUrl?: string };
     tongyi?: { apiKey?: string; model?: string; baseUrl?: string };
@@ -79,21 +50,19 @@ export class 设置服务 {
   }): { success: boolean } {
     // 更新 provider
     if (data.provider) {
-      const validProviders: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
-      if (validProviders.includes(data.provider)) {
+      if (所有LLM供应商.includes(data.provider)) {
         配置.llm.provider = data.provider;
         this.database.setSetting('llm.provider', data.provider);
       }
     }
 
     // 更新各供应商配置
-    const providers: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
-    for (const provider of providers) {
+    for (const provider of 所有LLM供应商) {
       const providerData = data[provider];
       if (!providerData) continue;
 
       const cfg = 配置.llm.providers[provider];
-      
+
       if (typeof providerData.apiKey === 'string') {
         cfg.apiKey = providerData.apiKey;
         this.database.setSetting(`${provider}.apiKey`, providerData.apiKey);
@@ -121,10 +90,10 @@ export class 设置服务 {
     const wsBusinessUrl = this.database.getSetting('ui.wsBusinessUrl') || '';
     const wsAudioUploadUrl = this.database.getSetting('ui.wsAudioUploadUrl') || '';
     const wsAudioDownloadUrl = this.database.getSetting('ui.wsAudioDownloadUrl') || '';
-    
+
     const mhRaw = this.database.getSetting('ui.maxHistory');
     const maxHistory = mhRaw ? parseInt(mhRaw, 10) || 10 : 10;
-    
+
     let controlLayout: UIConfig['controlLayout'] = null;
     const layoutRaw = this.database.getSetting('ui.controlLayout');
     if (layoutRaw) {
@@ -161,10 +130,10 @@ export class 设置服务 {
     controlLayout: Record<string, { x: number; y: number }> | string;
   }>): void {
     const stringFields = [
-      'serverUrl', 'wsPath', 'wsControlUrl', 
+      'serverUrl', 'wsPath', 'wsControlUrl',
       'wsBusinessUrl', 'wsAudioUploadUrl', 'wsAudioDownloadUrl'
     ] as const;
-    
+
     for (const field of stringFields) {
       if (typeof data[field] === 'string') {
         this.database.setSetting(`ui.${field}`, data[field] as string);
@@ -172,8 +141,8 @@ export class 设置服务 {
     }
 
     if (data.maxHistory !== undefined) {
-      const mh = Array.isArray(data.maxHistory) 
-        ? Number(data.maxHistory[0]) 
+      const mh = Array.isArray(data.maxHistory)
+        ? Number(data.maxHistory[0])
         : Number(data.maxHistory);
       if (!Number.isNaN(mh)) {
         this.database.setSetting('ui.maxHistory', String(mh));
@@ -195,14 +164,13 @@ export class 设置服务 {
     const settings = this.database.getAllSettings();
 
     // 加载 provider
-    const provider = settings['llm.provider'] as LLMProvider;
-    if (provider && ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'].includes(provider)) {
+    const provider = settings['llm.provider'] as LLM供应商枚举;
+    if (provider && 所有LLM供应商.includes(provider)) {
       配置.llm.provider = provider;
     }
 
     // 加载各供应商配置
-    const providers: LLMProvider[] = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'];
-    for (const p of providers) {
+    for (const p of 所有LLM供应商) {
       const cfg = 配置.llm.providers[p];
       const apiKey = settings[`${p}.apiKey`];
       const model = settings[`${p}.model`];
@@ -226,4 +194,4 @@ export class 设置服务 {
   }
 }
 
-export { 设置服务 as SettingsService };
+

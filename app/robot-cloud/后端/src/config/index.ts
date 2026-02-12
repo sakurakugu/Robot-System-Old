@@ -1,14 +1,8 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import type { LLMProvider } from '../types';
+import type { LLM供应商枚举, LLM供应商配置 } from '../modules/大模型管理/types';
 
 dotenv.config();
-
-export interface LLM供应商配置 {
-  apiKey: string;
-  model: string;
-  baseUrl?: string;
-}
 
 export interface 配置 {
   // 服务配置
@@ -23,8 +17,8 @@ export interface 配置 {
 
   // AI服务配置
   llm: {
-    provider: LLMProvider;
-    providers: Record<LLMProvider, LLM供应商配置>;
+    provider: LLM供应商枚举;
+    providers: Record<LLM供应商枚举, LLM供应商配置>;
   };
 
   // 语音识别配置
@@ -75,7 +69,7 @@ export interface 配置 {
 /**
  * 默认 LLM 供应商配置
  */
-const 默认供应商: Record<LLMProvider, LLM供应商配置> = {
+const 默认供应商: Record<LLM供应商枚举, LLM供应商配置> = {
   openai: {
     apiKey: '',
     model: 'gpt-4o-mini',
@@ -113,7 +107,7 @@ const 配置: 配置 = {
   },
 
   llm: {
-    provider: (process.env.LLM_PROVIDER as LLMProvider) || 'tongyi',
+    provider: (process.env.LLM_PROVIDER as LLM供应商枚举) || 'tongyi',
     providers: { ...默认供应商 },
   },
 

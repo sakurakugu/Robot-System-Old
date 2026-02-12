@@ -36,6 +36,7 @@ export class VideoStreamService extends EventEmitter {
 
     // GStreamer pipeline for low-latency RTSP to JPEG
     // 使用TCP传输、零延迟、最小缓冲
+    // TODO:从RTSP改成视频而非图片
     const pipeline = [
       'rtspsrc',
       `location=${rtspUrl}`,

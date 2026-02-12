@@ -1,8 +1,8 @@
 import { logger } from "../../core/logger";
 import { parseActions } from "../../core/utils/helpers";
-import { AIResponse, ConversationContext, Message } from "../../types";
 import ActionController from "./action-controller";
 import LLMService from "./llm-service";
+import { AIResponse, ConversationContext, Message } from "./types";
 
 class ConversationEngine {
   private llmService: LLMService;

@@ -256,46 +256,6 @@ export interface ServerMessage {
   error?: string;
 }
 
-// ============ AI/LLM 类型 ============
-
-export type LLMProvider = 'openai' | 'anthropic' | 'tongyi' | 'deepseek' | 'bigmodel';
-
-export interface LLMProviderConfig {
-  apiKey: string;
-  model: string;
-  baseUrl?: string;
-}
-
-export interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: Date;
-}
-
-export interface ConversationContext {
-  history: Message[];
-  maxHistory: number;
-  systemPrompt?: string;
-  model?: string;
-  temperature?: number;
-}
-
-export interface Action {
-  name: string;
-  parameters: Record<string, any>;
-  priority?: number;
-}
-
-export interface AIResponse {
-  text: string;
-  actions: Action[];
-  metadata?: {
-    model?: string;
-    tokensUsed?: number;
-    responseTime?: number;
-  };
-}
-
 /**
  * 音频响应
  */
@@ -306,23 +266,6 @@ export interface AudioResponse {
   sampleRate?: number;
 }
 
-/**
- * 安全检查规则
- */
-export interface SafetyRule {
-  action: string;
-  maxValue?: number;
-  minValue?: number;
-}
-
-/**
- * 安全检查结果
- */
-export interface SafetyCheckResult {
-  safe: boolean;
-  reason?: string;
-  sanitizedAction?: Action;
-}
 
 /**
  * LLM 调用选项

@@ -1,5 +1,5 @@
 import { RateLimiter } from '../../core/utils/helpers';
-import { Action, SafetyCheckResult, SafetyRule } from '../../types';
+import { Action, SafetyCheckResult, SafetyRule } from './types';
 
 export class 动作控制器 {
   // 动作白名单
@@ -59,7 +59,7 @@ export class 动作控制器 {
       if (action.name === 'move') {
         const sanitizedAction = { ...action };
         let modified = false;
-        
+
         // 方式1：距离/步数/角度控制
         if (action.parameters.distance !== undefined) {
           const distance = Number(action.parameters.distance);
@@ -68,7 +68,7 @@ export class 动作控制器 {
             modified = true;
           }
         }
-        
+
         if (action.parameters.steps !== undefined) {
           const steps = Number(action.parameters.steps);
           if (Math.abs(steps) > 10) {
@@ -76,7 +76,7 @@ export class 动作控制器 {
             modified = true;
           }
         }
-        
+
         if (action.parameters.angle !== undefined) {
           const angle = Number(action.parameters.angle);
           if (Math.abs(angle) > 360) {
@@ -84,7 +84,7 @@ export class 动作控制器 {
             modified = true;
           }
         }
-        
+
         // 验证 direction 参数
         if (action.parameters.direction !== undefined) {
           const validDirections = ['forward', 'backward', 'left', 'right'];
@@ -95,7 +95,7 @@ export class 动作控制器 {
             };
           }
         }
-        
+
         // 方式2：速度控制
         if (action.parameters.vx !== undefined) {
           const vx = Number(action.parameters.vx);
@@ -118,7 +118,7 @@ export class 动作控制器 {
             modified = true;
           }
         }
-        
+
         // 验证持续时间
         if (action.parameters.duration !== undefined) {
           const duration = Number(action.parameters.duration);
@@ -132,7 +132,7 @@ export class 动作控制器 {
             };
           }
         }
-        
+
         if (modified) {
           return {
             safe: true,
@@ -143,15 +143,15 @@ export class 动作控制器 {
       } else {
         // 检查步数、角度等参数
         const paramValue = action.parameters.steps || action.parameters.angle || action.parameters.value;
-        
+
         if (paramValue !== undefined) {
           if (rule.maxValue && paramValue > rule.maxValue) {
             // 自动修正参数
             const sanitizedAction = { ...action };
-            const paramKey = action.parameters.steps !== undefined ? 'steps' 
-              : action.parameters.angle !== undefined ? 'angle' 
+            const paramKey = action.parameters.steps !== undefined ? 'steps'
+              : action.parameters.angle !== undefined ? 'angle'
               : 'value';
-            
+
             sanitizedAction.parameters = {
               ...action.parameters,
               [paramKey]: rule.maxValue,

@@ -2,7 +2,6 @@ import cors from 'cors';
 import express from 'express';
 import DatabaseService from './core/database';
 import { logger } from './core/logger';
-import { createSystemRoutes } from './modules/system/routes';
 import WebSocketService from './modules/websocket/service';
 import { ConversationController } from './modules/机器人交互/controller';
 import { createConversationRoutes } from './modules/机器人交互/routes';
@@ -10,6 +9,7 @@ import { ConversationService } from './modules/机器人交互/service';
 import { 机器人控制器 } from './modules/机器人管理/controller';
 import { createRobotRoutes } from './modules/机器人管理/routes';
 import { 机器人服务 } from './modules/机器人管理/service';
+import { createSystemRoutes } from './modules/系统/routes';
 import { ChoreoController } from './modules/编舞系统/controller';
 import { createChoreoRoutes } from './modules/编舞系统/routes';
 import { ChoreoService } from './modules/编舞系统/service';
@@ -18,7 +18,7 @@ import { createRoleRoutes } from './modules/角色管理/routes';
 import { 角色服务 } from './modules/角色管理/service';
 import { SettingsController } from './modules/设置/controller';
 import { createSettingsRoutes } from './modules/设置/routes';
-import { SettingsService } from './modules/设置/service';
+import { 设置服务 } from './modules/设置/service';
 
 export class 应用程序 {
   public 应用: express.Application;
@@ -28,7 +28,7 @@ export class 应用程序 {
   // 服务实例
   private 机器人服务: 机器人服务;
   private 对话服务: ConversationService;
-  private 设置服务: SettingsService;
+  private 设置服务: 设置服务;
   private 角色服务: 角色服务;
   private 编舞服务: ChoreoService;
 
@@ -47,7 +47,7 @@ export class 应用程序 {
     // 初始化服务
     this.机器人服务 = new 机器人服务(this.数据库);
     this.对话服务 = new ConversationService(this.数据库);
-    this.设置服务 = new SettingsService(this.数据库);
+    this.设置服务 = new 设置服务(this.数据库);
     this.角色服务 = new 角色服务(this.数据库);
     this.编舞服务 = new ChoreoService(this.数据库);
 

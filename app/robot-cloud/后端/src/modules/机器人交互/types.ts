@@ -2,29 +2,33 @@
 
 // 动作相关
 export interface Action {
-  name: string;
-  parameters: Record<string, any>;
-  priority?: number;
+  name: string;                    // 动作名称
+  parameters: Record<string, any>; // 动作参数
+  priority?: number;               // 动作优先级，数值越大优先级越高
 }
 
 export interface ActionCommand {
-  action: string;
-  parameters: Record<string, any>;
-  safetyChecked: boolean;
+  action: string;                  // 动作名称
+  parameters: Record<string, any>; // 动作参数
+  safetyChecked: boolean;          // 是否通过安全检查
 }
 
+// 安全检查结果
 export interface SafetyCheckResult {
-  safe: boolean;
-  reason?: string;
-  sanitizedAction?: Action;
+  safe: boolean;            // 是否安全
+  reason?: string;          // 不安全原因
+  sanitizedAction?: Action; // 如果不安全，提供一个安全的替代动作
 }
 
+// 安全检查规则
 export interface SafetyRule {
   action: string;
   maxValue?: number;
   minValue?: number;
   maxFrequency?: number;
 }
+
+// ============ AI/LLM 类型 ============
 
 // AI相关
 export interface ConversationContext {

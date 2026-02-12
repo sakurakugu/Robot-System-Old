@@ -1,12 +1,12 @@
 import type { Request, Response } from 'express';
 import 配置 from '../../config';
-import type { SettingsService } from './service';
+import type { 设置服务 } from './service';
 
 /**
  * 设置控制器
  */
 export class 设置控制器 {
-  constructor(private settingsService: SettingsService) {}
+  constructor(private settingsService: 设置服务) {}
 
   /**
    * 获取 LLM 配置
@@ -114,3 +114,4 @@ export class 设置控制器 {
 }
 
 export { 设置控制器 as SettingsController };
+

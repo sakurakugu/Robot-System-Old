@@ -1,8 +1,8 @@
 import type DatabaseService from '../../core/database';
 import { parseActions, removeActionTags } from '../../core/utils/helpers';
-import type { AIResponse, ConversationContext, Message } from '../../types';
 import { ActionController } from './action-controller';
 import { LLMService } from './llm-service';
+import type { AIResponse, ConversationContext, Message } from './types';
 
 export class 对话服务 {
   private llmService: LLMService;

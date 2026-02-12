@@ -364,4 +364,6 @@ export interface AsrTranscriptMessage {
 }
 
 // 引用conversation模块的类型
-import type { ActionCommand, TTSOptions } from '../机器人交互/types';
+import type { TTSOptions } from '../大模型交互/types';
+import type { ActionCommand } from '../机器人交互/types';
+

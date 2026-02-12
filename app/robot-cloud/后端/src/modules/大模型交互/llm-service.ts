@@ -1,5 +1,6 @@
 import axios from 'axios';
 import 配置 from '../../config';
+import { apiKeyManager } from '../../core/apikey-manager';
 import { logger } from '../../core/logger';
 import type { LLMMessage, LLMOptions, LLMResponse } from '../大模型管理/types';
 
@@ -50,8 +51,8 @@ export class LLM服务 {
         return this.OpenAI对话(messages, options);
       case 'bigmodel':
         return this.大模型对话(messages, options);
-      case 'tongyi':
-        return this.通义对话(messages, options);
+      case 'aliyun':
+        return this.千问对话(messages, options);
       case 'anthropic':
         return this.Anthropic对话(messages, options);
       case 'deepseek':
@@ -67,9 +68,10 @@ export class LLM服务 {
    * @param imageBase64 base64编码的图片
    */
   async 视觉分析(userQuestion: string, imageBase64: string): Promise<LLMResponse> {
-    const cfg = 配置.llm.providers.tongyi;
-    if (!cfg?.apiKey) {
-      throw new Error('Tongyi API密钥未配置');
+    const cfg = 配置.llm.providers.aliyun;
+    const apiKey = apiKeyManager.get('aliyun');
+    if (!apiKey) {
+      throw new Error('阿里云 API密钥未配置');
     }
 
     const baseUrl = cfg.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
@@ -114,7 +116,7 @@ export class LLM服务 {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${cfg.apiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           timeout: LLM服务.默认超时毫秒,
         }
@@ -133,7 +135,7 @@ export class LLM服务 {
       };
     } catch (error: any) {
       const errorData = error.response?.data;
-      logger.error('Tongyi Vision API调用失败', error, {
+      logger.error('阿里云视觉模型API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: errorData,
@@ -149,7 +151,8 @@ export class LLM服务 {
    */
   private async OpenAI对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.openai;
-    if (!cfg?.apiKey) {
+    const apiKey = apiKeyManager.get('openai');
+    if (!apiKey) {
       throw new Error('OpenAI API密钥未配置');
     }
 
@@ -171,7 +174,7 @@ export class LLM服务 {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${cfg.apiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           timeout: LLM服务.默认超时毫秒,
         }
@@ -202,7 +205,8 @@ export class LLM服务 {
    */
   private async 大模型对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.bigmodel;
-    if (!cfg?.apiKey) {
+    const apiKey = apiKeyManager.get('bigmodel');
+    if (!apiKey) {
       throw new Error('BigModel API密钥未配置');
     }
     const baseUrl = cfg.baseUrl || 'https://open.bigmodel.cn/api/paas/v4';
@@ -218,7 +222,7 @@ export class LLM服务 {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${cfg.apiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           timeout: LLM服务.默认超时毫秒,
         }
@@ -247,12 +251,13 @@ export class LLM服务 {
   }
 
   /**
-   * Tongyi API调用 (Qwen系列)
+   * 阿里云 API调用 (Qwen系列)
    */
-  private async 通义对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
-    const cfg = 配置.llm.providers.tongyi;
-    if (!cfg?.apiKey) {
-      throw new Error('Tongyi API密钥未配置');
+  private async 千问对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+    const cfg = 配置.llm.providers.aliyun;
+    const apiKey = apiKeyManager.get('aliyun');
+    if (!apiKey) {
+      throw new Error('阿里云 API密钥未配置');
     }
     const baseUrl = cfg.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     const url = `${baseUrl}/chat/completions`;
@@ -268,7 +273,7 @@ export class LLM服务 {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${cfg.apiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           timeout: LLM服务.默认超时毫秒,
         }
@@ -286,7 +291,7 @@ export class LLM服务 {
         },
       };
     } catch (error: any) {
-      logger.error('Tongyi API调用失败', error, {
+      logger.error('阿里云 API调用失败', error, {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -301,7 +306,8 @@ export class LLM服务 {
    */
   private async Anthropic对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.anthropic;
-    if (!cfg?.apiKey) {
+    const apiKey = apiKeyManager.get('anthropic');
+    if (!apiKey) {
       throw new Error('Anthropic API密钥未配置');
     }
     const baseUrl = cfg.baseUrl || 'https://api.anthropic.com/v1';
@@ -323,7 +329,7 @@ export class LLM服务 {
         {
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': cfg.apiKey,
+            'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
           },
           timeout: LLM服务.默认超时毫秒,
@@ -354,7 +360,8 @@ export class LLM服务 {
    */
   private async DeepSeek对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.deepseek;
-    if (!cfg?.apiKey) {
+    const apiKey = apiKeyManager.get('deepseek');
+    if (!apiKey) {
       throw new Error('DeepSeek API密钥未配置');
     }
     const baseUrl = cfg.baseUrl || 'https://api.deepseek.com/v1';
@@ -372,7 +379,7 @@ export class LLM服务 {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${cfg.apiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
           timeout: LLM服务.默认超时毫秒,
         }

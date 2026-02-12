@@ -1,7 +1,7 @@
 // 系统设置模块 - 类型定义
 
 export interface LLMConfig {
-  provider: 'openai' | 'bigmodel' | 'anthropic' | 'deepseek' | 'tongyi'
+  provider: 'openai' | 'bigmodel' | 'anthropic' | 'deepseek' | 'aliyun';
   openai: {
     model: string
     baseUrl: string
@@ -26,7 +26,7 @@ export interface LLMConfig {
     hasApiKey: boolean
     apiKeyLength: number
   }
-  tongyi: {
+  aliyun: {
     model: string
     baseUrl: string
     hasApiKey: boolean

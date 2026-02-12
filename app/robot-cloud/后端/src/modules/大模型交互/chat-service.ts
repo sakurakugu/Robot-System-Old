@@ -2,15 +2,15 @@ import type DatabaseService from '../../core/database';
 import { logger } from "../../core/logger";
 import { parseActions } from "../../core/utils/helpers";
 import ActionController from "../机器人交互/action-controller";
-import { AI响应, ConversationContext, Message } from "../机器人交互/types";
 import LLM服务 from "./llm-service";
+import { AI响应, ConversationContext, Message } from "./types";
 
 export class 对话服务 {
   private static readonly 最大会话数 = 500;
   private static readonly 会话过期毫秒 = 30 * 60 * 1000;
   private llmService: LLM服务;
   private actionController: ActionController;
-  private conversationHistory: Map<string, Message[]>; // TODO: 可以考虑持久化存储
+  private conversationHistory: Map<string, Message[]>;
   private lastActiveAt: Map<string, number>;
 
   constructor(private database: DatabaseService) {

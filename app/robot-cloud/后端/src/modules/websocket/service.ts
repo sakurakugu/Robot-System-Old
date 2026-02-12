@@ -9,7 +9,7 @@ import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import 语音识别服务 from '../大模型交互/asr-service';
-import 对话服务 from '../大模型交互/service';
+import 对话服务 from '../大模型交互/chat-service';
 import TTSService from '../大模型交互/tts-service';
 import { VideoStreamManager } from '../机器人交互/视频流';
 import type { 机器人服务 } from '../机器人管理/service';

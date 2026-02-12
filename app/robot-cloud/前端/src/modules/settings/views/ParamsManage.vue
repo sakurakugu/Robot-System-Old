@@ -84,20 +84,20 @@
                 </el-input>
               </el-form-item>
 
-              <!-- 通义千问 配置 -->
-              <el-divider content-position="left">通义千问 (Tongyi)</el-divider>
+              <!-- 千问 配置 -->
+              <el-divider content-position="left">千问 (Aliyun)</el-divider>
               <el-form-item label="API密钥">
                 <el-input
-                  v-model="tongyiConfig.apiKey"
-                  :readonly="tongyiConfig.readonly"
-                  :type="tongyiConfig.readonly || tongyiConfig.showKey ? 'text' : 'password'"
-                  placeholder="粘贴通义千问 API Key"
+                  v-model="aliyunConfig.apiKey"
+                  :readonly="aliyunConfig.readonly"
+                  :type="aliyunConfig.readonly || aliyunConfig.showKey ? 'text' : 'password'"
+                  placeholder="粘贴阿里云 API Key"
                 >
                   <template #append>
                     <el-button-group>
-                      <el-button :icon="View" @click="toggleVisibility('tongyi')" v-if="!tongyiConfig.readonly" />
-                      <el-button :icon="CopyDocument" @click="pasteApiKey('tongyi')" />
-                      <el-button :icon="Edit" @click="enableEdit('tongyi')" v-if="tongyiConfig.readonly && tongyiConfig.hasKey" />
+                      <el-button :icon="View" @click="toggleVisibility('aliyun')" v-if="!aliyunConfig.readonly" />
+                      <el-button :icon="CopyDocument" @click="pasteApiKey('aliyun')" />
+                      <el-button :icon="Edit" @click="enableEdit('aliyun')" v-if="aliyunConfig.readonly && aliyunConfig.hasKey" />
                     </el-button-group>
                   </template>
                 </el-input>
@@ -181,7 +181,7 @@ const deepseekConfig = ref({
   keyLength: 0
 })
 
-const tongyiConfig = ref({
+const aliyunConfig = ref({
   apiKey: '',
   showKey: false,
   readonly: false,
@@ -190,7 +190,7 @@ const tongyiConfig = ref({
 })
 
 const getMaskedText = (len: number) => len > 0 ? Array(len).fill('•').join('') : ''
- 
+
 
 onMounted(async () => {
   // 加载后端配置
@@ -257,21 +257,21 @@ onMounted(async () => {
         }
       }
 
-      // 通义千问
-      if (providers.tongyi) {
-        tongyiConfig.value.hasKey = !!providers.tongyi.hasApiKey
-        tongyiConfig.value.keyLength = providers.tongyi.apiKeyLength || 0
-        tongyiConfig.value.readonly = tongyiConfig.value.hasKey
-        if (tongyiConfig.value.hasKey) {
-          tongyiConfig.value.apiKey = getMaskedText(tongyiConfig.value.keyLength)
-          console.log('通义千问配置:', tongyiConfig.value)
+      // 千问
+      if (providers.aliyun) {
+        aliyunConfig.value.hasKey = !!providers.aliyun.hasApiKey
+        aliyunConfig.value.keyLength = providers.aliyun.apiKeyLength || 0
+        aliyunConfig.value.readonly = aliyunConfig.value.hasKey
+        if (aliyunConfig.value.hasKey) {
+          aliyunConfig.value.apiKey = getMaskedText(aliyunConfig.value.keyLength)
+          console.log('千问配置:', aliyunConfig.value)
         }
       }
     }
   } catch (e) {
     console.error('加载参数配置失败:', e)
   }
-  
+
 })
 
 const toggleVisibility = (provider: string) => {
@@ -279,7 +279,7 @@ const toggleVisibility = (provider: string) => {
   else if (provider === 'bigmodel') bigmodelConfig.value.showKey = !bigmodelConfig.value.showKey
   else if (provider === 'anthropic') anthropicConfig.value.showKey = !anthropicConfig.value.showKey
   else if (provider === 'deepseek') deepseekConfig.value.showKey = !deepseekConfig.value.showKey
-  else if (provider === 'tongyi') tongyiConfig.value.showKey = !tongyiConfig.value.showKey
+  else if (provider === 'aliyun') aliyunConfig.value.showKey = !aliyunConfig.value.showKey
 }
 
 const pasteApiKey = async (provider: string) => {
@@ -290,7 +290,7 @@ const pasteApiKey = async (provider: string) => {
       else if (provider === 'bigmodel') bigmodelConfig.value.apiKey = text.trim()
       else if (provider === 'anthropic') anthropicConfig.value.apiKey = text.trim()
       else if (provider === 'deepseek') deepseekConfig.value.apiKey = text.trim()
-      else if (provider === 'tongyi') tongyiConfig.value.apiKey = text.trim()
+      else if (provider === 'aliyun') aliyunConfig.value.apiKey = text.trim()
     }
   } catch {}
 }
@@ -312,10 +312,10 @@ const enableEdit = (provider: string) => {
     deepseekConfig.value.readonly = false
     deepseekConfig.value.apiKey = ''
     deepseekConfig.value.showKey = true
-  } else if (provider === 'tongyi') {
-    tongyiConfig.value.readonly = false
-    tongyiConfig.value.apiKey = ''
-    tongyiConfig.value.showKey = true
+  } else if (provider === 'aliyun') {
+    aliyunConfig.value.readonly = false
+    aliyunConfig.value.apiKey = ''
+    aliyunConfig.value.showKey = true
   }
 }
 
@@ -342,9 +342,9 @@ const saveLLMConfig = async () => {
     payload.deepseek = { apiKey: deepseekConfig.value.apiKey.trim() }
   }
 
-  // 通义千问
-  if ((tongyiConfig.value.apiKey || '').trim().length > 0 && tongyiConfig.value.apiKey !== getMaskedText(tongyiConfig.value.keyLength)) {
-    payload.tongyi = { apiKey: tongyiConfig.value.apiKey.trim() }
+  // 千问
+  if ((aliyunConfig.value.apiKey || '').trim().length > 0 && aliyunConfig.value.apiKey !== getMaskedText(aliyunConfig.value.keyLength)) {
+    payload.aliyun = { apiKey: aliyunConfig.value.apiKey.trim() }
   }
 
   try {

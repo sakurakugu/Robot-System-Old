@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type DatabaseService from '../../core/database';
-import type { 对话服务 } from './service';
+import type { 对话服务 } from './chat-service';
 
 export class 对话控制器 {
   constructor(

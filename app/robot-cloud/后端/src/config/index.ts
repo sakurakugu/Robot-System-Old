@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import type { LLM供应商枚举, LLM供应商配置 } from '../modules/大模型管理/types';
+import type { ASR供应商枚举, LLM供应商枚举, LLM供应商配置 } from '../modules/大模型管理/types';
 
 dotenv.config();
 
@@ -23,7 +23,7 @@ export interface 配置 {
 
   // 语音识别配置
   asr: {
-    provider: 'xunfei' | 'openai' | 'aliyun';
+    provider: ASR供应商枚举;
     xunfei?: {
       appId: string;
       apiKey: string;
@@ -80,7 +80,7 @@ const 默认供应商: Record<LLM供应商枚举, LLM供应商配置> = {
     model: 'claude-3-haiku-20240307',
     baseUrl: 'https://api.anthropic.com/v1',
   },
-  tongyi: {
+  aliyun: {
     apiKey: '',
     model: 'qwen-plus',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
@@ -107,7 +107,7 @@ const 配置: 配置 = {
   },
 
   llm: {
-    provider: (process.env.LLM_PROVIDER as LLM供应商枚举) || 'tongyi',
+    provider: (process.env.LLM_PROVIDER as LLM供应商枚举) || 'aliyun',
     providers: { ...默认供应商 },
   },
 

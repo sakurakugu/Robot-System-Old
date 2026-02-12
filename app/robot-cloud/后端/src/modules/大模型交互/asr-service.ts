@@ -3,14 +3,9 @@ import crypto from 'crypto';
 import FormData from 'form-data';
 import WebSocket from 'ws';
 import 配置 from '../../config';
+import { apiKeyManager } from '../../core/apikey-manager';
 import { logger } from '../../core/logger';
-
-export interface ASROptions {
-  language?: string;
-  prompt?: string;
-  provider?: 'xunfei' | 'openai' | 'aliyun';
-  model?: string;
-}
+import type { ASROptions } from './types';
 
 class 语音识别服务 {
   async 转录Wav(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
@@ -187,7 +182,11 @@ class 语音识别服务 {
 
   private async 转录OpenAI(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
     const openai = 配置.asr.openai;
-    if (!openai?.apiKey) {
+    if (!openai) {
+      throw new Error('OpenAI ASR配置未启用');
+    }
+    const apiKey = apiKeyManager.get('openai');
+    if (!apiKey) {
       throw new Error('OpenAI ASR API密钥未配置');
     }
 
@@ -212,7 +211,7 @@ class 语音识别服务 {
       const response = await axios.post(url, form, {
         headers: {
           ...form.getHeaders(),
-          Authorization: `Bearer ${openai.apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         maxBodyLength: Infinity,
         timeout: 60000,
@@ -228,7 +227,11 @@ class 语音识别服务 {
 
   private async 转录阿里云(wavBuffer: Buffer, options?: ASROptions): Promise<string> {
     const aliyun = 配置.asr.aliyun;
-    if (!aliyun?.apiKey) {
+    if (!aliyun) {
+      throw new Error('阿里云 ASR配置未启用');
+    }
+    const apiKey = apiKeyManager.get('aliyun');
+    if (!apiKey) {
       throw new Error('阿里云 ASR API密钥未配置');
     }
 
@@ -251,7 +254,7 @@ class 语音识别服务 {
       const timeoutMs = 9_0000;
       const ws = new WebSocket(wsUrl, {
         headers: {
-          'Authorization': `Bearer ${aliyun.apiKey}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
       });
 

@@ -1,9 +1,13 @@
 
 // ============ LLM 相关类型 ============
 
-export const 所有LLM供应商 = ['openai', 'anthropic', 'tongyi', 'deepseek', 'bigmodel'] as const;
-
+export const 所有LLM供应商 = ['openai', 'anthropic', 'aliyun', 'deepseek', 'bigmodel'] as const;
 export type LLM供应商枚举 = typeof 所有LLM供应商[number];
+
+export const 所有ASR供应商 = ['xunfei', 'openai', 'aliyun'] as const;
+export type ASR供应商枚举 = typeof 所有ASR供应商[number];
+
+export type 所有供应商枚举 = LLM供应商枚举 | ASR供应商枚举;
 
 export interface LLM供应商配置 {
   apiKey: string;
@@ -120,8 +124,8 @@ export const LLM供应商列表: LLM供应商选项[] = [
     ],
   },
   {
-    value: 'tongyi',
-    label: '通义千问',
+    value: 'aliyun',
+    label: '千问',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     models: [
       { value: 'qwen-plus', label: 'Qwen Plus' },

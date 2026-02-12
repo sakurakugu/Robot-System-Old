@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import WebSocket from 'ws';
 import 配置 from '../../config';
+import { apiKeyManager } from '../../core/apikey-manager';
 import { logger } from '../../core/logger';
 
 export interface StreamingASROptions {
@@ -68,7 +69,11 @@ export class AliyunStreamingASR {
    */
   async start(): Promise<void> {
     const aliyun = 配置.asr.aliyun;
-    if (!aliyun?.apiKey) {
+    if (!aliyun) {
+      throw new Error('阿里云 ASR配置未启用');
+    }
+    const apiKey = apiKeyManager.get('aliyun');
+    if (!apiKey) {
       throw new Error('阿里云 ASR API密钥未配置');
     }
 
@@ -83,7 +88,7 @@ export class AliyunStreamingASR {
 
       this.ws = new WebSocket(wsUrl, {
         headers: {
-          'Authorization': `Bearer ${aliyun.apiKey}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
       });
 

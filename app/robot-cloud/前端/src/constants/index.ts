@@ -40,7 +40,7 @@ export const LLM_PROVIDERS = {
   BIGMODEL: 'bigmodel',  // 大模型提供商
   ANTHROPIC: 'anthropic',// Anthropic 提供商
   DEEPSEEK: 'deepseek',  // DeepSeek 提供商
-  TONGYI: 'tongyi',      // 通义千问
+  ALIYUN: 'aliyun',      // 阿里云
 } as const
 
 // 消息类型

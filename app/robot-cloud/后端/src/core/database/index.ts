@@ -1,16 +1,10 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import 配置 from '../../config';
+import type { RobotRecord, 机器人状态 } from '../../modules/机器人管理/types';
+import type { RoleRecord } from '../../modules/角色管理/types';
+import type { ActionStatus, ConversationRecord, 对话类型 } from '../../types';
 import { logger } from '../logger';
-import type {
-  ActionStatus,
-  ConversationRecord,
-  RobotRecord,
-  RoleRecord,
-  对话类型,
-  机器人状态
-} from '../../types';
-
 /**
  * 数据库服务
  * 统一管理所有数据库操作
@@ -80,13 +74,13 @@ class 数据库服务 {
         group_name TEXT,
         tags TEXT,
         sn TEXT,
-        role_id TEXT,
+        role_uuid TEXT,
         status TEXT DEFAULT 'offline',
-        last_connected DATETIME,
+        last_connected_at DATETIME,
         registered_at DATETIME,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (role_id) REFERENCES roles(uuid) ON DELETE SET NULL
+        FOREIGN KEY (role_uuid) REFERENCES roles(uuid) ON DELETE SET NULL
       )
     `);
 
@@ -300,7 +294,7 @@ move动作支持三种控制方式：
    */
   upsertRobot(robot: Partial<RobotRecord> & { uuid: string }): void {
     const stmt = this.数据库.prepare(`
-      INSERT INTO robots (uuid, name, model, version, ip, group_name, tags, sn, role_id, status, last_connected, registered_at, updated_at)
+      INSERT INTO robots (uuid, name, model, version, ip, group_name, tags, sn, role_uuid, status, last_connected_at, registered_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(uuid) DO UPDATE SET
         name = COALESCE(excluded.name, robots.name),
@@ -310,9 +304,9 @@ move动作支持三种控制方式：
         group_name = COALESCE(excluded.group_name, robots.group_name),
         tags = COALESCE(excluded.tags, robots.tags),
         sn = COALESCE(excluded.sn, robots.sn),
-        role_id = COALESCE(excluded.role_id, robots.role_id),
+        role_uuid = COALESCE(excluded.role_uuid, robots.role_uuid),
         status = COALESCE(excluded.status, robots.status),
-        last_connected = COALESCE(excluded.last_connected, robots.last_connected),
+        last_connected_at = COALESCE(excluded.last_connected_at, robots.last_connected_at),
         updated_at = CURRENT_TIMESTAMP
     `);
 
@@ -325,9 +319,9 @@ move动作支持三种控制方式：
       robot.group_name ?? null,
       Array.isArray(robot.tags) ? JSON.stringify(robot.tags) : robot.tags ?? null,
       robot.sn ?? null,
-      robot.role_id ?? null,
+      robot.role_uuid ?? null,
       robot.status ?? 'offline',
-      robot.last_connected ?? null,
+      robot.last_connected_at ?? null,
       robot.registered_at ?? null
     );
   }
@@ -338,7 +332,7 @@ move动作支持三种控制方式：
   updateRobotStatus(robotId: string, status: 机器人状态): void {
     const stmt = this.数据库.prepare(`
       UPDATE robots
-      SET status = ?, last_connected = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      SET status = ?, last_connected_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
       WHERE uuid = ?
     `);
     stmt.run(status, robotId);
@@ -356,7 +350,7 @@ move动作支持三种控制方式：
    * 获取所有机器人
    */
   getAllRobots(): RobotRecord[] {
-    const stmt = this.数据库.prepare('SELECT * FROM robots ORDER BY last_connected DESC');
+    const stmt = this.数据库.prepare('SELECT * FROM robots ORDER BY last_connected_at DESC');
     return stmt.all() as RobotRecord[];
   }
 
@@ -367,7 +361,7 @@ move动作支持三种控制方式：
     const fields: string[] = [];
     const values: any[] = [];
 
-    const allowedFields = ['name', 'model', 'version', 'ip', 'group_name', 'tags', 'sn', 'role_id', 'status', 'last_connected'];
+    const allowedFields = ['name', 'model', 'version', 'ip', 'group_name', 'tags', 'sn', 'role_uuid', 'status', 'last_connected_at'];
 
     for (const field of allowedFields) {
       if ((data as any)[field] !== undefined) {
@@ -497,7 +491,7 @@ move动作支持三种控制方式：
    */
   deleteRole(uuid: string): void {
     // 解绑所有使用该角色的机器人
-    const unbindStmt = this.数据库.prepare('UPDATE robots SET role_id = NULL WHERE role_id = ?');
+    const unbindStmt = this.数据库.prepare('UPDATE robots SET role_uuid = NULL WHERE role_uuid = ?');
     unbindStmt.run(uuid);
 
     // 删除角色
@@ -509,7 +503,7 @@ move动作支持三种控制方式：
    * 获取使用该角色的所有机器人
    */
   getRobotsByRole(roleId: string): RobotRecord[] {
-    const stmt = this.数据库.prepare('SELECT * FROM robots WHERE role_id = ?');
+    const stmt = this.数据库.prepare('SELECT * FROM robots WHERE role_uuid = ?');
     return stmt.all(roleId) as RobotRecord[];
   }
 

@@ -7,12 +7,12 @@ import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
-import type { RobotService } from '../robot/service';
 import { AliyunStreamingASR } from '../机器人交互/aliyun-streaming-asr';
 import ASRService from '../机器人交互/asr-service';
 import ConversationEngine from '../机器人交互/conversation-engine';
 import TTSService from '../机器人交互/tts-service';
 import { VideoStreamManager } from '../机器人交互/视频流';
+import type { 机器人服务 } from '../机器人管理/service';
 
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
@@ -46,7 +46,7 @@ class WebSocket服务 {
   private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
   private conversationEngine: ConversationEngine;
   private database: DatabaseService;
-  private robotService?: RobotService;
+  private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
   private videoStreamManager: VideoStreamManager;
   private asrService: ASRService;
@@ -75,10 +75,10 @@ class WebSocket服务 {
   }
 
   /**
-   * 设置 RobotService 引用（用于拍照等功能）
+   * 设置 机器人服务 引用（用于拍照等功能）
    */
-  setRobotService(robotService: RobotService): void {
-    this.robotService = robotService;
+  set机器人服务(机器人服务: 机器人服务): void {
+    this.机器人服务 = 机器人服务;
   }
 
   /**
@@ -435,7 +435,7 @@ class WebSocket服务 {
       }
 
       // 检查机器人是否配置了角色
-      if (!robot.role_id) {
+      if (!robot.role_uuid) {
         const errorMsg = '该机器人未配置角色，无法进行对话。请在管理界面为机器人分配一个角色。';
         logger.warn('机器人未配置角色', { robotId });
 
@@ -471,8 +471,8 @@ class WebSocket服务 {
           model = undefined;
         }
         // 新数据库结构中不再使用 metadata，AI 配置从 role 获取
-        if (robot.role_id) {
-          const role = this.database.getRole(robot.role_id);
+        if (robot.role_uuid) {
+          const role = this.database.getRole(robot.role_uuid);
           if (role) {
             if (typeof role.max_history === 'number') {
               maxHistory = role.max_history || 10;
@@ -508,9 +508,9 @@ class WebSocket服务 {
         logger.info('检测到视觉识别需求，开始拍照', { robotId });
 
         try {
-          // 检查是否有 robotService
-          if (!this.robotService) {
-            throw new Error('RobotService 未初始化');
+          // 检查是否有 机器人服务
+          if (!this.机器人服务) {
+            throw new Error('机器人服务 未初始化');
           }
 
           // 发送状态消息到UI
@@ -526,7 +526,7 @@ class WebSocket服务 {
           }, 'business');
 
           // 调用拍照功能
-          const photoResult = await this.robotService.拍照(robotId);
+          const photoResult = await this.机器人服务.拍照(robotId);
 
           logger.info('拍照成功，开始视觉分析', { robotId });
 
@@ -913,8 +913,8 @@ class WebSocket服务 {
     let asrOptions: any = {};
     let useStreamingASR = false;
 
-    if (robot?.role_id) {
-      const role = this.database.getRole(robot.role_id);
+    if (robot?.role_uuid) {
+      const role = this.database.getRole(robot.role_uuid);
       if (role?.asr_provider) {
         asrOptions.provider = role.asr_provider;
         if (role.asr_model) {
@@ -1211,7 +1211,7 @@ class WebSocket服务 {
       if (session.opusDecoder) {
         try {
           session.opusDecoder.delete?.();
-        } catch (e) {
+        } catch (error) {
           // 忽略清理错误
         }
       }

@@ -1,7 +1,7 @@
 import { v7 as uuidv7 } from 'uuid';
 import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
-import type { CreateRoleDto, RoleRecord, UpdateRoleDto } from '../../types';
+import type { CreateRoleDto, RoleRecord, UpdateRoleDto } from './types';
 
 /**
  * 角色服务
@@ -56,8 +56,8 @@ export class 角色服务 {
    * 更新角色
    */
   updateRole(uuid: string, data: UpdateRoleDto): RoleRecord {
-    const existing = this.database.getRole(uuid);
-    if (!existing) {
+    const 现存角色 = this.database.getRole(uuid);
+    if (!现存角色) {
       throw new Error('角色不存在');
     }
 
@@ -96,7 +96,7 @@ export class 角色服务 {
       throw new Error('默认角色无法删除');
     }
 
-    // 检查是否有机器人正在使用该角色
+    // 检查是否有机器人正在使用该角色（不自动解绑）
     const robots = this.database.getRobotsByRole(uuid);
     if (robots.length > 0) {
       throw new Error(`有 ${robots.length} 个机器人正在使用此角色，无法删除`);
@@ -114,4 +114,3 @@ export class 角色服务 {
   }
 }
 
-export { 角色服务 as RoleService };

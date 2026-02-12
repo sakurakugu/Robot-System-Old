@@ -2,23 +2,23 @@ import cors from 'cors';
 import express from 'express';
 import DatabaseService from './core/database';
 import { logger } from './core/logger';
-import { RobotController } from './modules/robot/controller';
-import { createRobotRoutes } from './modules/robot/routes';
-import { RobotService } from './modules/robot/service';
-import { RoleController } from './modules/role/controller';
-import { createRoleRoutes } from './modules/role/routes';
-import { RoleService } from './modules/role/service';
-import { SettingsController } from './modules/settings/controller';
-import { createSettingsRoutes } from './modules/settings/routes';
-import { SettingsService } from './modules/settings/service';
 import { createSystemRoutes } from './modules/system/routes';
 import WebSocketService from './modules/websocket/service';
 import { ConversationController } from './modules/机器人交互/controller';
 import { createConversationRoutes } from './modules/机器人交互/routes';
 import { ConversationService } from './modules/机器人交互/service';
+import { 机器人控制器 } from './modules/机器人管理/controller';
+import { createRobotRoutes } from './modules/机器人管理/routes';
+import { 机器人服务 } from './modules/机器人管理/service';
 import { ChoreoController } from './modules/编舞系统/controller';
 import { createChoreoRoutes } from './modules/编舞系统/routes';
 import { ChoreoService } from './modules/编舞系统/service';
+import { 角色控制器 } from './modules/角色管理/controller';
+import { createRoleRoutes } from './modules/角色管理/routes';
+import { 角色服务 } from './modules/角色管理/service';
+import { SettingsController } from './modules/设置/controller';
+import { createSettingsRoutes } from './modules/设置/routes';
+import { SettingsService } from './modules/设置/service';
 
 export class 应用程序 {
   public 应用: express.Application;
@@ -26,17 +26,17 @@ export class 应用程序 {
   public WebSocket服务: WebSocketService;
 
   // 服务实例
-  private 机器人服务: RobotService;
+  private 机器人服务: 机器人服务;
   private 对话服务: ConversationService;
   private 设置服务: SettingsService;
-  private 角色服务: RoleService;
+  private 角色服务: 角色服务;
   private 编舞服务: ChoreoService;
 
   // 控制器实例
-  private 机器人控制器: RobotController;
+  private 机器人控制器: 机器人控制器;
   private 对话控制器: ConversationController;
   private 设置控制器: SettingsController;
-  private 角色控制器: RoleController;
+  private 角色控制器: 角色控制器;
   private 编舞控制器: ChoreoController;
 
   constructor() {
@@ -45,17 +45,17 @@ export class 应用程序 {
     this.WebSocket服务 = new WebSocketService(this.数据库);
 
     // 初始化服务
-    this.机器人服务 = new RobotService(this.数据库);
+    this.机器人服务 = new 机器人服务(this.数据库);
     this.对话服务 = new ConversationService(this.数据库);
     this.设置服务 = new SettingsService(this.数据库);
-    this.角色服务 = new RoleService(this.数据库);
+    this.角色服务 = new 角色服务(this.数据库);
     this.编舞服务 = new ChoreoService(this.数据库);
 
     // 初始化控制器
-    this.机器人控制器 = new RobotController(this.机器人服务);
+    this.机器人控制器 = new 机器人控制器(this.机器人服务);
     this.对话控制器 = new ConversationController(this.对话服务, this.数据库);
     this.设置控制器 = new SettingsController(this.设置服务);
-    this.角色控制器 = new RoleController(this.角色服务);
+    this.角色控制器 = new 角色控制器(this.角色服务);
     this.编舞控制器 = new ChoreoController(this.编舞服务);
 
     // 加载持久化配置
@@ -67,8 +67,8 @@ export class 应用程序 {
     this.编舞服务.setWebSocketService(this.WebSocket服务);
     // 延迟注入 WebSocket 服务到机器人服务
     this.机器人服务.setWebSocketService(this.WebSocket服务);
-    // 延迟注入 RobotService 到 WebSocket 服务
-    this.WebSocket服务.setRobotService(this.机器人服务);
+    // 延迟注入 机器人服务 到 WebSocket 服务
+    this.WebSocket服务.set机器人服务(this.机器人服务);
   }
 
   /**

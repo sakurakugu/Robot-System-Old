@@ -5,52 +5,10 @@
 
 // ============ 基础类型 ============
 
-export type 机器人状态 = 'online' | 'offline' | 'error';
 export type 对话类型 = 'audio' | 'text';
 export type ActionStatus = 'success' | 'failed' | 'rejected';
 
 // ============ 数据库实体 ============
-
-/**
- * 机器人记录
- */
-export interface RobotRecord {
-  uuid: string;
-  name: string | null;
-  model: string | null;
-  version: string | null;
-  ip: string | null;
-  group_name: string | null;
-  tags: string | null; // JSON array string
-  sn: string | null;
-  role_id: string | null;
-  status: 机器人状态;
-  last_connected: string | null;
-  registered_at: string | null;
-  updated_at: string;
-  created_at: string;
-}
-
-/**
- * 角色记录
- */
-export interface RoleRecord {
-  uuid: string;
-  name: string;
-  description: string | null;
-  llm_provider: string | null;
-  llm_model: string | null;
-  temperature: number;
-  system_prompt: string | null;
-  voice: string | null;
-  asr_provider: string | null;
-  asr_model: string | null;
-  intent_strategy: string | null;
-  max_history: number;
-  is_default: number;
-  created_at: string;
-  updated_at: string;
-}
 
 /**
  * 对话记录
@@ -100,74 +58,7 @@ export interface ApiResponse<T = any> {
   message?: string;
 }
 
-/**
- * 机器人 API 响应（带解析后的字段）
- */
-export interface RobotResponse extends Omit<RobotRecord, 'tags'> {
-  tags: string[];
-  role?: RoleRecord | null;
-}
-
 // ============ DTO 类型 ============
-
-/**
- * 创建机器人 DTO
- */
-export interface CreateRobotDto {
-  name?: string;
-  ip?: string;
-  group_name?: string;
-  model?: string;
-  sn?: string;
-  tags?: string[];
-}
-
-/**
- * 更新机器人 DTO
- */
-export interface UpdateRobotDto {
-  name?: string;
-  model?: string;
-  ip?: string;
-  group_name?: string;
-  sn?: string;
-  tags?: string[];
-  role_id?: string | null;
-}
-
-/**
- * 创建角色 DTO
- */
-export interface CreateRoleDto {
-  name: string;
-  description?: string;
-  llm_provider?: string;
-  llm_model?: string;
-  temperature?: number;
-  system_prompt?: string;
-  voice?: string;
-  asr_provider?: string;
-  asr_model?: string;
-  intent_strategy?: string;
-  max_history?: number;
-}
-
-/**
- * 更新角色 DTO
- */
-export interface UpdateRoleDto {
-  name?: string;
-  description?: string;
-  llm_provider?: string;
-  llm_model?: string;
-  temperature?: number;
-  asr_provider?: string;
-  asr_model?: string;
-  system_prompt?: string;
-  voice?: string;
-  intent_strategy?: string;
-  max_history?: number;
-}
 
 // ============ WebSocket 类型 ============
 

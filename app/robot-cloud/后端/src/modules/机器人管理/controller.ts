@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-import type { RobotService } from './service';
+import type { 机器人服务 } from './service';
 
 /**
  * 机器人控制器
  */
 export class 机器人控制器 {
-  constructor(private robotService: RobotService) {}
+  constructor(private 机器人服务: 机器人服务) {}
 
   private 获取参数(req: Request, ...keys: string[]): string {
     for (const key of keys) {
@@ -22,7 +22,7 @@ export class 机器人控制器 {
    */
   getAllRobots = async (_req: Request, res: Response) => {
     try {
-      const robots = this.robotService.获取所有机器人();
+      const robots = this.机器人服务.获取所有机器人();
       res.json({ success: true, data: { robots } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -34,7 +34,7 @@ export class 机器人控制器 {
    */
   getGroups = async (_req: Request, res: Response) => {
     try {
-      const groups = this.robotService.获取分组();
+      const groups = this.机器人服务.获取分组();
       res.json({ success: true, data: { groups } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -47,7 +47,7 @@ export class 机器人控制器 {
   getRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid', 'robotId');
-      const robot = this.robotService.获取机器人(uuid);
+      const robot = this.机器人服务.获取机器人(uuid);
       if (!robot) {
         return res.status(404).json({ success: false, error: '机器人不存在' });
       }
@@ -62,7 +62,7 @@ export class 机器人控制器 {
    */
   createRobot = async (req: Request, res: Response) => {
     try {
-      const robot = await this.robotService.创建机器人(req.body || {});
+      const robot = await this.机器人服务.创建机器人(req.body || {});
       res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message.includes('无法') ? 400 : 500;
@@ -76,7 +76,7 @@ export class 机器人控制器 {
   updateRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const robot = this.robotService.更新机器人(uuid, req.body || {});
+      const robot = this.机器人服务.更新机器人(uuid, req.body || {});
       res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : 500;
@@ -90,7 +90,7 @@ export class 机器人控制器 {
   deleteRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      this.robotService.删除机器人(uuid);
+      this.机器人服务.删除机器人(uuid);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -103,9 +103,9 @@ export class 机器人控制器 {
   testConnection = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const result = await this.robotService.测试连接(uuid);
-      res.json({ 
-        success: result.connected, 
+      const result = await this.机器人服务.测试连接(uuid);
+      res.json({
+        success: result.connected,
         connected: result.connected,
         message: result.message,
       });
@@ -121,7 +121,7 @@ export class 机器人控制器 {
   connectRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const robot = await this.robotService.连接机器人(uuid);
+      const robot = await this.机器人服务.连接机器人(uuid);
       res.json({ success: true, data: robot, message: '连接成功' });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
@@ -135,9 +135,9 @@ export class 机器人控制器 {
   updateFirmware = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const result = await this.robotService.更新固件(uuid);
-      res.json({ 
-        success: true, 
+      const result = await this.机器人服务.更新固件(uuid);
+      res.json({
+        success: true,
         message: '客户端代码已成功更新到机器人',
         data: result,
       });
@@ -153,8 +153,8 @@ export class 机器人控制器 {
   discoverRobots = async (req: Request, res: Response) => {
     try {
       const timeout = Math.max(1, Math.min(10, parseFloat(req.query.timeout as string) || 3));
-      const result = await this.robotService.发现机器人(timeout);
-      
+      const result = await this.机器人服务.发现机器人(timeout);
+
       if (result.success) {
         res.json({
           success: true,
@@ -174,7 +174,7 @@ export class 机器人控制器 {
   getVolume = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const volumeInfo = await this.robotService.获取音量(uuid);
+      const volumeInfo = await this.机器人服务.获取音量(uuid);
       res.json({ success: true, data: volumeInfo });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
@@ -189,12 +189,12 @@ export class 机器人控制器 {
     try {
       const uuid = this.获取参数(req, 'uuid');
       const { volume } = req.body || {};
-      
+
       if (typeof volume !== 'number') {
         return res.status(400).json({ success: false, error: '缺少音量参数' });
       }
 
-      await this.robotService.设置音量(uuid, volume);
+      await this.机器人服务.设置音量(uuid, volume);
       res.json({ success: true, message: `音量已设置为 ${volume}` });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') || error.message.includes('必须') ? 400 : 500);
@@ -209,12 +209,12 @@ export class 机器人控制器 {
     try {
       const uuid = this.获取参数(req, 'uuid');
       const { mute } = req.body || {};
-      
+
       if (typeof mute !== 'boolean') {
         return res.status(400).json({ success: false, error: '缺少静音参数' });
       }
 
-      await this.robotService.设置静音(uuid, mute);
+      await this.机器人服务.设置静音(uuid, mute);
       res.json({ success: true, message: mute ? '已静音' : '已取消静音' });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('缺少') ? 400 : 500);
@@ -228,7 +228,7 @@ export class 机器人控制器 {
   capturePhoto = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const result = await this.robotService.拍照(uuid);
+      const result = await this.机器人服务.拍照(uuid);
       res.json({ success: true, data: result });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
@@ -242,7 +242,7 @@ export class 机器人控制器 {
   getConfig = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const config = await this.robotService.获取配置(uuid);
+      const config = await this.机器人服务.获取配置(uuid);
       res.json({ success: true, config });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
@@ -257,12 +257,12 @@ export class 机器人控制器 {
     try {
       const uuid = this.获取参数(req, 'uuid');
       const config = req.body;
-      
+
       if (!config || typeof config !== 'object') {
         return res.status(400).json({ success: false, error: '缺少配置数据' });
       }
 
-      const result = await this.robotService.更新配置(uuid, config);
+      const result = await this.机器人服务.更新配置(uuid, config);
       res.json({ success: true, ...result });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
@@ -271,4 +271,4 @@ export class 机器人控制器 {
   };
 }
 
-export { 机器人控制器 as RobotController };
+

@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-import type { RoleService } from './service';
+import type { 角色服务 } from './service';
 
 /**
  * 角色控制器
  */
 export class 角色控制器 {
-  constructor(private roleService: RoleService) {}
+  constructor(private 角色服务: 角色服务) {} // 构造函数
 
   private 获取参数(req: Request, key: string): string {
     const v = (req.params as Record<string, unknown>)[key];
@@ -17,7 +17,7 @@ export class 角色控制器 {
    */
   getAllRoles = async (_req: Request, res: Response) => {
     try {
-      const roles = this.roleService.getAllRoles();
+      const roles = this.角色服务.getAllRoles();
       res.json({ success: true, data: roles });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -30,12 +30,12 @@ export class 角色控制器 {
   getRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const role = this.roleService.getRole(uuid);
-      
+      const role = this.角色服务.getRole(uuid);
+
       if (!role) {
         return res.status(404).json({ success: false, error: '角色不存在' });
       }
-      
+
       res.json({ success: true, data: role });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -51,8 +51,8 @@ export class 角色控制器 {
       if (!data.name) {
         return res.status(400).json({ success: false, error: '角色名称不能为空' });
       }
-      
-      const role = this.roleService.createRole(data);
+
+      const role = this.角色服务.createRole(data);
       res.status(201).json({ success: true, data: role });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -65,7 +65,7 @@ export class 角色控制器 {
   updateRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const role = this.roleService.updateRole(uuid, req.body);
+      const role = this.角色服务.updateRole(uuid, req.body);
       res.json({ success: true, data: role });
     } catch (error: any) {
       const status = error.message === '角色不存在' ? 404 : 500;
@@ -79,7 +79,7 @@ export class 角色控制器 {
   deleteRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      this.roleService.deleteRole(uuid);
+      this.角色服务.deleteRole(uuid);
       res.json({ success: true, message: '角色删除成功' });
     } catch (error: any) {
       let status = 500;
@@ -96,7 +96,7 @@ export class 角色控制器 {
   getRobotsByRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const robots = this.roleService.getRobotsByRole(uuid);
+      const robots = this.角色服务.getRobotsByRole(uuid);
       res.json({ success: true, data: robots });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -104,4 +104,4 @@ export class 角色控制器 {
   };
 }
 
-export { 角色控制器 as RoleController };
+

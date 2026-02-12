@@ -1,18 +1,18 @@
 import { spawn } from 'child_process';
 import net from 'net';
 import path from 'path';
-import { v7 as uuidv7 } from 'uuid';
+import { v7 as uuidv7, validate as validUUID } from 'uuid';
 import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
-import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from '../../types';
 import type WebSocketService from '../websocket/service';
+import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from './types';
 
 /**
  * 机器人服务
  */
 export class 机器人服务 {
-  private pythonCommand: string = 'python'; // 默认使用 python
+  private pythonCommand: string;
   private websocketService?: WebSocketService;
 
   constructor(private database: DatabaseService) {
@@ -25,39 +25,6 @@ export class 机器人服务 {
    */
   setWebSocketService(service: WebSocketService): void {
     this.websocketService = service;
-  }
-
-  /**
-   * 调用机器人 HTTP API
-   */
-  private async 调用机器人API(ip: string, path: string, options: {
-    method?: string;
-    body?: any;
-  } = {}): Promise<any> {
-    const method = options.method || 'GET';
-    const url = `http://${ip}:8080${path}`;
-
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: method !== 'GET' && options.body
-          ? { 'Content-Type': 'application/json' }
-          : undefined,
-        body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: AbortSignal.timeout(5000), // 5秒超时
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        throw new Error(`请求超时: ${url}`);
-      }
-      throw new Error(`API调用失败: ${error.message}`);
-    }
   }
 
   /**
@@ -79,8 +46,8 @@ export class 机器人服务 {
 
     // 获取关联的角色
     let role = null;
-    if (record.role_id) {
-      role = this.database.getRole(record.role_id) || null;
+    if (record.role_uuid) {
+      role = this.database.getRole(record.role_uuid) || null;
     }
 
     return {
@@ -133,17 +100,16 @@ export class 机器人服务 {
       const remoteInitCmd = [
         'mkdir -p /home/firefly/sparkrobot/robot-agent',
         'mkdir -p /home/firefly/sparkrobot/config',
-        'if [ -f /home/firefly/sparkrobot/config/配置.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/配置.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
+        'if [ -f /home/firefly/sparkrobot/config/config.toml ]; then grep "^uuid" /home/firefly/sparkrobot/config/config.toml | cut -d"=" -f2 | tr -d \' \"\' | xargs; fi',
       ].join(' && ');
 
       try {
         const remoteUuid = await this.执行SSH命令(pythonScript, ip, remoteInitCmd);
-        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (remoteUuid && uuidPattern.test(remoteUuid)) {
+        if (remoteUuid && validUUID(remoteUuid)) {
           uuid = remoteUuid;
           logger.info(`从机器人读取到UUID: ${uuid}`);
         }
-      } catch (e) {
+      } catch (error) {
         logger.warn('读取远程UUID失败，将生成新的');
       }
 
@@ -152,7 +118,7 @@ export class 机器人服务 {
         logger.info(`生成新UUID: ${uuid}`);
 
         const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
-        await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/配置.toml', configToml);
+        await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/config.toml', configToml);
       }
 
       // 复制客户端代码
@@ -175,7 +141,7 @@ export class 机器人服务 {
       ip: ip,
       group_name: data.group_name || null,
       sn: data.sn || null,
-      tags: data.tags ? JSON.stringify(data.tags) : null,
+      tags: data.tags ? JSON.stringify(data.tags) : null, // SQLite 不支持JSON数组，存为 JSON 字符串
       status: 'offline',
       registered_at: new Date().toISOString(),
     });
@@ -203,7 +169,7 @@ export class 机器人服务 {
       group_name: data.group_name,
       sn: data.sn,
       tags: data.tags ? JSON.stringify(data.tags) : undefined,
-      role_id: data.role_id,
+      role_uuid: data.role_uuid,
     });
 
     const result = this.获取机器人(uuid);
@@ -682,5 +648,4 @@ export class 机器人服务 {
   }
 }
 
-export { 机器人服务 as RobotService };
 

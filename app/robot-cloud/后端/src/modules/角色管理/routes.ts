@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import type { RoleController } from './controller';
+import type { 角色控制器 } from './controller';
 
-export function createRoleRoutes(controller: RoleController): Router {
+export function createRoleRoutes(controller: 角色控制器): Router {
   const router = Router();
 
   // CRUD

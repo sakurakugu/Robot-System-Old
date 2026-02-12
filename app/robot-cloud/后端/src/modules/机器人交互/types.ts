@@ -28,7 +28,7 @@ export interface SafetyRule {
   maxFrequency?: number;
 }
 
-// ============ AI/LLM 类型 ============
+// ============ AI 类型 ============
 
 // AI相关
 export interface ConversationContext {
@@ -73,43 +73,6 @@ export interface TTSOptions {
   pitch?: number;
   volume?: number;
   stream?: boolean;
-}
-
-// LLM相关
-export interface LLMOptions {
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-  tools?: Tool[];
-}
-
-export interface Tool {
-  type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: any;
-  };
-}
-
-export interface LLMResponse {
-  content: string;
-  finishReason: string;
-  usage: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  toolCalls?: ToolCall[];
-}
-
-export interface ToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
 }
 
 // 知识库

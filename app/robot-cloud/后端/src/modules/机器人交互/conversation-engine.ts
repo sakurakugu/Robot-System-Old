@@ -1,7 +1,7 @@
 import { logger } from "../../core/logger";
 import { parseActions } from "../../core/utils/helpers";
+import LLMService from "../大模型管理/llm-service";
 import ActionController from "./action-controller";
-import LLMService from "./llm-service";
 import { AIResponse, ConversationContext, Message } from "./types";
 
 class ConversationEngine {

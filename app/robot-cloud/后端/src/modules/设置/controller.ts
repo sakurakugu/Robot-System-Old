@@ -9,42 +9,6 @@ export class 设置控制器 {
   constructor(private settingsService: 设置服务) {}
 
   /**
-   * 获取 LLM 配置
-   */
-  getLLMConfig = async (_req: Request, res: Response) => {
-    try {
-      const data = this.settingsService.getLLMConfig();
-      res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
-
-  /**
-   * 获取 LLM 供应商列表
-   */
-  getLLMProviders = async (_req: Request, res: Response) => {
-    try {
-      const data = this.settingsService.getLLMProviders();
-      res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
-
-  /**
-   * 更新 LLM 配置
-   */
-  updateLLMConfig = async (req: Request, res: Response) => {
-    try {
-      const data = this.settingsService.updateLLMConfig(req.body || {});
-      res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
-
-  /**
    * 获取 UI 配置
    */
   getUIConfig = async (req: Request, res: Response) => {
@@ -95,18 +59,6 @@ export class 设置控制器 {
     try {
       this.settingsService.updateUIConfig(req.body || {});
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
-
-  /**
-   * 获取当前激活的 LLM 配置
-   */
-  getActiveLLMConfig = async (_req: Request, res: Response) => {
-    try {
-      const data = this.settingsService.getActiveLLMConfig();
-      res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }

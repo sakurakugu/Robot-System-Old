@@ -11,6 +11,47 @@ export interface LLM供应商配置 {
   baseUrl?: string;
 }
 
+export interface LLMMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface LLMOptions {
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+  tools?: Tool[];
+}
+
+export interface Tool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: any;
+  };
+}
+
+export interface LLMResponse {
+  content: string;
+  finishReason: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  toolCalls?: ToolCall[];
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 /**
  * LLM 配置视图（不暴露完整 API Key）
  */

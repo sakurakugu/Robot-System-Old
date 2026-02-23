@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import FormData from 'form-data';
 import WebSocket from 'ws';
 import 配置 from '../../config';
-import { apiKeyManager } from '../../core/apikey-manager';
+import { apiKeyManager } from '../../core/config/apikey-manager';
 import { logger } from '../../core/logger';
 import type { ASROptions } from './types';
 

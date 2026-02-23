@@ -15,7 +15,7 @@ export interface LLM供应商配置 {
   baseUrl?: string;
 }
 
-export interface LLMMessage {
+export interface LLM消息 {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }

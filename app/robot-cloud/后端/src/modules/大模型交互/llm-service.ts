@@ -1,8 +1,8 @@
 import axios from 'axios';
 import 配置 from '../../config';
-import { apiKeyManager } from '../../core/apikey-manager';
+import { apiKeyManager } from '../../core/config/apikey-manager';
 import { logger } from '../../core/logger';
-import type { LLMMessage, LLMOptions, LLMResponse } from '../大模型管理/types';
+import type { LLMOptions, LLMResponse, LLM消息 } from '../大模型管理/types';
 
 export class LLM服务 {
   private static readonly 默认超时毫秒 = 3_0000;
@@ -44,7 +44,7 @@ export class LLM服务 {
   /**
    * 调用LLM进行对话
    */
-  async 对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  async 对话(messages: LLM消息[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const provider = 配置.llm.provider;
     switch (provider) {
       case 'openai':
@@ -149,7 +149,7 @@ export class LLM服务 {
   /**
    * OpenAI API调用
    */
-  private async OpenAI对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async OpenAI对话(messages: LLM消息[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.openai;
     const apiKey = apiKeyManager.get('openai');
     if (!apiKey) {
@@ -203,7 +203,7 @@ export class LLM服务 {
   /**
    * BigModel API调用 (GLM系列)
    */
-  private async 大模型对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async 大模型对话(messages: LLM消息[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.bigmodel;
     const apiKey = apiKeyManager.get('bigmodel');
     if (!apiKey) {
@@ -253,7 +253,7 @@ export class LLM服务 {
   /**
    * 阿里云 API调用 (Qwen系列)
    */
-  private async 千问对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async 千问对话(messages: LLM消息[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.aliyun;
     const apiKey = apiKeyManager.get('aliyun');
     if (!apiKey) {
@@ -304,7 +304,7 @@ export class LLM服务 {
   /**
    * Anthropic API调用 (Claude系列)
    */
-  private async Anthropic对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async Anthropic对话(messages: LLM消息[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.anthropic;
     const apiKey = apiKeyManager.get('anthropic');
     if (!apiKey) {
@@ -358,7 +358,7 @@ export class LLM服务 {
   /**
    * DeepSeek API调用
    */
-  private async DeepSeek对话(messages: LLMMessage[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
+  private async DeepSeek对话(messages: LLM消息[], options?: Partial<LLMOptions>): Promise<LLMResponse> {
     const cfg = 配置.llm.providers.deepseek;
     const apiKey = apiKeyManager.get('deepseek');
     if (!apiKey) {

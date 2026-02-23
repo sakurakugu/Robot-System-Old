@@ -1,5 +1,5 @@
 import 配置 from '../../config';
-import { apiKeyManager } from '../../core/apikey-manager';
+import { apiKeyManager } from '../../core/config/apikey-manager';
 import type DatabaseService from '../../core/database';
 import {
   LLM供应商列表,

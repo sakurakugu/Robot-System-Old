@@ -61,7 +61,7 @@ test/
 *.blend
 *.blend1
 
-other/
+/other/
 *.db
 tools/scripts/config/
 

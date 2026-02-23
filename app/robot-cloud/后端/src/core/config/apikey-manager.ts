@@ -1,4 +1,4 @@
-import type { 所有供应商枚举 } from '../modules/大模型管理/types';
+import type { 所有供应商枚举 } from '../../modules/大模型管理/types';
 
 class ApiKeyManager {
   private keys = new Map<所有供应商枚举, string>();

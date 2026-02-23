@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import WebSocket from 'ws';
 import 配置 from '../../config';
-import { apiKeyManager } from '../../core/apikey-manager';
+import { apiKeyManager } from '../../core/config/apikey-manager';
 import { logger } from '../../core/logger';
 
 export interface StreamingASROptions {

@@ -161,6 +161,13 @@ class 数据库服务 {
     if (!hasIsDefault || !hasAsrProvider || !hasAsrModel) {
       logger.info('数据库迁移完成');
     }
+
+    // 统一 ASR 默认厂商为阿里云，修复历史空值
+    this.数据库.exec(`
+      UPDATE roles
+      SET asr_provider = 'aliyun'
+      WHERE asr_provider IS NULL OR TRIM(asr_provider) = ''
+    `);
   }
 
   /**
@@ -228,8 +235,8 @@ move动作支持三种控制方式：
 3. 一次回复中可以包含多个动作标记`;
 
       const stmt = this.数据库.prepare(`
-        INSERT INTO roles (uuid, name, description, temperature, system_prompt, max_history, is_default, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+        INSERT INTO roles (uuid, name, description, temperature, system_prompt, asr_provider, max_history, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
       `);
 
       stmt.run(
@@ -238,6 +245,7 @@ move动作支持三种控制方式：
         '系统默认的机器狗AI助手角色，无法删除和修改',
         0.7,
         systemPrompt,
+        'aliyun',
         10
       );
 
@@ -324,6 +332,18 @@ move动作支持三种控制方式：
       robot.last_connected_at ?? null,
       robot.registered_at ?? null
     );
+  }
+
+  /**
+   * 重置所有机器人状态为离线（用于服务器启动时）
+   */
+  resetAllRobotsStatusToOffline(): void {
+    const stmt = this.数据库.prepare(`
+      UPDATE robots
+      SET status = 'offline'
+    `);
+    stmt.run();
+    logger.info('已重置所有机器人状态为离线');
   }
 
   /**
@@ -435,7 +455,7 @@ move动作支持三种控制方式：
       data.temperature ?? 0.7,
       data.system_prompt ?? null,
       data.voice ?? null,
-      data.asr_provider ?? null,
+      data.asr_provider ?? 'aliyun',
       data.asr_model ?? null,
       data.intent_strategy ?? null,
       data.max_history ?? 10,

@@ -93,26 +93,8 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <el-alert
-          v-if="robot.status === 'offline' && connectionErrors[robot.uuid]"
-          :title="connectionErrors[robot.uuid]"
-          type="warning"
-          :closable="true"
-          style="margin-top: 12px"
-          @close="dismissError(robot.uuid)"
-        />
-
         <template #footer>
           <el-space wrap>
-            <el-button
-              size="small"
-              :type="robot.status === 'online' ? 'success' : 'primary'"
-              :loading="testing[robot.uuid]"
-              :disabled="robot.status === 'online' && connectReady[robot.uuid] === false"
-              @click="testConnection(robot)"
-            >
-              {{ testing[robot.uuid] ? '测试中' : (robot.status === 'online' ? '连接' : '测试连接') }}
-            </el-button>
             <el-button
               size="small"
               :icon="Upload"
@@ -237,15 +219,6 @@
             <el-space>
               <el-button
                 size="small"
-                :type="row.status === 'online' ? 'success' : 'primary'"
-                :loading="testing[row.uuid]"
-                :disabled="row.status === 'online' && connectReady[row.uuid] === false"
-                @click="testConnection(row)"
-              >
-                {{ testing[row.uuid] ? '测试中' : (row.status === 'online' ? '连接' : '测试') }}
-              </el-button>
-              <el-button
-                size="small"
                 :loading="updating[row.uuid]"
                 title="更新固件"
                 @click="updateFirmware(row)"
@@ -271,15 +244,6 @@
               >
                 删除
               </el-button>
-              <el-tooltip
-                v-if="row.status === 'offline' && connectionErrors[row.uuid]"
-                :content="connectionErrors[row.uuid]"
-                placement="top"
-              >
-                <el-icon color="var(--el-color-warning)">
-                  <Warning />
-                </el-icon>
-              </el-tooltip>
             </el-space>
           </template>
         </el-table-column>
@@ -453,35 +417,6 @@
       </template>
     </el-dialog>
 
-    <!-- 重启运控对话框 -->
-    <el-dialog
-      v-model="showRestartDialog"
-      title="重启运控"
-      width="400px"
-      :close-on-click-modal="false"
-    >
-      <el-alert
-        title="请确认设备已卧倒，避免急停"
-        type="warning"
-        :closable="false"
-        style="margin-bottom: 16px"
-      />
-      <el-text v-if="restarting">
-        将在 {{ countdown }} 秒后执行重启，可随时取消。
-      </el-text>
-      <template #footer>
-        <el-button @click="closeRestartDialog">
-          取消
-        </el-button>
-        <el-button
-          type="primary"
-          :disabled="restarting"
-          @click="confirmRestart"
-        >
-          {{ restarting ? '倒计时中' : '确认设备已卧倒' }}
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -529,15 +464,7 @@ const router = useRouter()
 const robots = ref<Robot[]>([])
 const viewMode = ref<'card' | 'list'>('card')
 const showAddDialog = ref(false)
-const testing = ref<Record<string, boolean>>({})
 const updating = ref<Record<string, boolean>>({})
-const connectionErrors = ref<Record<string, string>>({})
-const connectReady = ref<Record<string, boolean>>({})
-const showRestartDialog = ref(false)
-const restartRobot = ref<Robot | null>(null)
-const restarting = ref(false)
-const countdown = ref(3)
-let countdownTimer: any = null
 const error = ref('')
 const loading = ref(false)
 
@@ -645,69 +572,6 @@ async function loadRobots() {
 }
 
 // 顶部本机IP及相关逻辑已移除
-
-async function testConnection(robot: Robot) {
-  if (robot.status === 'online') {
-    return connectNow(robot)
-  }
-  testing.value[robot.uuid] = true
-  connectionErrors.value[robot.uuid] = ''
-  try {
-    const res = await fetch(`/api/v1/robots/${robot.uuid}/test-connection`, { method: 'POST' })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
-    if (json.success && json.connected) {
-      robot.status = 'online'
-      connectReady.value[robot.uuid] = false
-      setTimeout(() => {
-        connectReady.value[robot.uuid] = true
-      }, 1000)
-      ElMessage.success(json.message || '测试通过，请点击连接')
-    } else {
-      robot.status = 'offline'
-      const errMsg = json?.message || json?.error || '测试失败'
-      connectionErrors.value[robot.uuid] = errMsg
-      ElMessage.error(errMsg)
-    }
-  } catch (e: any) {
-    robot.status = 'offline'
-    const errMsg = e?.message || '连接测试失败'
-    connectionErrors.value[robot.uuid] = errMsg
-    ElMessage.error(errMsg)
-  } finally {
-    testing.value[robot.uuid] = false
-  }
-}
-
-async function connectNow(robot: Robot) {
-  if (connectReady.value[robot.uuid] === false) {
-    return
-  }
-  testing.value[robot.uuid] = true
-  connectionErrors.value[robot.uuid] = ''
-  try {
-    const res = await fetch(`/api/v1/robots/${robot.uuid}/connect`, { method: 'POST' })
-    const json = await res.json().catch(() => ({}))
-    if (res.ok && json.success) {
-      ElMessage.success(json.message || '连接成功')
-      restartRobot.value = robot
-      countdown.value = 3
-      showRestartDialog.value = true
-    } else {
-      robot.status = 'offline'
-      const errMsg = json?.message || json?.error || `HTTP ${res.status}`
-      connectionErrors.value[robot.uuid] = errMsg
-      ElMessage.error(errMsg || '连接失败')
-    }
-  } catch (e: any) {
-    robot.status = 'offline'
-    const errMsg = e?.message || '连接失败'
-    connectionErrors.value[robot.uuid] = errMsg
-    ElMessage.error(errMsg)
-  } finally {
-    testing.value[robot.uuid] = false
-  }
-}
 
 function editRobot(robot: Robot) {
   router.push(`/robots/${robot.uuid}`)
@@ -942,46 +806,14 @@ async function addDiscoveredRobot() {
   }
 }
 
-function dismissError(uuid: string) {
-  if (connectionErrors.value[uuid]) {
-    delete connectionErrors.value[uuid]
-  }
-}
-
-function closeRestartDialog() {
-  showRestartDialog.value = false
-  restartRobot.value = null
-  restarting.value = false
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-  countdown.value = 3
-}
-
-async function confirmRestart() {
-  if (!restartRobot.value || restarting.value) return
-  restarting.value = true
-  countdown.value = 3
-  countdownTimer = setInterval(async () => {
-    countdown.value -= 1
-    if (countdown.value <= 0 && restartRobot.value) {
-      clearInterval(countdownTimer)
-      countdownTimer = null
-      ElMessage.success('已发送重启指令')
-      closeRestartDialog()
-    }
-  }, 1000)
-}
-
 onMounted(() => {
   loadRobots()
 })
 
 onUnmounted(() => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-  }
+  // if (countdownTimer) {
+  //   clearInterval(countdownTimer)
+  // }
 })
 </script>
 

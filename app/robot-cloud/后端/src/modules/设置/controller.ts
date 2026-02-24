@@ -8,6 +8,24 @@ import type { 设置服务 } from './service';
 export class 设置控制器 {
   constructor(private settingsService: 设置服务) {}
 
+  getAIConfig = async (_req: Request, res: Response) => {
+    try {
+      const data = this.settingsService.getAIConfig();
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  updateAIConfig = async (req: Request, res: Response) => {
+    try {
+      const data = this.settingsService.updateAIConfig(req.body || {});
+      res.json({ success: true, data });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  };
+
   /**
    * 获取 UI 配置
    */

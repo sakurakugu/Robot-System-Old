@@ -16,8 +16,8 @@ export function createRobotRoutes(controller: 机器人控制器): Router {
   router.delete('/:uuid', controller.deleteRobot);
 
   // 连接管理
-  router.post('/:uuid/test-connection', controller.testConnection);
-  router.post('/:uuid/connect', controller.connectRobot);
+  // router.post('/:uuid/test-connection', controller.testConnection);
+  // router.post('/:uuid/connect', controller.connectRobot);
   router.post('/:uuid/update-firmware', controller.updateFirmware);
 
   // 音量控制

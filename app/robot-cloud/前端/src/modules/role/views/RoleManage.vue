@@ -59,6 +59,21 @@
           show-overflow-tooltip
         />
         <el-table-column
+          prop="asr_provider"
+          label="ASR厂商"
+          width="120"
+        >
+          <template #default="scope">
+            {{ getAsrProviderLabel(scope.row.asr_provider) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="asr_model"
+          label="ASR模型"
+          width="170"
+          show-overflow-tooltip
+        />
+        <el-table-column
           label="绑定机器人"
           width="120"
           align="center"
@@ -177,6 +192,34 @@
             :min="0"
             :max="100"
           />
+        </el-form-item>
+        <el-form-item label="ASR厂商">
+          <el-select
+            v-model="roleForm.asr_provider"
+            placeholder="选择ASR厂商"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in asrProviders"
+              :key="p.value"
+              :label="p.label"
+              :value="p.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="ASR模型">
+          <el-select
+            v-model="roleForm.asr_model"
+            placeholder="选择ASR模型"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="m in availableAsrModels"
+              :key="m.value"
+              :label="m.label"
+              :value="m.value"
+            />
+          </el-select>
         </el-form-item>
         <el-divider content-position="left">
           系统提示词
@@ -308,6 +351,8 @@ interface Role {
   description?: string
   llm_provider?: string
   llm_model?: string
+  asr_provider?: string
+  asr_model?: string
   temperature?: number
   system_prompt?: string
   voice?: string
@@ -323,6 +368,22 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
 const providers = ref<any[]>([])
+const asrProviders = ref([
+  { value: 'aliyun', label: '阿里云' },
+  { value: 'xunfei', label: '讯飞' },
+  { value: 'openai', label: 'OpenAI' }
+])
+const asrModelsMap: Record<string, Array<{ value: string; label: string }>> = {
+  aliyun: [
+    { value: 'fun-asr-realtime', label: 'Fun-ASR Realtime' }
+  ],
+  xunfei: [
+    { value: 'iat', label: '实时语音听写(IAT)' }
+  ],
+  openai: [
+    { value: 'whisper-1', label: 'Whisper-1' }
+  ]
+}
 
 const roleForm = ref({
   uuid: '',
@@ -330,6 +391,8 @@ const roleForm = ref({
   description: '',
   llm_provider: '',
   llm_model: '',
+  asr_provider: 'aliyun',
+  asr_model: 'fun-asr-realtime',
   temperature: 0.7,
   system_prompt: '',
   voice: '',
@@ -347,6 +410,11 @@ const availableModels = computed(() => {
   return provider?.models || []
 })
 
+const availableAsrModels = computed(() => {
+  const provider = roleForm.value.asr_provider || 'aliyun'
+  return asrModelsMap[provider] || asrModelsMap.aliyun
+})
+
 onMounted(async () => {
   loadRoles()
   loadProviders()
@@ -355,6 +423,12 @@ onMounted(async () => {
 watch(() => roleForm.value.llm_provider, () => {
   if (!availableModels.value.find((m: any) => m.value === roleForm.value.llm_model)) {
     roleForm.value.llm_model = availableModels.value[0]?.value || ''
+  }
+})
+
+watch(() => roleForm.value.asr_provider, () => {
+  if (!availableAsrModels.value.find((m) => m.value === roleForm.value.asr_model)) {
+    roleForm.value.asr_model = availableAsrModels.value[0]?.value || ''
   }
 })
 
@@ -399,6 +473,11 @@ const getProviderLabel = (value?: string) => {
   return provider?.label || value || '-'
 }
 
+const getAsrProviderLabel = (value?: string) => {
+  const provider = asrProviders.value.find(p => p.value === value)
+  return provider?.label || value || '阿里云'
+}
+
 const showCreateDialog = () => {
   isEdit.value = false
   roleForm.value = {
@@ -407,6 +486,8 @@ const showCreateDialog = () => {
     description: '',
     llm_provider: providers.value[0]?.value || '',
     llm_model: '',
+    asr_provider: 'aliyun',
+    asr_model: 'fun-asr-realtime',
     temperature: 0.7,
     system_prompt: '',
     voice: 'female-soft',
@@ -424,6 +505,8 @@ const editRole = (role: Role) => {
     description: role.description || '',
     llm_provider: role.llm_provider || '',
     llm_model: role.llm_model || '',
+    asr_provider: role.asr_provider || 'aliyun',
+    asr_model: role.asr_model || (role.asr_provider ? (asrModelsMap[role.asr_provider]?.[0]?.value || '') : 'fun-asr-realtime'),
     temperature: role.temperature || 0.7,
     system_prompt: role.system_prompt || '',
     voice: role.voice || '',

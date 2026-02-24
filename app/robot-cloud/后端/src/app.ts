@@ -47,6 +47,7 @@ export class 应用程序 {
   constructor() {
     this.应用 = express();
     this.数据库 = new DatabaseService();
+    this.数据库.resetAllRobotsStatusToOffline();
     this.WebSocket服务 = new WebSocketService(this.数据库);
 
     // 初始化服务

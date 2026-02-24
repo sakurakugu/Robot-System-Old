@@ -41,6 +41,25 @@ export interface UpdateLLMConfigDTO {
   baseUrl?: string
 }
 
+export interface AIConfig {
+  xunfeiAsr: {
+    hasAppId: boolean
+    appIdLength: number
+    hasApiKey: boolean
+    apiKeyLength: number
+    hasApiSecret: boolean
+    apiSecretLength: number
+  }
+}
+
+export interface UpdateAIConfigDTO {
+  xunfeiAsr?: {
+    appId?: string
+    apiKey?: string
+    apiSecret?: string
+  }
+}
+
 export interface LLMProvider {
   id: string
   name: string

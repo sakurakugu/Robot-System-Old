@@ -38,7 +38,7 @@ export class 角色服务 {
       temperature: data.temperature ?? 0.7,
       system_prompt: data.system_prompt,
       voice: data.voice,
-      asr_provider: data.asr_provider,
+      asr_provider: data.asr_provider ?? 'aliyun',
       asr_model: data.asr_model,
       intent_strategy: data.intent_strategy,
       max_history: data.max_history ?? 10,

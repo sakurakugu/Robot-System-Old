@@ -184,6 +184,92 @@
                 </el-input>
               </el-form-item>
 
+              <!-- 讯飞 ASR 配置 -->
+              <el-divider content-position="left">
+                讯飞 ASR
+              </el-divider>
+              <el-form-item label="APP ID">
+                <el-input
+                  v-model="xunfeiAsrConfig.appId"
+                  :readonly="xunfeiAsrConfig.readonlyAppId"
+                  :type="xunfeiAsrConfig.readonlyAppId || xunfeiAsrConfig.showAppId ? 'text' : 'password'"
+                  placeholder="粘贴讯飞 APP ID"
+                >
+                  <template #append>
+                    <el-button-group>
+                      <el-button
+                        v-if="!xunfeiAsrConfig.readonlyAppId"
+                        :icon="View"
+                        @click="toggleXunfeiVisibility('appId')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteXunfeiField('appId')"
+                      />
+                      <el-button
+                        v-if="xunfeiAsrConfig.readonlyAppId && xunfeiAsrConfig.hasAppId"
+                        :icon="Edit"
+                        @click="enableXunfeiEdit('appId')"
+                      />
+                    </el-button-group>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item label="API Key">
+                <el-input
+                  v-model="xunfeiAsrConfig.apiKey"
+                  :readonly="xunfeiAsrConfig.readonlyApiKey"
+                  :type="xunfeiAsrConfig.readonlyApiKey || xunfeiAsrConfig.showApiKey ? 'text' : 'password'"
+                  placeholder="粘贴讯飞 API Key"
+                >
+                  <template #append>
+                    <el-button-group>
+                      <el-button
+                        v-if="!xunfeiAsrConfig.readonlyApiKey"
+                        :icon="View"
+                        @click="toggleXunfeiVisibility('apiKey')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteXunfeiField('apiKey')"
+                      />
+                      <el-button
+                        v-if="xunfeiAsrConfig.readonlyApiKey && xunfeiAsrConfig.hasApiKey"
+                        :icon="Edit"
+                        @click="enableXunfeiEdit('apiKey')"
+                      />
+                    </el-button-group>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item label="API Secret">
+                <el-input
+                  v-model="xunfeiAsrConfig.apiSecret"
+                  :readonly="xunfeiAsrConfig.readonlyApiSecret"
+                  :type="xunfeiAsrConfig.readonlyApiSecret || xunfeiAsrConfig.showApiSecret ? 'text' : 'password'"
+                  placeholder="粘贴讯飞 API Secret"
+                >
+                  <template #append>
+                    <el-button-group>
+                      <el-button
+                        v-if="!xunfeiAsrConfig.readonlyApiSecret"
+                        :icon="View"
+                        @click="toggleXunfeiVisibility('apiSecret')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteXunfeiField('apiSecret')"
+                      />
+                      <el-button
+                        v-if="xunfeiAsrConfig.readonlyApiSecret && xunfeiAsrConfig.hasApiSecret"
+                        :icon="Edit"
+                        @click="enableXunfeiEdit('apiSecret')"
+                      />
+                    </el-button-group>
+                  </template>
+                </el-input>
+              </el-form-item>
+
               <el-form-item>
                 <el-button
                   type="primary"
@@ -309,6 +395,24 @@ const aliyunConfig = ref({
   keyLength: 0
 })
 
+const xunfeiAsrConfig = ref({
+  appId: '',
+  apiKey: '',
+  apiSecret: '',
+  showAppId: false,
+  showApiKey: false,
+  showApiSecret: false,
+  readonlyAppId: false,
+  readonlyApiKey: false,
+  readonlyApiSecret: false,
+  hasAppId: false,
+  hasApiKey: false,
+  hasApiSecret: false,
+  appIdLength: 0,
+  apiKeyLength: 0,
+  apiSecretLength: 0
+})
+
 const getMaskedText = (len: number) => len > 0 ? Array(len).fill('•').join('') : ''
 
 
@@ -392,6 +496,35 @@ onMounted(async () => {
     console.error('加载参数配置失败:', e)
   }
 
+  try {
+    const aiRes = await fetch('/api/v1/config/ai').then(r => r.json())
+    if (aiRes?.success && aiRes.data?.xunfeiAsr) {
+      const xunfei = aiRes.data.xunfeiAsr
+      xunfeiAsrConfig.value.hasAppId = !!xunfei.hasAppId
+      xunfeiAsrConfig.value.hasApiKey = !!xunfei.hasApiKey
+      xunfeiAsrConfig.value.hasApiSecret = !!xunfei.hasApiSecret
+      xunfeiAsrConfig.value.appIdLength = xunfei.appIdLength || 0
+      xunfeiAsrConfig.value.apiKeyLength = xunfei.apiKeyLength || 0
+      xunfeiAsrConfig.value.apiSecretLength = xunfei.apiSecretLength || 0
+
+      xunfeiAsrConfig.value.readonlyAppId = xunfeiAsrConfig.value.hasAppId
+      xunfeiAsrConfig.value.readonlyApiKey = xunfeiAsrConfig.value.hasApiKey
+      xunfeiAsrConfig.value.readonlyApiSecret = xunfeiAsrConfig.value.hasApiSecret
+
+      if (xunfeiAsrConfig.value.hasAppId) {
+        xunfeiAsrConfig.value.appId = getMaskedText(xunfeiAsrConfig.value.appIdLength)
+      }
+      if (xunfeiAsrConfig.value.hasApiKey) {
+        xunfeiAsrConfig.value.apiKey = getMaskedText(xunfeiAsrConfig.value.apiKeyLength)
+      }
+      if (xunfeiAsrConfig.value.hasApiSecret) {
+        xunfeiAsrConfig.value.apiSecret = getMaskedText(xunfeiAsrConfig.value.apiSecretLength)
+      }
+    }
+  } catch (e) {
+    console.error('加载讯飞配置失败:', e)
+  }
+
 })
 
 const toggleVisibility = (provider: string) => {
@@ -439,41 +572,98 @@ const enableEdit = (provider: string) => {
   }
 }
 
+const toggleXunfeiVisibility = (field: 'appId' | 'apiKey' | 'apiSecret') => {
+  if (field === 'appId') xunfeiAsrConfig.value.showAppId = !xunfeiAsrConfig.value.showAppId
+  else if (field === 'apiKey') xunfeiAsrConfig.value.showApiKey = !xunfeiAsrConfig.value.showApiKey
+  else if (field === 'apiSecret') xunfeiAsrConfig.value.showApiSecret = !xunfeiAsrConfig.value.showApiSecret
+}
+
+const pasteXunfeiField = async (field: 'appId' | 'apiKey' | 'apiSecret') => {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (!text) return
+    const value = text.trim()
+    if (field === 'appId') xunfeiAsrConfig.value.appId = value
+    else if (field === 'apiKey') xunfeiAsrConfig.value.apiKey = value
+    else if (field === 'apiSecret') xunfeiAsrConfig.value.apiSecret = value
+  } catch {}
+}
+
+const enableXunfeiEdit = (field: 'appId' | 'apiKey' | 'apiSecret') => {
+  if (field === 'appId') {
+    xunfeiAsrConfig.value.readonlyAppId = false
+    xunfeiAsrConfig.value.appId = ''
+    xunfeiAsrConfig.value.showAppId = true
+  } else if (field === 'apiKey') {
+    xunfeiAsrConfig.value.readonlyApiKey = false
+    xunfeiAsrConfig.value.apiKey = ''
+    xunfeiAsrConfig.value.showApiKey = true
+  } else if (field === 'apiSecret') {
+    xunfeiAsrConfig.value.readonlyApiSecret = false
+    xunfeiAsrConfig.value.apiSecret = ''
+    xunfeiAsrConfig.value.showApiSecret = true
+  }
+}
+
 const saveLLMConfig = async () => {
-  const payload: any = {}
+  const llmPayload: any = {}
 
   // OpenAI
   if ((openaiConfig.value.apiKey || '').trim().length > 0 && openaiConfig.value.apiKey !== getMaskedText(openaiConfig.value.keyLength)) {
-    payload.openai = { apiKey: openaiConfig.value.apiKey.trim() }
+    llmPayload.openai = { apiKey: openaiConfig.value.apiKey.trim() }
   }
 
   // BigModel
   if ((bigmodelConfig.value.apiKey || '').trim().length > 0 && bigmodelConfig.value.apiKey !== getMaskedText(bigmodelConfig.value.keyLength)) {
-    payload.bigmodel = { apiKey: bigmodelConfig.value.apiKey.trim() }
+    llmPayload.bigmodel = { apiKey: bigmodelConfig.value.apiKey.trim() }
   }
 
   // Anthropic
   if ((anthropicConfig.value.apiKey || '').trim().length > 0 && anthropicConfig.value.apiKey !== getMaskedText(anthropicConfig.value.keyLength)) {
-    payload.anthropic = { apiKey: anthropicConfig.value.apiKey.trim() }
+    llmPayload.anthropic = { apiKey: anthropicConfig.value.apiKey.trim() }
   }
 
   // DeepSeek
   if ((deepseekConfig.value.apiKey || '').trim().length > 0 && deepseekConfig.value.apiKey !== getMaskedText(deepseekConfig.value.keyLength)) {
-    payload.deepseek = { apiKey: deepseekConfig.value.apiKey.trim() }
+    llmPayload.deepseek = { apiKey: deepseekConfig.value.apiKey.trim() }
   }
 
   // 千问
   if ((aliyunConfig.value.apiKey || '').trim().length > 0 && aliyunConfig.value.apiKey !== getMaskedText(aliyunConfig.value.keyLength)) {
-    payload.aliyun = { apiKey: aliyunConfig.value.apiKey.trim() }
+    llmPayload.aliyun = { apiKey: aliyunConfig.value.apiKey.trim() }
   }
 
+  const xunfeiPayload: any = {}
+  if ((xunfeiAsrConfig.value.appId || '').trim().length > 0 && xunfeiAsrConfig.value.appId !== getMaskedText(xunfeiAsrConfig.value.appIdLength)) {
+    xunfeiPayload.appId = xunfeiAsrConfig.value.appId.trim()
+  }
+  if ((xunfeiAsrConfig.value.apiKey || '').trim().length > 0 && xunfeiAsrConfig.value.apiKey !== getMaskedText(xunfeiAsrConfig.value.apiKeyLength)) {
+    xunfeiPayload.apiKey = xunfeiAsrConfig.value.apiKey.trim()
+  }
+  if ((xunfeiAsrConfig.value.apiSecret || '').trim().length > 0 && xunfeiAsrConfig.value.apiSecret !== getMaskedText(xunfeiAsrConfig.value.apiSecretLength)) {
+    xunfeiPayload.apiSecret = xunfeiAsrConfig.value.apiSecret.trim()
+  }
+
+  const hasLLMUpdate = Object.keys(llmPayload).length > 0
+  const hasXunfeiUpdate = Object.keys(xunfeiPayload).length > 0
+
   try {
-    const res = await fetch('/api/v1/config/llm', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    if (res.ok) {
+    if (hasLLMUpdate) {
+      await fetch('/api/v1/config/llm', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(llmPayload)
+      })
+    }
+    if (hasXunfeiUpdate) {
+      await fetch('/api/v1/config/ai', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xunfeiAsr: xunfeiPayload })
+      })
+    }
+
+    if (hasLLMUpdate || hasXunfeiUpdate) {
       saved.value = true
       setTimeout(() => (saved.value = false), 1200)
     }

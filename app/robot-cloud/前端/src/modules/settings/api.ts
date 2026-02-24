@@ -3,12 +3,14 @@
 import { http } from '@/api/request'
 import type {
     ApiResponse,
+    AIConfig,
     LLMConfig,
     LLMProvider,
     NetworkInfo,
     SystemStatus,
     UIConfig,
     UpdateInfo,
+    UpdateAIConfigDTO,
     UpdateLLMConfigDTO,
     UpdateUIConfigDTO,
 } from './types'
@@ -32,6 +34,20 @@ export function getLLMProviders() {
  */
 export function updateLLMConfig(data: UpdateLLMConfigDTO) {
   return http.put<ApiResponse>('/api/v1/config/llm', data)
+}
+
+/**
+ * 获取 AI 配置
+ */
+export function getAIConfig() {
+  return http.get<ApiResponse<AIConfig>>('/api/v1/config/ai')
+}
+
+/**
+ * 更新 AI 配置
+ */
+export function updateAIConfig(data: UpdateAIConfigDTO) {
+  return http.put<ApiResponse>('/api/v1/config/ai', data)
 }
 
 /**

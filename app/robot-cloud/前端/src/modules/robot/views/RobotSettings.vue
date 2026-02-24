@@ -59,10 +59,10 @@
               label-width="100px"
             >
               <el-form-item label="名称">
-                <el-input 
-                  v-model="formData.name" 
-                  maxlength="16" 
-                  show-word-limit 
+                <el-input
+                  v-model="formData.name"
+                  maxlength="16"
+                  show-word-limit
                   placeholder="请输入机器人名称"
                   @change="autoSave('name')"
                 />
@@ -74,9 +74,9 @@
                 />
               </el-form-item>
               <el-form-item label="角色">
-                <el-select 
-                  v-model="formData.role_id" 
-                  placeholder="选择角色" 
+                <el-select
+                  v-model="formData.role_id"
+                  placeholder="选择角色"
                   clearable
                   @change="autoSave('role_id')"
                 >
@@ -89,11 +89,11 @@
                 </el-select>
               </el-form-item>
               <el-form-item label="分组">
-                <el-select 
-                  v-model="formData.group_name" 
-                  placeholder="选择分组" 
-                  allow-create 
-                  filterable 
+                <el-select
+                  v-model="formData.group_name"
+                  placeholder="选择分组"
+                  allow-create
+                  filterable
                   default-first-option
                   @change="autoSave('group_name')"
                 >
@@ -208,7 +208,7 @@
                 </div>
                 <div class="status-item">
                   <span class="label">电量</span>
-                  <span class="value">{{ status.battery }}%</span>
+                  <span class="value">{{ status.battery !== undefined ? status.battery + '%' : '--' }}</span>
                 </div>
                 <div class="status-item">
                   <span class="label">连接状态</span>
@@ -333,7 +333,7 @@
                 </el-button>
               </el-form-item>
             </el-form>
-            
+
             <div class="log-history">
               <h4>最近上传记录</h4>
               <el-table
@@ -456,11 +456,11 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-divider content-position="left">
                 系统提示词
               </el-divider>
-              
+
               <el-form-item label="角色名称">
                 <el-input
                   v-model="formData.ai_role_name"
@@ -503,7 +503,7 @@
             <h3 class="section-title">
               系统升级
             </h3>
-            
+
             <div class="upgrade-card">
               <div class="upgrade-header">
                 <h4>APP 客户端</h4>
@@ -621,7 +621,7 @@ const InputRef = ref()
 
 const status = reactive({
   temperature: 42,
-  battery: 85,
+  battery: undefined as number | undefined,
   connected: true
 })
 
@@ -684,7 +684,7 @@ const loadData = async () => {
       if (lipRes.ok && lipJson.success) {
         formData.local_ip = lipJson.data?.ip || ''
       }
-      
+
       // 加载音量信息
       if (status.connected) {
         await loadVolume()
@@ -841,12 +841,12 @@ let volumeDebounceTimer: number | null = null
 
 const loadVolume = async () => {
   if (!uuid.value || !status.connected) return
-  
+
   volumeData.loading = true
   try {
     const response = await fetch(`/api/v1/robots/${uuid.value}/volume`)
     const json = await response.json().catch(() => ({}))
-    
+
     if (response.ok && json.success && json.data) {
       volumeData.volume = json.data.volume || 50
       volumeData.muted = json.data.muted || false
@@ -863,10 +863,10 @@ const handleVolumeChange = (value: number) => {
   if (volumeDebounceTimer) {
     clearTimeout(volumeDebounceTimer)
   }
-  
+
   volumeDebounceTimer = window.setTimeout(async () => {
     if (!uuid.value) return
-    
+
     volumeData.loading = true
     try {
       const response = await fetch(`/api/v1/robots/${uuid.value}/volume`, {
@@ -874,9 +874,9 @@ const handleVolumeChange = (value: number) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ volume: value })
       })
-      
+
       const json = await response.json().catch(() => ({}))
-      
+
       if (response.ok && json.success) {
         ElMessage.success({ message: `音量已设置为 ${value}`, duration: 1000 })
       } else {
@@ -892,19 +892,19 @@ const handleVolumeChange = (value: number) => {
 
 const handleMuteToggle = async () => {
   if (!uuid.value) return
-  
+
   const newMuteState = !volumeData.muted
   volumeData.loading = true
-  
+
   try {
     const response = await fetch(`/api/v1/robots/${uuid.value}/volume/mute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mute: newMuteState })
     })
-    
+
     const json = await response.json().catch(() => ({}))
-    
+
     if (response.ok && json.success) {
       volumeData.muted = newMuteState
       ElMessage.success(newMuteState ? '已静音' : '已取消静音')

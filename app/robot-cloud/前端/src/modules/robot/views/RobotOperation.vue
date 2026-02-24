@@ -14,9 +14,9 @@
             <Back />
           </el-icon>
         </el-button>
-        
+
         <el-divider direction="vertical" />
-        
+
         <el-switch
           v-model="controlMode"
           active-text="姿态"
@@ -40,10 +40,10 @@
 
         <el-divider direction="vertical" />
 
-        <el-select 
-          v-model="selectedUuid" 
-          placeholder="选择机器人" 
-          style="width: 160px" 
+        <el-select
+          v-model="selectedUuid"
+          placeholder="选择机器人"
+          style="width: 160px"
           size="small"
           filterable
         >
@@ -56,7 +56,7 @@
         </el-select>
 
         <el-divider direction="vertical" />
-        
+
         <el-popover
           placement="bottom"
           :width="200"
@@ -117,14 +117,14 @@
       <div class="right-info">
         <div class="info-item">
           <el-icon><Bot /></el-icon>
-          <span>{{ robotBattery }}%</span>
+          <span>{{ robotBattery !== undefined ? robotBattery + '%' : '--' }}</span>
         </div>
         <div
           v-if="phoneBattery !== null"
           class="info-item"
         >
           <el-icon><Cellphone /></el-icon>
-          <span>{{ phoneBattery }}%</span>
+          <span>{{ phoneBattery !== null ? phoneBattery + '%' : '--' }}</span>
         </div>
         <div class="info-item time-display">
           <span>{{ currentTime }}</span>
@@ -146,7 +146,7 @@
       </div>
     </div>
 
-    
+
 
     <!-- Middle Video Area -->
     <div class="video-area">
@@ -250,11 +250,11 @@
         </div>
       </div>
     </div>
-    
-    <el-drawer 
-      v-model="showChatPanel" 
-      direction="rtl" 
-      size="50%" 
+
+    <el-drawer
+      v-model="showChatPanel"
+      direction="rtl"
+      size="50%"
       :with-header="false"
       :append-to-body="false"
       class="robot-agent-drawer"
@@ -321,7 +321,7 @@ const controlMode = ref('move')
 const selectedUuid = ref('')
 const speed = ref(5)
 const showVideo = ref(true)
-const robotBattery = ref(85) // Mock value
+const robotBattery = ref<number | undefined>(undefined) // Mock value
 const phoneBattery = ref<number | null>(null) // Mock value, null to hide
 const currentTime = ref('')
 const currentVideoFrame = ref<string | null>(null)
@@ -473,12 +473,12 @@ const handleCapturePhoto = async () => {
     ElMessage.warning('请先选择机器人')
     return
   }
-  
+
   isCapturing.value = true
   try {
     ElMessage.info('正在拍照，请稍候...')
     const res = await capturePhoto(selectedUuid.value)
-    
+
     if (res.success && res.data.image) {
       // 下载图片
       const link = document.createElement('a')
@@ -487,7 +487,7 @@ const handleCapturePhoto = async () => {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
+
       ElMessage.success('拍照成功，已开始下载')
     } else {
       ElMessage.error('拍照失败')
@@ -507,13 +507,13 @@ const handleSdkModeChange = async (value: boolean) => {
     sdkMode.value = !value // 恢复原值
     return
   }
-  
+
   if (!isConnected.value) {
     ElMessage.warning('未连接机器人')
     sdkMode.value = !value // 恢复原值
     return
   }
-  
+
   sdkModeLoading.value = true
   try {
     // 发送SDK模式切换消息到服务端
@@ -523,11 +523,11 @@ const handleSdkModeChange = async (value: boolean) => {
       timestamp: Date.now(),
       data: { sdkMode: value },
     })
-    
+
     // 等待响应
     // 这里简化处理，实际应该等待服务端的 sdk_mode_response 消息
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
+
     ElMessage.success(value ? 'SDK模式已开启' : '遥控模式已开启')
   } catch (error: any) {
     console.error('SDK模式切换错误:', error)
@@ -798,7 +798,7 @@ watch(
 onMounted(() => {
   updateTime()
   timeInterval = setInterval(updateTime, 1000)
-  
+
   // Try to get phone battery if API available (Mock for now)
   if ('getBattery' in navigator) {
     (navigator as any).getBattery().then((battery: any) => {

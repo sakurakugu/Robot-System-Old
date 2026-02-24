@@ -1,9 +1,18 @@
 <template>
-  <div class="robot-settings" :class="{ 'is-embedded': props.embedded }">
-    <el-page-header v-if="!props.embedded" @back="() => router.push('/robots')" class="page-header">
+  <div
+    class="robot-settings"
+    :class="{ 'is-embedded': props.embedded }"
+  >
+    <el-page-header
+      v-if="!props.embedded"
+      class="page-header"
+      @back="() => router.push('/robots')"
+    >
       <template #content>
         <div class="header-content">
-          <el-icon :size="24"><Bot /></el-icon>
+          <el-icon :size="24">
+            <Bot />
+          </el-icon>
           <span class="title">机器人设置</span>
         </div>
       </template>
@@ -16,23 +25,39 @@
           @confirm="handleUnbind"
         >
           <template #reference>
-            <el-button type="danger" plain>解除绑定</el-button>
+            <el-button
+              type="danger"
+              plain
+            >
+              解除绑定
+            </el-button>
           </template>
         </el-popconfirm>
       </template>
     </el-page-header>
 
-    <div class="content" v-loading="loading">
+    <div
+      v-loading="loading"
+      class="content"
+    >
       <el-tabs
         v-model="currentTab"
         tab-position="left"
         class="settings-tabs"
         :class="{ 'is-hide-tabs': props.hideTabs }"
       >
-        <el-tab-pane label="基本信息" name="basic">
+        <el-tab-pane
+          label="基本信息"
+          name="basic"
+        >
           <div class="pane-content">
-            <h3 class="section-title">基本信息</h3>
-            <el-form :model="formData" label-width="100px">
+            <h3 class="section-title">
+              基本信息
+            </h3>
+            <el-form
+              :model="formData"
+              label-width="100px"
+            >
               <el-form-item label="名称">
                 <el-input 
                   v-model="formData.name" 
@@ -43,7 +68,10 @@
                 />
               </el-form-item>
               <el-form-item label="类型">
-                <el-input v-model="formData.model" disabled />
+                <el-input
+                  v-model="formData.model"
+                  disabled
+                />
               </el-form-item>
               <el-form-item label="角色">
                 <el-select 
@@ -69,9 +97,18 @@
                   default-first-option
                   @change="autoSave('group_name')"
                 >
-                  <el-option label="默认分组" value="Default" />
-                  <el-option label="开发测试" value="Dev" />
-                  <el-option label="演示展厅" value="Demo" />
+                  <el-option
+                    label="默认分组"
+                    value="Default"
+                  />
+                  <el-option
+                    label="开发测试"
+                    value="Dev"
+                  />
+                  <el-option
+                    label="演示展厅"
+                    value="Demo"
+                  />
                 </el-select>
               </el-form-item>
               <el-form-item label="标签">
@@ -94,13 +131,20 @@
                     @keyup.enter="handleInputConfirm"
                     @blur="handleInputConfirm"
                   />
-                  <el-button v-else class="button-new-tag" size="small" @click="showInput">
+                  <el-button
+                    v-else
+                    class="button-new-tag"
+                    size="small"
+                    @click="showInput"
+                  >
                     + New Tag
                   </el-button>
                 </div>
               </el-form-item>
               <el-divider />
-              <h4 class="subsection-title">系统音量</h4>
+              <h4 class="subsection-title">
+                系统音量
+              </h4>
               <el-form-item label="音量">
                 <div class="volume-control">
                   <el-slider
@@ -108,43 +152,53 @@
                     :min="0"
                     :max="100"
                     :disabled="volumeData.loading || !status.connected"
-                    @change="handleVolumeChange"
                     style="flex: 1; margin-right: 12px;"
+                    @change="handleVolumeChange"
                   />
                   <el-input-number
                     v-model="volumeData.volume"
                     :min="0"
                     :max="100"
                     :disabled="volumeData.loading || !status.connected"
-                    @change="handleVolumeChange"
                     style="width: 100px; margin-right: 8px;"
+                    @change="handleVolumeChange"
                   />
                   <el-button
                     :icon="volumeData.muted ? 'VideoPause' : 'VideoPlay'"
-                    @click="handleMuteToggle"
                     :disabled="volumeData.loading || !status.connected"
                     :type="volumeData.muted ? 'danger' : 'default'"
+                    @click="handleMuteToggle"
                   >
                     {{ volumeData.muted ? '静音' : '取消静音' }}
                   </el-button>
                   <el-button
-                    @click="loadVolume"
                     :loading="volumeData.loading"
                     :disabled="!status.connected"
                     icon="Refresh"
                     circle
+                    @click="loadVolume"
                   />
                 </div>
-                <el-text v-if="!status.connected" type="info" size="small">
+                <el-text
+                  v-if="!status.connected"
+                  type="info"
+                  size="small"
+                >
                   机器人未连接，无法控制音量
                 </el-text>
               </el-form-item>
               <el-divider />
               <el-form-item label="SN">
-                <el-input v-model="formData.sn" disabled />
+                <el-input
+                  v-model="formData.sn"
+                  disabled
+                />
               </el-form-item>
               <el-form-item label="UUID">
-                <el-input v-model="formData.uuid" disabled />
+                <el-input
+                  v-model="formData.uuid"
+                  disabled
+                />
               </el-form-item>
               <el-divider />
               <div class="status-grid">
@@ -167,32 +221,69 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="网络配置" name="network">
+        <el-tab-pane
+          label="网络配置"
+          name="network"
+        >
           <div class="pane-content">
-            <h3 class="section-title">网络配置</h3>
-            <el-form :model="formData" label-width="100px">
+            <h3 class="section-title">
+              网络配置
+            </h3>
+            <el-form
+              :model="formData"
+              label-width="100px"
+            >
               <el-form-item label="机器人IP">
-                <el-input v-model="formData.ip" placeholder="例如：192.168.1.110" @change="autoSave('ip')">
+                <el-input
+                  v-model="formData.ip"
+                  placeholder="例如：192.168.1.110"
+                  @change="autoSave('ip')"
+                >
                   <template #append>
-                    <el-button @click="copyText(formData.ip)" :disabled="!formData.ip">复制</el-button>
+                    <el-button
+                      :disabled="!formData.ip"
+                      @click="copyText(formData.ip)"
+                    >
+                      复制
+                    </el-button>
                   </template>
                 </el-input>
-                <el-text v-if="formData.ip && !isValidIP(formData.ip)" type="danger" size="small">IP格式不正确</el-text>
+                <el-text
+                  v-if="formData.ip && !isValidIP(formData.ip)"
+                  type="danger"
+                  size="small"
+                >
+                  IP格式不正确
+                </el-text>
               </el-form-item>
               <el-form-item label="本地IP">
-                <el-input v-model="formData.local_ip" disabled />
+                <el-input
+                  v-model="formData.local_ip"
+                  disabled
+                />
               </el-form-item>
               <!-- <el-form-item label="本地端口">
                 <el-input v-model="formData.local_port" disabled />
               </el-form-item> -->
               <el-form-item>
-                <el-button type="primary" :loading="testingNetwork" @click="testConnection">
+                <el-button
+                  type="primary"
+                  :loading="testingNetwork"
+                  @click="testConnection"
+                >
                   测试连接
                 </el-button>
-                <el-button type="success" :disabled="!canOpenWifi" @click="openWifiSettings">
+                <el-button
+                  type="success"
+                  :disabled="!canOpenWifi"
+                  @click="openWifiSettings"
+                >
                   修改WiFi
                 </el-button>
-                <span v-if="networkResult" :class="['network-result', networkResult.success ? 'success' : 'error']">
+                <span
+                  v-if="networkResult"
+                  :class="['network-result', networkResult.success ? 'success' : 'error']"
+                >
                   {{ networkResult.message }}
                 </span>
               </el-form-item>
@@ -200,9 +291,14 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="日志管理" name="logs">
+        <el-tab-pane
+          label="日志管理"
+          name="logs"
+        >
           <div class="pane-content">
-            <h3 class="section-title">日志管理</h3>
+            <h3 class="section-title">
+              日志管理
+            </h3>
             <el-form label-position="top">
               <el-form-item label="时间范围">
                 <el-date-picker
@@ -216,13 +312,23 @@
               </el-form-item>
               <el-form-item label="日志类型">
                 <el-radio-group v-model="logType">
-                  <el-radio-button label="robot">机器人日志</el-radio-button>
-                  <el-radio-button label="app">APP日志</el-radio-button>
-                  <el-radio-button label="all">全部日志</el-radio-button>
+                  <el-radio-button label="robot">
+                    机器人日志
+                  </el-radio-button>
+                  <el-radio-button label="app">
+                    APP日志
+                  </el-radio-button>
+                  <el-radio-button label="all">
+                    全部日志
+                  </el-radio-button>
                 </el-radio-group>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" @click="uploadLogs" :loading="uploadingLogs">
+                <el-button
+                  type="primary"
+                  :loading="uploadingLogs"
+                  @click="uploadLogs"
+                >
                   打包上传
                 </el-button>
               </el-form-item>
@@ -230,23 +336,46 @@
             
             <div class="log-history">
               <h4>最近上传记录</h4>
-              <el-table :data="logHistory" style="width: 100%" size="small">
-                <el-table-column prop="time" label="时间" width="160" />
-                <el-table-column prop="type" label="类型" width="100">
-                   <template #default="scope">
-                     {{ getLogTypeLabel(scope.row.type) }}
-                   </template>
+              <el-table
+                :data="logHistory"
+                style="width: 100%"
+                size="small"
+              >
+                <el-table-column
+                  prop="time"
+                  label="时间"
+                  width="160"
+                />
+                <el-table-column
+                  prop="type"
+                  label="类型"
+                  width="100"
+                >
+                  <template #default="scope">
+                    {{ getLogTypeLabel(scope.row.type) }}
+                  </template>
                 </el-table-column>
-                <el-table-column prop="size" label="大小" />
+                <el-table-column
+                  prop="size"
+                  label="大小"
+                />
               </el-table>
             </div>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="AI 配置" name="ai">
+        <el-tab-pane
+          label="AI 配置"
+          name="ai"
+        >
           <div class="pane-content">
-            <h3 class="section-title">AI 配置</h3>
-            <el-form :model="formData" label-position="top">
+            <h3 class="section-title">
+              AI 配置
+            </h3>
+            <el-form
+              :model="formData"
+              label-position="top"
+            >
               <el-form-item label="回复温度">
                 <el-slider
                   v-model="formData.ai_temperature"
@@ -259,7 +388,12 @@
                 />
               </el-form-item>
               <el-form-item label="使用模型">
-                <el-select v-model="formData.ai_model" placeholder="请选择模型" style="width: 100%" @change="autoSave('ai_model')">
+                <el-select
+                  v-model="formData.ai_model"
+                  placeholder="请选择模型"
+                  style="width: 100%"
+                  @change="autoSave('ai_model')"
+                >
                   <el-option
                     v-for="m in availableModels"
                     :key="m.value"
@@ -269,27 +403,70 @@
                 </el-select>
               </el-form-item>
               <el-form-item label="音色">
-                <el-select v-model="formData.ai_voice" placeholder="请选择音色" style="width: 100%" @change="autoSave('ai_voice')">
-                  <el-option label="女声-温柔" value="female-soft" />
-                  <el-option label="女声-活泼" value="female-bright" />
-                  <el-option label="男声-低沉" value="male-deep" />
-                  <el-option label="男声-洪亮" value="male-bright" />
-                  <el-option label="童声" value="child" />
-                  <el-option label="电子音" value="robotic" />
+                <el-select
+                  v-model="formData.ai_voice"
+                  placeholder="请选择音色"
+                  style="width: 100%"
+                  @change="autoSave('ai_voice')"
+                >
+                  <el-option
+                    label="女声-温柔"
+                    value="female-soft"
+                  />
+                  <el-option
+                    label="女声-活泼"
+                    value="female-bright"
+                  />
+                  <el-option
+                    label="男声-低沉"
+                    value="male-deep"
+                  />
+                  <el-option
+                    label="男声-洪亮"
+                    value="male-bright"
+                  />
+                  <el-option
+                    label="童声"
+                    value="child"
+                  />
+                  <el-option
+                    label="电子音"
+                    value="robotic"
+                  />
                 </el-select>
               </el-form-item>
               <el-form-item label="意图识别">
-                <el-select v-model="formData.ai_intent" placeholder="请选择方案" style="width: 100%" @change="autoSave('ai_intent')">
-                  <el-option label="规则引擎" value="rule-based" />
-                  <el-option label="LLM分类器" value="llm-classifier" />
-                  <el-option label="混合策略" value="hybrid" />
+                <el-select
+                  v-model="formData.ai_intent"
+                  placeholder="请选择方案"
+                  style="width: 100%"
+                  @change="autoSave('ai_intent')"
+                >
+                  <el-option
+                    label="规则引擎"
+                    value="rule-based"
+                  />
+                  <el-option
+                    label="LLM分类器"
+                    value="llm-classifier"
+                  />
+                  <el-option
+                    label="混合策略"
+                    value="hybrid"
+                  />
                 </el-select>
               </el-form-item>
               
-              <el-divider content-position="left">系统提示词</el-divider>
+              <el-divider content-position="left">
+                系统提示词
+              </el-divider>
               
               <el-form-item label="角色名称">
-                <el-input v-model="formData.ai_role_name" placeholder="例如：导航助手" @change="autoSave('ai_role_name')" />
+                <el-input
+                  v-model="formData.ai_role_name"
+                  placeholder="例如：导航助手"
+                  @change="autoSave('ai_role_name')"
+                />
               </el-form-item>
               <el-form-item label="系统提示词">
                 <el-input
@@ -301,7 +478,12 @@
                 />
               </el-form-item>
               <el-form-item>
-                 <el-button type="primary" @click="saveAIConfig">保存配置</el-button>
+                <el-button
+                  type="primary"
+                  @click="saveAIConfig"
+                >
+                  保存配置
+                </el-button>
               </el-form-item>
             </el-form>
           </div>
@@ -311,21 +493,40 @@
           <template #label>
             <span class="custom-tab-label">
               系统升级
-              <span v-if="hasUpdate" class="dot"></span>
+              <span
+                v-if="hasUpdate"
+                class="dot"
+              />
             </span>
           </template>
           <div class="pane-content">
-            <h3 class="section-title">系统升级</h3>
+            <h3 class="section-title">
+              系统升级
+            </h3>
             
             <div class="upgrade-card">
               <div class="upgrade-header">
                 <h4>APP 客户端</h4>
-                <el-tag size="small" type="info">当前版本 v1.0.2</el-tag>
+                <el-tag
+                  size="small"
+                  type="info"
+                >
+                  当前版本 v1.0.2
+                </el-tag>
               </div>
               <div class="upgrade-body">
-                <p v-if="appUpdateAvailable">发现新版本 v1.1.0 (2025-01-20)</p>
-                <p v-else>当前已是最新版本</p>
-                <el-button type="primary" size="small" :disabled="!appUpdateAvailable" @click="handleUpgrade('app')">
+                <p v-if="appUpdateAvailable">
+                  发现新版本 v1.1.0 (2025-01-20)
+                </p>
+                <p v-else>
+                  当前已是最新版本
+                </p>
+                <el-button
+                  type="primary"
+                  size="small"
+                  :disabled="!appUpdateAvailable"
+                  @click="handleUpgrade('app')"
+                >
                   {{ appUpdateAvailable ? '立即升级' : '检查更新' }}
                 </el-button>
               </div>
@@ -334,19 +535,42 @@
             <div class="upgrade-card">
               <div class="upgrade-header">
                 <h4>机器狗固件</h4>
-                <el-tag size="small" type="info">当前版本 v2.3.1</el-tag>
+                <el-tag
+                  size="small"
+                  type="info"
+                >
+                  当前版本 v2.3.1
+                </el-tag>
               </div>
-                <div class="upgrade-body">
-                <p v-if="firmwareUpdateAvailable">发现新版本 v2.4.0 (2025-01-18)</p>
-                <p v-else>当前已是最新版本</p>
-                <el-button type="primary" size="small" :disabled="!firmwareUpdateAvailable" @click="handleUpgrade('firmware')">
+              <div class="upgrade-body">
+                <p v-if="firmwareUpdateAvailable">
+                  发现新版本 v2.4.0 (2025-01-18)
+                </p>
+                <p v-else>
+                  当前已是最新版本
+                </p>
+                <el-button
+                  type="primary"
+                  size="small"
+                  :disabled="!firmwareUpdateAvailable"
+                  @click="handleUpgrade('firmware')"
+                >
                   {{ firmwareUpdateAvailable ? '立即升级' : '检查更新' }}
                 </el-button>
               </div>
             </div>
 
-            <div class="one-click-upgrade" v-if="appUpdateAvailable || firmwareUpdateAvailable">
-               <el-button type="success" @click="handleUpgrade('all')" style="width: 100%">一键升级所有</el-button>
+            <div
+              v-if="appUpdateAvailable || firmwareUpdateAvailable"
+              class="one-click-upgrade"
+            >
+              <el-button
+                type="success"
+                style="width: 100%"
+                @click="handleUpgrade('all')"
+              >
+                一键升级所有
+              </el-button>
             </div>
           </div>
         </el-tab-pane>

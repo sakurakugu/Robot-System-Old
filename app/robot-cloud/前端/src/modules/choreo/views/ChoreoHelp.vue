@@ -1,7 +1,11 @@
 <template>
   <div class="help-page">
     <div class="page-header">
-      <el-button text @click="goBack" class="back-btn">
+      <el-button
+        text
+        class="back-btn"
+        @click="goBack"
+      >
         <el-icon><ArrowLeft /></el-icon>
         返回
       </el-button>
@@ -16,29 +20,44 @@
           </div>
         </template>
         <el-collapse v-model="activeNames">
-          <el-collapse-item title="如何创建编舞项目？" name="1">
+          <el-collapse-item
+            title="如何创建编舞项目？"
+            name="1"
+          >
             <p>1. 在编舞列表页面点击"新建项目"按钮</p>
             <p>2. 输入项目名称和描述</p>
             <p>3. 点击"创建"完成项目创建</p>
           </el-collapse-item>
-          <el-collapse-item title="如何添加机器人？" name="2">
+          <el-collapse-item
+            title="如何添加机器人？"
+            name="2"
+          >
             <p>1. 进入编舞编辑器</p>
             <p>2. 在左侧面板点击"添加机器人"</p>
             <p>3. 从已配置的机器人列表中选择</p>
             <p>4. 机器人将被添加到项目中</p>
           </el-collapse-item>
-          <el-collapse-item title="如何创建动作轨道？" name="3">
+          <el-collapse-item
+            title="如何创建动作轨道？"
+            name="3"
+          >
             <p>1. 在时间轴编辑器中点击"动作轨道"按钮</p>
             <p>2. 新的动作轨道将被添加到时间轴</p>
             <p>3. 为轨道绑定对应的机器人</p>
             <p>4. 点击轨道上的"+"按钮添加动作块</p>
           </el-collapse-item>
-          <el-collapse-item title="如何添加音频？" name="4">
+          <el-collapse-item
+            title="如何添加音频？"
+            name="4"
+          >
             <p>1. 点击"音频轨道"按钮添加音频轨道</p>
             <p>2. 在轨道上点击上传音频文件</p>
             <p>3. 音频将自动与时间轴同步播放</p>
           </el-collapse-item>
-          <el-collapse-item title="如何执行编舞？" name="5">
+          <el-collapse-item
+            title="如何执行编舞？"
+            name="5"
+          >
             <p>1. 确保所有动作轨道都绑定了机器人</p>
             <p>2. 点击右上角的"执行"按钮</p>
             <p>3. 机器人将按照时间轴执行动作</p>
@@ -53,9 +72,19 @@
             <span>快捷键</span>
           </div>
         </template>
-        <el-table :data="shortcuts" stripe>
-          <el-table-column prop="key" label="快捷键" width="150" />
-          <el-table-column prop="description" label="功能" />
+        <el-table
+          :data="shortcuts"
+          stripe
+        >
+          <el-table-column
+            prop="key"
+            label="快捷键"
+            width="150"
+          />
+          <el-table-column
+            prop="description"
+            label="功能"
+          />
         </el-table>
       </el-card>
     </div>

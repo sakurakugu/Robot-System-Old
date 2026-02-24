@@ -1,20 +1,36 @@
 <template>
   <div class="robot-manager">
-    <PageHeader title="机器人管理" :icon="Bot">
+    <PageHeader
+      title="机器人管理"
+      :icon="Bot"
+    >
       <template #extra>
-        <el-space>
-          <el-radio-group v-model="viewMode" size="small">
+        <div class="header-actions">
+          <el-radio-group
+            v-model="viewMode"
+            size="default"
+          >
             <el-radio-button value="card">
-              <el-icon><Grid /></el-icon>
+              <el-icon>
+                <Grid />
+              </el-icon>
+              卡片
             </el-radio-button>
             <el-radio-button value="list">
-              <el-icon><List /></el-icon>
+              <el-icon>
+                <List />
+              </el-icon>
+              列表
             </el-radio-button>
           </el-radio-group>
-          <el-button type="primary" :icon="Plus" @click="openAddDialog">
+          <el-button
+            type="primary"
+            :icon="Plus"
+            @click="openAddDialog"
+          >
             添加机器人
           </el-button>
-        </el-space>
+        </div>
       </template>
     </PageHeader>
 
@@ -27,7 +43,11 @@
     />
 
     <!-- 卡片视图 -->
-    <div v-if="viewMode === 'card'" class="robot-cards" v-loading="loading">
+    <div
+      v-if="viewMode === 'card'"
+      v-loading="loading"
+      class="robot-cards"
+    >
       <el-card
         v-for="robot in robots"
         :key="robot.uuid"
@@ -37,7 +57,9 @@
         <template #header>
           <div class="card-header-content">
             <div class="card-title">
-              <el-icon :size="20"><Bot /></el-icon>
+              <el-icon :size="20">
+                <Bot />
+              </el-icon>
               <span>{{ robot.name || '未命名' }}</span>
             </div>
             <el-tag
@@ -50,9 +72,18 @@
           </div>
         </template>
 
-        <el-descriptions :column="1" size="small" border>
+        <el-descriptions
+          :column="1"
+          size="small"
+          border
+        >
           <el-descriptions-item label="UUID">
-            <el-text class="mono" size="small">{{ robot.uuid }}</el-text>
+            <el-text
+              class="mono"
+              size="small"
+            >
+              {{ robot.uuid }}
+            </el-text>
           </el-descriptions-item>
           <el-descriptions-item label="型号">
             {{ robot.model || '-' }}
@@ -67,8 +98,8 @@
           :title="connectionErrors[robot.uuid]"
           type="warning"
           :closable="true"
-          @close="dismissError(robot.uuid)"
           style="margin-top: 12px"
+          @close="dismissError(robot.uuid)"
         />
 
         <template #footer>
@@ -82,19 +113,27 @@
             >
               {{ testing[robot.uuid] ? '测试中' : (robot.status === 'online' ? '连接' : '测试连接') }}
             </el-button>
-            <el-button 
-              size="small" 
-              :icon="Upload" 
+            <el-button
+              size="small"
+              :icon="Upload"
               :loading="updating[robot.uuid]"
-              @click="updateFirmware(robot)"
               title="更新客户端代码到机器人"
+              @click="updateFirmware(robot)"
             >
               {{ updating[robot.uuid] ? '更新中' : '更新固件' }}
             </el-button>
-            <el-button size="small" :icon="ChatLineSquare" @click="openChat(robot)">
+            <el-button
+              size="small"
+              :icon="ChatLineSquare"
+              @click="openChat(robot)"
+            >
               对话
             </el-button>
-            <el-button size="small" :icon="Edit" @click="editRobot(robot)">
+            <el-button
+              size="small"
+              :icon="Edit"
+              @click="editRobot(robot)"
+            >
               编辑
             </el-button>
             <el-button
@@ -113,40 +152,87 @@
         v-if="!loading && robots.length === 0"
         description="暂无机器人"
       >
-        <el-button type="primary" @click="openAddDialog">添加第一个机器人</el-button>
+        <el-button
+          type="primary"
+          @click="openAddDialog"
+        >
+          添加第一个机器人
+        </el-button>
       </el-empty>
     </div>
 
     <!-- 列表视图 -->
-    <div v-else class="robot-list" v-loading="loading">
-      <el-table :data="robots" stripe style="width: 100%">
-        <el-table-column prop="name" label="名称" width="150">
+    <div
+      v-else
+      v-loading="loading"
+      class="robot-list"
+    >
+      <el-table
+        :data="robots"
+        stripe
+        style="width: 100%"
+      >
+        <el-table-column
+          prop="name"
+          label="名称"
+          width="150"
+        >
           <template #default="{ row }">
             <div class="name-cell">
-              <el-icon><Bot /></el-icon>
+              <el-icon>
+                <Bot />
+              </el-icon>
               <span>{{ row.name || '未命名' }}</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column
+          prop="status"
+          label="状态"
+          width="100"
+        >
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" size="small">
+            <el-tag
+              :type="getStatusType(row.status)"
+              size="small"
+            >
               {{ statusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="model" label="型号" width="150" />
-        <el-table-column prop="uuid" label="UUID" min-width="200">
+        <el-table-column
+          prop="model"
+          label="型号"
+          width="150"
+        />
+        <el-table-column
+          prop="uuid"
+          label="UUID"
+          min-width="200"
+        >
           <template #default="{ row }">
-            <el-text class="mono" size="small">{{ row.uuid }}</el-text>
+            <el-text
+              class="mono"
+              size="small"
+            >
+              {{ row.uuid }}
+            </el-text>
           </template>
         </el-table-column>
-        <el-table-column prop="last_connected" label="最近连接" width="180">
+        <el-table-column
+          prop="last_connected"
+          label="最近连接"
+          width="180"
+        >
           <template #default="{ row }">
             {{ formatTime(row.last_connected) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="350" fixed="right">
+        <el-table-column
+          label="操作"
+          width="350"
+          fixed="right"
+        >
           <template #default="{ row }">
             <el-space>
               <el-button
@@ -158,23 +244,41 @@
               >
                 {{ testing[row.uuid] ? '测试中' : (row.status === 'online' ? '连接' : '测试') }}
               </el-button>
-              <el-button 
-                size="small" 
+              <el-button
+                size="small"
                 :loading="updating[row.uuid]"
-                @click="updateFirmware(row)"
                 title="更新固件"
+                @click="updateFirmware(row)"
               >
                 {{ updating[row.uuid] ? '更新中' : '更新' }}
               </el-button>
-              <el-button size="small" @click="openChat(row)">对话</el-button>
-              <el-button size="small" @click="editRobot(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteRobotConfirm(row)">删除</el-button>
+              <el-button
+                size="small"
+                @click="openChat(row)"
+              >
+                对话
+              </el-button>
+              <el-button
+                size="small"
+                @click="editRobot(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                @click="deleteRobotConfirm(row)"
+              >
+                删除
+              </el-button>
               <el-tooltip
                 v-if="row.status === 'offline' && connectionErrors[row.uuid]"
                 :content="connectionErrors[row.uuid]"
                 placement="top"
               >
-                <el-icon color="var(--el-color-warning)"><Warning /></el-icon>
+                <el-icon color="var(--el-color-warning)">
+                  <Warning />
+                </el-icon>
               </el-tooltip>
             </el-space>
           </template>
@@ -185,7 +289,12 @@
         v-if="!loading && robots.length === 0"
         description="暂无机器人"
       >
-        <el-button type="primary" @click="openAddDialog">添加第一个机器人</el-button>
+        <el-button
+          type="primary"
+          @click="openAddDialog"
+        >
+          添加第一个机器人
+        </el-button>
       </el-empty>
     </div>
 
@@ -199,19 +308,27 @@
       <!-- 自动发现区域 -->
       <div class="discover-section">
         <div class="discover-header">
-          <el-text type="info" size="small">自动发现局域网内的机器人</el-text>
-          <el-button 
-            type="primary" 
-            size="small" 
-            :icon="Refresh" 
+          <el-text
+            type="info"
+            size="small"
+          >
+            自动发现局域网内的机器人
+          </el-text>
+          <el-button
+            type="primary"
+            size="small"
+            :icon="Refresh"
             :loading="discovering"
             @click="discoverRobots"
           >
             {{ discovering ? '扫描中...' : '扫描' }}
           </el-button>
         </div>
-        
-        <div v-if="discoveredRobots.length > 0" class="discovered-list">
+
+        <div
+          v-if="discoveredRobots.length > 0"
+          class="discovered-list"
+        >
           <el-card
             v-for="robot in discoveredRobots"
             :key="robot.uuid"
@@ -222,71 +339,114 @@
           >
             <div class="robot-info">
               <div class="robot-main">
-                <el-icon :size="20" color="var(--el-color-primary)"><Bot /></el-icon>
+                <el-icon
+                  :size="20"
+                  color="var(--el-color-primary)"
+                >
+                  <Bot />
+                </el-icon>
                 <div class="robot-details">
                   <span class="robot-name">{{ robot.name }}</span>
                   <span class="robot-model">{{ robot.model }} · {{ robot.version }}</span>
                 </div>
               </div>
               <div class="robot-ip">
-                <el-tag size="small" type="success">{{ robot.ip }}:{{ robot.port }}</el-tag>
+                <el-tag
+                  size="small"
+                  type="success"
+                >
+                  {{ robot.ip }}:{{ robot.port }}
+                </el-tag>
               </div>
             </div>
             <div class="robot-uuid">
-              <el-text class="mono" size="small" type="info">{{ robot.uuid }}</el-text>
+              <el-text
+                class="mono"
+                size="small"
+                type="info"
+              >
+                {{ robot.uuid }}
+              </el-text>
             </div>
           </el-card>
         </div>
-        
-        <el-empty 
-          v-else-if="!discovering && hasScanned" 
-          description="未发现机器人" 
+
+        <el-empty
+          v-else-if="!discovering && hasScanned"
+          description="未发现机器人"
           :image-size="60"
         />
       </div>
 
       <el-divider>或手动输入</el-divider>
 
-      <el-form :model="formData" label-width="100px">
-        <el-form-item label="名称" required>
-          <el-input v-model="formData.name" placeholder="例如：机器狗1" />
+      <el-form
+        :model="formData"
+        label-width="100px"
+      >
+        <el-form-item
+          label="名称"
+          required
+        >
+          <el-input
+            v-model="formData.name"
+            placeholder="例如：机器狗1"
+          />
         </el-form-item>
         <el-form-item label="机器人IP">
-          <el-input v-model="formData.robot_ip" placeholder="例如：192.168.1.110" />
-          <el-text v-if="formData.robot_ip && !isValidIp(formData.robot_ip)" type="danger" size="small">
+          <el-input
+            v-model="formData.robot_ip"
+            placeholder="例如：192.168.1.110"
+          />
+          <el-text
+            v-if="formData.robot_ip && !isValidIp(formData.robot_ip)"
+            type="danger"
+            size="small"
+          >
             IP格式不正确
           </el-text>
         </el-form-item>
         <el-form-item label="分组">
-          <el-select 
-            v-model="formData.group_name" 
-            placeholder="选择分组" 
-            allow-create 
-            filterable 
+          <el-select
+            v-model="formData.group_name"
+            placeholder="选择分组"
+            allow-create
+            filterable
             default-first-option
           >
-            <el-option label="默认分组" value="Default" />
-            <el-option label="开发测试" value="Dev" />
-            <el-option label="演示展厅" value="Demo" />
+            <el-option
+              label="默认分组"
+              value="Default"
+            />
+            <el-option
+              label="开发测试"
+              value="Dev"
+            />
+            <el-option
+              label="演示展厅"
+              value="Demo"
+            />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="closeDialog">取消</el-button>
-        <el-button 
-          v-if="selectedDiscoveredRobot" 
-          type="success" 
-          @click="addDiscoveredRobot"
+        <el-button @click="closeDialog">
+          取消
+        </el-button>
+        <el-button
+          v-if="selectedDiscoveredRobot"
+          type="success"
           :loading="adding"
+          @click="addDiscoveredRobot"
         >
           添加已发现的机器人
         </el-button>
-        <el-button 
+        <el-button
           v-else
-          type="primary" 
-          @click="saveRobot" 
+          type="primary"
           :disabled="!isFormValid"
           :loading="adding"
+          @click="saveRobot"
         >
           手动添加
         </el-button>
@@ -306,10 +466,18 @@
         :closable="false"
         style="margin-bottom: 16px"
       />
-      <el-text v-if="restarting">将在 {{ countdown }} 秒后执行重启，可随时取消。</el-text>
+      <el-text v-if="restarting">
+        将在 {{ countdown }} 秒后执行重启，可随时取消。
+      </el-text>
       <template #footer>
-        <el-button @click="closeRestartDialog">取消</el-button>
-        <el-button type="primary" @click="confirmRestart" :disabled="restarting">
+        <el-button @click="closeRestartDialog">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :disabled="restarting"
+          @click="confirmRestart"
+        >
           {{ restarting ? '倒计时中' : '确认设备已卧倒' }}
         </el-button>
       </template>
@@ -550,25 +718,25 @@ async function updateFirmware(robot: Robot) {
     await ElMessageBox.confirm(
       `确定要更新机器人"${robot.name || robot.uuid}"的客户端代码吗？\n\n这将把最新的客户端代码复制到机器人。`,
       '更新固件',
-      { 
-        type: 'warning', 
-        confirmButtonText: '确定更新', 
-        cancelButtonText: '取消' 
+      {
+        type: 'warning',
+        confirmButtonText: '确定更新',
+        cancelButtonText: '取消'
       }
     )
-    
+
     updating.value[robot.uuid] = true
-    
+
     const res = await fetch(`/api/v1/robots/${robot.uuid}/update-firmware`, {
       method: 'POST'
     })
-    
+
     const json = await res.json().catch(() => ({}))
-    
+
     if (!res.ok || !json.success) {
       throw new Error(json.error || `HTTP ${res.status}`)
     }
-    
+
     ElMessage.success({
       message: json.message || '客户端代码更新成功',
       duration: 3000
@@ -592,7 +760,7 @@ function openChat(robot: Robot) {
 function notifyRobotsUpdated() {
   try {
     window.dispatchEvent(new CustomEvent('robots_updated'))
-  } catch {}
+  } catch { }
 }
 
 async function saveRobot() {
@@ -684,18 +852,18 @@ async function discoverRobots() {
   hasScanned.value = true
   discoveredRobots.value = []
   selectedDiscoveredRobot.value = null
-  
+
   try {
     const res = await fetch('/api/v1/robots/discover?timeout=3')
     const json = await res.json().catch(() => ({}))
-    
+
     if (res.ok && json.success) {
       // 过滤掉已经添加过的机器人
       const existingUuids = new Set(robots.value.map(r => r.uuid))
       discoveredRobots.value = (json.data?.robots || []).filter(
         (r: DiscoveredRobot) => !existingUuids.has(r.uuid)
       )
-      
+
       if (discoveredRobots.value.length === 0 && json.data?.robots?.length > 0) {
         ElMessage.info('所有发现的机器人都已添加')
       } else if (discoveredRobots.value.length > 0) {
@@ -724,26 +892,26 @@ function selectDiscoveredRobot(robot: DiscoveredRobot) {
 
 async function addDiscoveredRobot() {
   if (!selectedDiscoveredRobot.value) return
-  
+
   adding.value = true
   const robot = selectedDiscoveredRobot.value
-  
+
   try {
     const payload = {
       name: robot.name,
       robot_ip: robot.ip,
       group_name: formData.value.group_name || ''
     }
-    
+
     const res = await fetch('/api/v1/robots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    
+
     const json = await res.json().catch(() => ({}))
     if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
-    
+
     const saved = json.data
     let meta: any = {}
     try {
@@ -751,7 +919,7 @@ async function addDiscoveredRobot() {
     } catch {
       meta = {}
     }
-    
+
     robots.value.push({
       uuid: saved.uuid,
       name: saved.name || '',
@@ -763,7 +931,7 @@ async function addDiscoveredRobot() {
       local_port: saved.local_port ?? meta.local_port ?? 10000,
       group_name: saved.group_name ?? meta.group_name ?? ''
     })
-    
+
     notifyRobotsUpdated()
     closeDialog()
     ElMessage.success(`机器人 "${robot.name}" 添加成功`)
@@ -823,6 +991,34 @@ onUnmounted(() => {
   height: 100%;
   overflow: auto;
   background: var(--el-bg-color-page);
+}
+
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.header-actions .el-radio-group {
+  margin-right: 20px;
+}
+
+.header-actions :deep(.el-radio-button__inner) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+  height: 32px;
+  padding: 0 12px;
+}
+
+.header-actions :deep(.el-radio-button__inner .el-icon) {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.header-actions .el-button .el-icon {
+  margin-right: 8px;
 }
 
 .robot-cards {

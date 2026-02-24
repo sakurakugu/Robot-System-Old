@@ -1,15 +1,33 @@
 <template>
   <div class="page">
-    <PageHeader title="参数管理" :icon="Setting" />
+    <PageHeader
+      title="参数管理"
+      :icon="Setting"
+    />
     <div class="content">
-      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs">
+      <el-tabs
+        v-model="activeTab"
+        tab-position="left"
+        class="settings-tabs"
+      >
         <!-- LLM配置标签页 -->
-        <el-tab-pane label="模型配置" name="llm">
+        <el-tab-pane
+          label="模型配置"
+          name="llm"
+        >
           <div class="pane-content">
-            <h3 class="section-title">大语言模型API配置</h3>
-            <el-form :model="formData" label-width="120px" label-position="left">
+            <h3 class="section-title">
+              大语言模型API配置
+            </h3>
+            <el-form
+              :model="formData"
+              label-width="120px"
+              label-position="left"
+            >
               <!-- OpenAI 配置 -->
-              <el-divider content-position="left">OpenAI</el-divider>
+              <el-divider content-position="left">
+                OpenAI
+              </el-divider>
               <el-form-item label="API密钥">
                 <el-input
                   v-model="openaiConfig.apiKey"
@@ -19,16 +37,29 @@
                 >
                   <template #append>
                     <el-button-group>
-                      <el-button :icon="View" @click="toggleVisibility('openai')" v-if="!openaiConfig.readonly" />
-                      <el-button :icon="CopyDocument" @click="pasteApiKey('openai')" />
-                      <el-button :icon="Edit" @click="enableEdit('openai')" v-if="openaiConfig.readonly && openaiConfig.hasKey" />
+                      <el-button
+                        v-if="!openaiConfig.readonly"
+                        :icon="View"
+                        @click="toggleVisibility('openai')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteApiKey('openai')"
+                      />
+                      <el-button
+                        v-if="openaiConfig.readonly && openaiConfig.hasKey"
+                        :icon="Edit"
+                        @click="enableEdit('openai')"
+                      />
                     </el-button-group>
                   </template>
                 </el-input>
               </el-form-item>
 
               <!-- BigModel 配置 -->
-              <el-divider content-position="left">智谱AI (BigModel)</el-divider>
+              <el-divider content-position="left">
+                智谱AI (BigModel)
+              </el-divider>
               <el-form-item label="API密钥">
                 <el-input
                   v-model="bigmodelConfig.apiKey"
@@ -38,16 +69,29 @@
                 >
                   <template #append>
                     <el-button-group>
-                      <el-button :icon="View" @click="toggleVisibility('bigmodel')" v-if="!bigmodelConfig.readonly" />
-                      <el-button :icon="CopyDocument" @click="pasteApiKey('bigmodel')" />
-                      <el-button :icon="Edit" @click="enableEdit('bigmodel')" v-if="bigmodelConfig.readonly && bigmodelConfig.hasKey" />
+                      <el-button
+                        v-if="!bigmodelConfig.readonly"
+                        :icon="View"
+                        @click="toggleVisibility('bigmodel')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteApiKey('bigmodel')"
+                      />
+                      <el-button
+                        v-if="bigmodelConfig.readonly && bigmodelConfig.hasKey"
+                        :icon="Edit"
+                        @click="enableEdit('bigmodel')"
+                      />
                     </el-button-group>
                   </template>
                 </el-input>
               </el-form-item>
 
               <!-- Anthropic 配置 -->
-              <el-divider content-position="left">Anthropic (Claude)</el-divider>
+              <el-divider content-position="left">
+                Anthropic (Claude)
+              </el-divider>
               <el-form-item label="API密钥">
                 <el-input
                   v-model="anthropicConfig.apiKey"
@@ -57,16 +101,29 @@
                 >
                   <template #append>
                     <el-button-group>
-                      <el-button :icon="View" @click="toggleVisibility('anthropic')" v-if="!anthropicConfig.readonly" />
-                      <el-button :icon="CopyDocument" @click="pasteApiKey('anthropic')" />
-                      <el-button :icon="Edit" @click="enableEdit('anthropic')" v-if="anthropicConfig.readonly && anthropicConfig.hasKey" />
+                      <el-button
+                        v-if="!anthropicConfig.readonly"
+                        :icon="View"
+                        @click="toggleVisibility('anthropic')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteApiKey('anthropic')"
+                      />
+                      <el-button
+                        v-if="anthropicConfig.readonly && anthropicConfig.hasKey"
+                        :icon="Edit"
+                        @click="enableEdit('anthropic')"
+                      />
                     </el-button-group>
                   </template>
                 </el-input>
               </el-form-item>
 
               <!-- DeepSeek 配置 -->
-              <el-divider content-position="left">DeepSeek</el-divider>
+              <el-divider content-position="left">
+                DeepSeek
+              </el-divider>
               <el-form-item label="API密钥">
                 <el-input
                   v-model="deepseekConfig.apiKey"
@@ -76,16 +133,29 @@
                 >
                   <template #append>
                     <el-button-group>
-                      <el-button :icon="View" @click="toggleVisibility('deepseek')" v-if="!deepseekConfig.readonly" />
-                      <el-button :icon="CopyDocument" @click="pasteApiKey('deepseek')" />
-                      <el-button :icon="Edit" @click="enableEdit('deepseek')" v-if="deepseekConfig.readonly && deepseekConfig.hasKey" />
+                      <el-button
+                        v-if="!deepseekConfig.readonly"
+                        :icon="View"
+                        @click="toggleVisibility('deepseek')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteApiKey('deepseek')"
+                      />
+                      <el-button
+                        v-if="deepseekConfig.readonly && deepseekConfig.hasKey"
+                        :icon="Edit"
+                        @click="enableEdit('deepseek')"
+                      />
                     </el-button-group>
                   </template>
                 </el-input>
               </el-form-item>
 
               <!-- 千问 配置 -->
-              <el-divider content-position="left">千问 (Aliyun)</el-divider>
+              <el-divider content-position="left">
+                千问 (Aliyun)
+              </el-divider>
               <el-form-item label="API密钥">
                 <el-input
                   v-model="aliyunConfig.apiKey"
@@ -95,36 +165,86 @@
                 >
                   <template #append>
                     <el-button-group>
-                      <el-button :icon="View" @click="toggleVisibility('aliyun')" v-if="!aliyunConfig.readonly" />
-                      <el-button :icon="CopyDocument" @click="pasteApiKey('aliyun')" />
-                      <el-button :icon="Edit" @click="enableEdit('aliyun')" v-if="aliyunConfig.readonly && aliyunConfig.hasKey" />
+                      <el-button
+                        v-if="!aliyunConfig.readonly"
+                        :icon="View"
+                        @click="toggleVisibility('aliyun')"
+                      />
+                      <el-button
+                        :icon="CopyDocument"
+                        @click="pasteApiKey('aliyun')"
+                      />
+                      <el-button
+                        v-if="aliyunConfig.readonly && aliyunConfig.hasKey"
+                        :icon="Edit"
+                        @click="enableEdit('aliyun')"
+                      />
                     </el-button-group>
                   </template>
                 </el-input>
               </el-form-item>
 
               <el-form-item>
-                <el-button type="primary" @click="saveLLMConfig" :icon="Select">保存API配置</el-button>
-                <el-text v-if="saved" type="success" style="margin-left: 12px">已保存</el-text>
+                <el-button
+                  type="primary"
+                  :icon="Select"
+                  @click="saveLLMConfig"
+                >
+                  保存API配置
+                </el-button>
+                <el-text
+                  v-if="saved"
+                  type="success"
+                  style="margin-left: 12px"
+                >
+                  已保存
+                </el-text>
               </el-form-item>
             </el-form>
           </div>
         </el-tab-pane>
 
         <!-- 后端配置标签页 -->
-        <el-tab-pane label="后端配置" name="connection">
+        <el-tab-pane
+          label="后端配置"
+          name="connection"
+        >
           <div class="pane-content">
-            <h3 class="section-title">后端连接配置</h3>
-            <el-form :model="formData" label-width="120px" label-position="left">
+            <h3 class="section-title">
+              后端连接配置
+            </h3>
+            <el-form
+              :model="formData"
+              label-width="120px"
+              label-position="left"
+            >
               <el-form-item label="后端地址">
-                <el-input v-model="serverUrl" placeholder="http://localhost:3001" />
+                <el-input
+                  v-model="serverUrl"
+                  placeholder="http://localhost:3001"
+                />
               </el-form-item>
               <el-form-item label="WebSocket路径">
-                <el-input v-model="wsPath" placeholder="/api/v1/interaction/connect" />
+                <el-input
+                  v-model="wsPath"
+                  placeholder="/api/v1/interaction/connect"
+                />
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" @click="saveConnectionConfig" :icon="Select">保存后端配置</el-button>
-                <el-text v-if="connectionSaved" type="success" style="margin-left: 12px">已保存</el-text>
+                <el-button
+                  type="primary"
+                  :icon="Select"
+                  @click="saveConnectionConfig"
+                >
+                  保存后端配置
+                </el-button>
+                <el-text
+                  v-if="connectionSaved"
+                  type="success"
+                  style="margin-left: 12px"
+                >
+                  已保存
+                </el-text>
               </el-form-item>
             </el-form>
           </div>

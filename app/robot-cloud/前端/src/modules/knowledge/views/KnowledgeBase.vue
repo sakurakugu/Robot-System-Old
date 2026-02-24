@@ -1,20 +1,33 @@
 <template>
   <div class="page">
-    <PageHeader title="知识库" :icon="Collection">
+    <PageHeader
+      title="知识库"
+      :icon="Collection"
+    >
       <template #extra>
-        <el-button :icon="Refresh" @click="refresh" :loading="loading">
+        <el-button
+          :icon="Refresh"
+          :loading="loading"
+          @click="refresh"
+        >
           刷新
         </el-button>
       </template>
     </PageHeader>
 
-    <div class="content" v-loading="loading">
+    <div
+      v-loading="loading"
+      class="content"
+    >
       <el-empty
         v-if="!loading && docs.length === 0"
         description="暂无文档"
         :image-size="120"
       />
-      <el-row :gutter="20" v-else>
+      <el-row
+        v-else
+        :gutter="20"
+      >
         <el-col
           v-for="doc in docs"
           :key="doc.uuid"
@@ -23,7 +36,10 @@
           :md="8"
           :lg="6"
         >
-          <el-card shadow="hover" class="doc-card">
+          <el-card
+            shadow="hover"
+            class="doc-card"
+          >
             <template #header>
               <div class="doc-header">
                 <el-icon><Document /></el-icon>
@@ -31,14 +47,23 @@
               </div>
             </template>
             <div class="doc-meta">
-              <el-tag size="small" type="info">
+              <el-tag
+                size="small"
+                type="info"
+              >
                 {{ doc.category || '未分类' }}
               </el-tag>
-              <el-text size="small" type="info">
+              <el-text
+                size="small"
+                type="info"
+              >
                 {{ formatTime(doc.updated_at) }}
               </el-text>
             </div>
-            <el-text class="doc-excerpt" line-clamp="3">
+            <el-text
+              class="doc-excerpt"
+              line-clamp="3"
+            >
               {{ doc.content }}
             </el-text>
           </el-card>

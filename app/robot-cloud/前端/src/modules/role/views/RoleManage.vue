@@ -1,46 +1,98 @@
 <template>
   <div class="role-manage">
-    <PageHeader title="角色管理" :icon="UserFilled">
+    <PageHeader
+      title="角色管理"
+      :icon="UserFilled"
+    >
       <template #extra>
-        <el-button type="primary" @click="showCreateDialog">创建角色</el-button>
+        <el-button
+          type="primary"
+          @click="showCreateDialog"
+        >
+          创建角色
+        </el-button>
       </template>
     </PageHeader>
 
     <div class="content">
-      <el-table :data="roles" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="角色名称" width="180">
+      <el-table
+        v-loading="loading"
+        :data="roles"
+        style="width: 100%"
+      >
+        <el-table-column
+          prop="name"
+          label="角色名称"
+          width="180"
+        >
           <template #default="scope">
             {{ scope.row.name }}
-            <el-tag v-if="scope.row.is_default === 1" type="info" size="small" style="margin-left: 8px">默认</el-tag>
+            <el-tag
+              v-if="scope.row.is_default === 1"
+              type="info"
+              size="small"
+              style="margin-left: 8px"
+            >
+              默认
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="llm_provider" label="服务商" width="150">
+        <el-table-column
+          prop="description"
+          label="描述"
+          min-width="200"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="llm_provider"
+          label="服务商"
+          width="150"
+        >
           <template #default="scope">
             {{ getProviderLabel(scope.row.llm_provider) }}
           </template>
         </el-table-column>
-        <el-table-column prop="llm_model" label="模型" width="180" show-overflow-tooltip />
-        <el-table-column label="绑定机器人" width="120" align="center">
+        <el-table-column
+          prop="llm_model"
+          label="模型"
+          width="180"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          label="绑定机器人"
+          width="120"
+          align="center"
+        >
           <template #default="scope">
-            <el-button type="text" @click="showRobots(scope.row)">
+            <el-button
+              type="text"
+              @click="showRobots(scope.row)"
+            >
               {{ scope.row.robot_count || 0 }} 台
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column
+          label="操作"
+          width="200"
+          fixed="right"
+        >
           <template #default="scope">
             <el-button 
               type="primary" 
               link 
               @click="editRole(scope.row)"
-            >编辑</el-button>
+            >
+              编辑
+            </el-button>
             <el-button 
               type="danger" 
               link 
-              @click="deleteRole(scope.row)"
               :disabled="scope.row.is_default === 1"
-            >删除</el-button>
+              @click="deleteRole(scope.row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -52,9 +104,21 @@
       :title="isEdit ? '编辑角色' : '创建角色'"
       width="600px"
     >
-      <el-form :model="roleForm" label-width="120px" label-position="left">
-        <el-form-item label="角色名称" required>
-          <el-input v-model="roleForm.name" placeholder="请输入角色名称" maxlength="32" show-word-limit />
+      <el-form
+        :model="roleForm"
+        label-width="120px"
+        label-position="left"
+      >
+        <el-form-item
+          label="角色名称"
+          required
+        >
+          <el-input
+            v-model="roleForm.name"
+            placeholder="请输入角色名称"
+            maxlength="32"
+            show-word-limit
+          />
         </el-form-item>
         <el-form-item label="角色描述">
           <el-input
@@ -66,9 +130,15 @@
             show-word-limit
           />
         </el-form-item>
-        <el-divider content-position="left">模型配置</el-divider>
+        <el-divider content-position="left">
+          模型配置
+        </el-divider>
         <el-form-item label="服务商">
-          <el-select v-model="roleForm.llm_provider" placeholder="选择服务商" style="width: 100%">
+          <el-select
+            v-model="roleForm.llm_provider"
+            placeholder="选择服务商"
+            style="width: 100%"
+          >
             <el-option
               v-for="p in providers"
               :key="p.value"
@@ -78,7 +148,11 @@
           </el-select>
         </el-form-item>
         <el-form-item label="使用模型">
-          <el-select v-model="roleForm.llm_model" placeholder="选择模型" style="width: 100%">
+          <el-select
+            v-model="roleForm.llm_model"
+            placeholder="选择模型"
+            style="width: 100%"
+          >
             <el-option
               v-for="m in availableModels"
               :key="m.value"
@@ -98,9 +172,15 @@
           />
         </el-form-item>
         <el-form-item label="最大历史轮数">
-          <el-input-number v-model="roleForm.max_history" :min="0" :max="100" />
+          <el-input-number
+            v-model="roleForm.max_history"
+            :min="0"
+            :max="100"
+          />
         </el-form-item>
-        <el-divider content-position="left">系统提示词</el-divider>
+        <el-divider content-position="left">
+          系统提示词
+        </el-divider>
         <el-form-item label="系统提示词">
           <el-input
             v-model="roleForm.system_prompt"
@@ -110,38 +190,105 @@
           />
         </el-form-item>
         <el-form-item label="音色">
-          <el-select v-model="roleForm.voice" placeholder="选择音色" style="width: 100%">
-            <el-option label="女声-温柔" value="female-soft" />
-            <el-option label="女声-活泼" value="female-bright" />
-            <el-option label="男声-低沉" value="male-deep" />
-            <el-option label="男声-洪亮" value="male-bright" />
-            <el-option label="童声" value="child" />
-            <el-option label="电子音" value="robotic" />
+          <el-select
+            v-model="roleForm.voice"
+            placeholder="选择音色"
+            style="width: 100%"
+          >
+            <el-option
+              label="女声-温柔"
+              value="female-soft"
+            />
+            <el-option
+              label="女声-活泼"
+              value="female-bright"
+            />
+            <el-option
+              label="男声-低沉"
+              value="male-deep"
+            />
+            <el-option
+              label="男声-洪亮"
+              value="male-bright"
+            />
+            <el-option
+              label="童声"
+              value="child"
+            />
+            <el-option
+              label="电子音"
+              value="robotic"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="意图识别">
-          <el-select v-model="roleForm.intent_strategy" placeholder="选择方案" style="width: 100%">
-            <el-option label="规则引擎" value="rule-based" />
-            <el-option label="LLM分类器" value="llm-classifier" />
-            <el-option label="混合策略" value="hybrid" />
+          <el-select
+            v-model="roleForm.intent_strategy"
+            placeholder="选择方案"
+            style="width: 100%"
+          >
+            <el-option
+              label="规则引擎"
+              value="rule-based"
+            />
+            <el-option
+              label="LLM分类器"
+              value="llm-classifier"
+            />
+            <el-option
+              label="混合策略"
+              value="hybrid"
+            />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveRole" :loading="saving">保存</el-button>
+        <el-button @click="dialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="saving"
+          @click="saveRole"
+        >
+          保存
+        </el-button>
       </template>
     </el-dialog>
 
     <!-- 机器人列表对话框 -->
-    <el-dialog v-model="robotsDialogVisible" title="绑定的机器人" width="600px">
-      <el-table :data="boundRobots" v-loading="loadingRobots">
-        <el-table-column prop="name" label="机器人名称" />
-        <el-table-column prop="model" label="型号" />
-        <el-table-column prop="ip" label="IP地址" />
-        <el-table-column label="操作" width="100">
+    <el-dialog
+      v-model="robotsDialogVisible"
+      title="绑定的机器人"
+      width="600px"
+    >
+      <el-table
+        v-loading="loadingRobots"
+        :data="boundRobots"
+      >
+        <el-table-column
+          prop="name"
+          label="机器人名称"
+        />
+        <el-table-column
+          prop="model"
+          label="型号"
+        />
+        <el-table-column
+          prop="ip"
+          label="IP地址"
+        />
+        <el-table-column
+          label="操作"
+          width="100"
+        >
           <template #default="scope">
-            <el-button type="text" @click="unbindRobot(scope.row)">解绑</el-button>
+            <el-button
+              type="text"
+              @click="unbindRobot(scope.row)"
+            >
+              解绑
+            </el-button>
           </template>
         </el-table-column>
       </el-table>

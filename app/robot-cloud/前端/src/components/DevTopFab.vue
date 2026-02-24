@@ -1,13 +1,13 @@
 <template>
   <div
+    v-if="isDev"
+    ref="rootEl"
     class="dev-top-fab"
     :style="{ left: `${posPx.x}px`, top: `${posPx.y}px` }"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
-    ref="rootEl"
-    v-if="isDev"
   >
     <el-popover
       v-model="visible"
@@ -17,17 +17,34 @@
       popper-class="dev-fab-popper"
     >
       <div class="fab-container">
-        <div class="fab-title">开发者工具</div>
+        <div class="fab-title">
+          开发者工具
+        </div>
         <el-button-group class="fab-panel">
-          <el-button size="small" class="panel-btn" @click="toggleTheme" text>
-            <el-icon v-if="effectiveTheme === 'dark'"><Moon /></el-icon>
-            <el-icon v-else><Sunny /></el-icon>
+          <el-button
+            size="small"
+            class="panel-btn"
+            text
+            @click="toggleTheme"
+          >
+            <el-icon v-if="effectiveTheme === 'dark'">
+              <Moon />
+            </el-icon>
+            <el-icon v-else>
+              <Sunny />
+            </el-icon>
             切换主题
           </el-button>
         </el-button-group>
       </div>
       <template #reference>
-        <el-button type="primary" circle class="fab-btn" aria-label="开发者工具" title="开发者工具">
+        <el-button
+          type="primary"
+          circle
+          class="fab-btn"
+          aria-label="开发者工具"
+          title="开发者工具"
+        >
           <el-icon><Tools /></el-icon>
         </el-button>
       </template>

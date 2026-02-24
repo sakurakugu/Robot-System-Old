@@ -2,12 +2,21 @@
   <el-container class="layout-container">
     <el-header class="layout-header">
       <div class="header-content">
-        <el-icon class="logo-icon" :size="24"><Bot /></el-icon>
+        <el-icon
+          class="logo-icon"
+          :size="24"
+        >
+          <Bot />
+        </el-icon>
         <h1>机器狗管理应用</h1>
       </div>
     </el-header>
     <el-container class="main-container">
-      <el-aside :width="asideWidth + 'px'" class="layout-aside" :class="{ collapsed: isCollapse }">
+      <el-aside
+        :width="asideWidth + 'px'"
+        class="layout-aside"
+        :class="{ collapsed: isCollapse }"
+      >
         <el-menu
           :default-active="activeMenu"
           class="el-menu-vertical"
@@ -17,34 +26,51 @@
         >
           <el-menu-item index="/robots">
             <el-icon><List /></el-icon>
-            <template #title>机器人管理</template>
+            <template #title>
+              机器人管理
+            </template>
           </el-menu-item>
           <el-menu-item index="/roles">
             <el-icon><UserFilled /></el-icon>
-            <template #title>角色管理</template>
+            <template #title>
+              角色管理
+            </template>
           </el-menu-item>
           <el-menu-item index="/operation">
             <el-icon><VideoPlay /></el-icon>
-            <template #title>机器人操作</template>
+            <template #title>
+              机器人操作
+            </template>
           </el-menu-item>
           <el-menu-item index="/choreo">
             <el-icon><Film /></el-icon>
-            <template #title>编舞系统</template>
+            <template #title>
+              编舞系统
+            </template>
           </el-menu-item>
           <el-menu-item index="/params">
             <el-icon><Setting /></el-icon>
-            <template #title>参数管理</template>
+            <template #title>
+              参数管理
+            </template>
           </el-menu-item>
           <el-menu-item index="/kb">
             <el-icon><Collection /></el-icon>
-            <template #title>知识库</template>
+            <template #title>
+              知识库
+            </template>
           </el-menu-item>
           <el-menu-item index="/settings">
             <el-icon><Tools /></el-icon>
-            <template #title>系统设置</template>
+            <template #title>
+              系统设置
+            </template>
           </el-menu-item>
         </el-menu>
-        <div class="collapse-toggle" @click="toggleCollapse">
+        <div
+          class="collapse-toggle"
+          @click="toggleCollapse"
+        >
           <el-icon><DArrowLeft v-if="!isCollapse" /><DArrowRight v-else /></el-icon>
         </div>
       </el-aside>

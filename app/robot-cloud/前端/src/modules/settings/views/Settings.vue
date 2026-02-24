@@ -1,35 +1,72 @@
 <template>
   <div class="page">
-    <PageHeader title="系统设置" :icon="Tools" />
+    <PageHeader
+      title="系统设置"
+      :icon="Tools"
+    />
 
     <div class="content">
       <el-card shadow="hover">
-        <el-form :model="formData" label-width="140px" label-position="left">
+        <el-form
+          :model="formData"
+          label-width="140px"
+          label-position="left"
+        >
           <el-form-item label="主题模式">
             <el-radio-group v-model="theme">
-              <el-radio value="system">跟随系统</el-radio>
-              <el-radio value="light">浅色</el-radio>
-              <el-radio value="dark">深色</el-radio>
+              <el-radio value="system">
+                跟随系统
+              </el-radio>
+              <el-radio value="light">
+                浅色
+              </el-radio>
+              <el-radio value="dark">
+                深色
+              </el-radio>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="界面语言">
-            <el-select v-model="language" placeholder="选择语言" style="width: 200px">
-              <el-option label="简体中文" value="zh-CN" />
-              <el-option label="English" value="en-US" />
+            <el-select
+              v-model="language"
+              placeholder="选择语言"
+              style="width: 200px"
+            >
+              <el-option
+                label="简体中文"
+                value="zh-CN"
+              />
+              <el-option
+                label="English"
+                value="en-US"
+              />
             </el-select>
           </el-form-item>
           <el-form-item label="字体大小">
             <el-radio-group v-model="fontSize">
-              <el-radio value="small">小</el-radio>
-              <el-radio value="medium">中</el-radio>
-              <el-radio value="large">大</el-radio>
+              <el-radio value="small">
+                小
+              </el-radio>
+              <el-radio value="medium">
+                中
+              </el-radio>
+              <el-radio value="large">
+                大
+              </el-radio>
             </el-radio-group>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="save" :icon="Select">
+            <el-button
+              type="primary"
+              :icon="Select"
+              @click="save"
+            >
               保存
             </el-button>
-            <el-text v-if="saved" type="success" style="margin-left: 12px">
+            <el-text
+              v-if="saved"
+              type="success"
+              style="margin-left: 12px"
+            >
               已保存
             </el-text>
           </el-form-item>

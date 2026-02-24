@@ -1,15 +1,26 @@
 <template>
   <div class="choreo-list">
     <el-container>
-      <el-aside width="60px" class="left-bar">
+      <el-aside
+        width="60px"
+        class="left-bar"
+      >
         <div class="left-bar-content">
           <div class="top-icons">
-            <el-button class="left-icon" text>
+            <el-button
+              class="left-icon"
+              text
+            >
               <el-icon><Folder /></el-icon>
             </el-button>
           </div>
           <div class="bottom-settings">
-            <el-button class="settings-btn" text @click="openSettings" title="设置">
+            <el-button
+              class="settings-btn"
+              text
+              title="设置"
+              @click="openSettings"
+            >
               <el-icon><Setting /></el-icon>
             </el-button>
           </div>
@@ -20,7 +31,10 @@
           <div class="header-content">
             <h1>机器狗编舞系统</h1>
             <div class="header-actions">
-              <el-radio-group v-model="viewMode" size="default">
+              <el-radio-group
+                v-model="viewMode"
+                size="default"
+              >
                 <el-radio-button value="grid">
                   <el-icon><Menu /></el-icon>
                   卡片
@@ -31,10 +45,15 @@
                 </el-radio-button>
               </el-radio-group>
               <el-button @click="handleImportClick">
-                <el-icon class="import-btn"><Upload /></el-icon>
+                <el-icon class="import-btn">
+                  <Upload />
+                </el-icon>
                 导入工程
               </el-button>
-              <el-button type="primary" @click="showCreateDialog = true">
+              <el-button
+                type="primary"
+                @click="showCreateDialog = true"
+              >
                 <el-icon><Plus /></el-icon>
                 新建项目
               </el-button>
@@ -43,19 +62,38 @@
         </el-header>
 
         <el-main>
-          <div v-if="loading" class="loading">
-            <el-icon class="is-loading"><Loading /></el-icon>
+          <div
+            v-if="loading"
+            class="loading"
+          >
+            <el-icon class="is-loading">
+              <Loading />
+            </el-icon>
             <p>加载中...</p>
           </div>
 
-          <div v-else-if="projects.length === 0" class="empty">
+          <div
+            v-else-if="projects.length === 0"
+            class="empty"
+          >
             <el-empty description="暂无项目">
-              <el-button type="primary" @click="showCreateDialog = true">创建第一个项目</el-button>
+              <el-button
+                type="primary"
+                @click="showCreateDialog = true"
+              >
+                创建第一个项目
+              </el-button>
             </el-empty>
           </div>
 
-          <div v-else class="projects-container">
-            <div v-if="viewMode === 'grid'" class="projects-grid">
+          <div
+            v-else
+            class="projects-container"
+          >
+            <div
+              v-if="viewMode === 'grid'"
+              class="projects-grid"
+            >
               <el-card
                 v-for="project in projects"
                 :key="project.uuid"
@@ -68,15 +106,24 @@
                 </div>
                 <div class="project-info">
                   <h3>{{ project.name }}</h3>
-                  <p class="description">{{ project.description || '无描述' }}</p>
+                  <p class="description">
+                    {{ project.description || '无描述' }}
+                  </p>
                   <div class="project-meta">
                     <span>创建于: {{ formatDate(project.created_at) }}</span>
                     <span v-if="project.updated_at">最后修改: {{ formatDate(project.updated_at) }}</span>
                   </div>
                 </div>
-                <div class="project-actions" @click.stop>
+                <div
+                  class="project-actions"
+                  @click.stop
+                >
                   <el-dropdown trigger="click">
-                    <el-button type="primary" size="small" circle>
+                    <el-button
+                      type="primary"
+                      size="small"
+                      circle
+                    >
                       <el-icon><MoreFilled /></el-icon>
                     </el-button>
                     <template #dropdown>
@@ -89,7 +136,10 @@
                           <el-icon><Download /></el-icon>
                           导出
                         </el-dropdown-item>
-                        <el-dropdown-item divided @click="deleteProject(project)">
+                        <el-dropdown-item
+                          divided
+                          @click="deleteProject(project)"
+                        >
                           <el-icon><Delete /></el-icon>
                           删除
                         </el-dropdown-item>
@@ -100,7 +150,10 @@
               </el-card>
             </div>
 
-            <div v-else class="projects-list">
+            <div
+              v-else
+              class="projects-list"
+            >
               <el-card
                 v-for="project in projects"
                 :key="project.uuid"
@@ -114,21 +167,38 @@
                   </div>
                   <div class="list-item-info">
                     <h3>{{ project.name }}</h3>
-                    <p class="description">{{ project.description || '无描述' }}</p>
+                    <p class="description">
+                      {{ project.description || '无描述' }}
+                    </p>
                   </div>
                   <div class="list-item-meta">
                     <div class="meta-item">
                       <span class="meta-label">创建于</span>
                       <span class="meta-value">{{ formatDate(project.created_at) }}</span>
                     </div>
-                    <div v-if="project.updated_at" class="meta-item">
+                    <div
+                      v-if="project.updated_at"
+                      class="meta-item"
+                    >
                       <span class="meta-label">最后修改</span>
                       <span class="meta-value">{{ formatDate(project.updated_at) }}</span>
                     </div>
                   </div>
-                  <div class="list-item-actions" @click.stop>
-                    <el-button size="small" @click="editProject(project)">编辑</el-button>
-                    <el-button type="danger" size="small" @click="deleteProject(project)">
+                  <div
+                    class="list-item-actions"
+                    @click.stop
+                  >
+                    <el-button
+                      size="small"
+                      @click="editProject(project)"
+                    >
+                      编辑
+                    </el-button>
+                    <el-button
+                      type="danger"
+                      size="small"
+                      @click="deleteProject(project)"
+                    >
                       <el-icon><Delete /></el-icon>
                     </el-button>
                   </div>
@@ -147,15 +217,35 @@
       accept=".zip,.hhzip"
       style="display: none"
       @change="handleFileSelect"
-    />
+    >
 
     <!-- 创建/编辑项目对话框 -->
-    <el-dialog v-model="showCreateDialog" :title="editingProject ? '编辑项目' : '创建新项目'" width="500px" @closed="resetForm">
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="80px">
-        <el-form-item label="项目名称" prop="name" required>
-          <el-input v-model="formData.name" placeholder="请输入项目名称" />
+    <el-dialog
+      v-model="showCreateDialog"
+      :title="editingProject ? '编辑项目' : '创建新项目'"
+      width="500px"
+      @closed="resetForm"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="80px"
+      >
+        <el-form-item
+          label="项目名称"
+          prop="name"
+          required
+        >
+          <el-input
+            v-model="formData.name"
+            placeholder="请输入项目名称"
+          />
         </el-form-item>
-        <el-form-item label="项目描述" prop="description">
+        <el-form-item
+          label="项目描述"
+          prop="description"
+        >
           <el-input
             v-model="formData.description"
             type="textarea"
@@ -165,8 +255,14 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <el-button @click="showCreateDialog = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="submitting"
+          @click="handleSubmit"
+        >
           {{ editingProject ? '保存' : '创建' }}
         </el-button>
       </template>

@@ -1,14 +1,23 @@
 <template>
-  <el-page-header class="page-header" @back="emit('back')">
+  <el-page-header
+    class="page-header"
+    @back="emit('back')"
+  >
     <template #content>
       <div class="header-content">
-        <el-icon v-if="icon" :size="iconSize">
+        <el-icon
+          v-if="icon"
+          :size="iconSize"
+        >
           <component :is="icon" />
         </el-icon>
         <span class="title">{{ title }}</span>
       </div>
     </template>
-    <template v-if="$slots.extra" #extra>
+    <template
+      v-if="$slots.extra"
+      #extra
+    >
       <slot name="extra" />
     </template>
   </el-page-header>

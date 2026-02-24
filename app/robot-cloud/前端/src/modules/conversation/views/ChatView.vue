@@ -1,14 +1,22 @@
 <template>
   <div class="chatview">
     <section class="content">
-      <div class="chat-area" ref="chatArea">
+      <div
+        ref="chatArea"
+        class="chat-area"
+      >
         <el-empty
           v-if="messages.length === 0"
           description="还没有对话记录，发送一条消息开始吧！"
           :image-size="120"
         >
           <template #image>
-            <el-icon :size="80" color="#909399"><ChatDotSquare /></el-icon>
+            <el-icon
+              :size="80"
+              color="#909399"
+            >
+              <ChatDotSquare />
+            </el-icon>
           </template>
         </el-empty>
         
@@ -18,17 +26,29 @@
           class="message-wrapper"
           :class="[{ 'align-right': msg.type === 'user' && msg.target === 'ai' }, msg.type]"
         >
-          <el-avatar :size="36" class="message-avatar">
-            <el-icon v-if="msg.type === 'user'"><User /></el-icon>
-            <el-icon v-else><Bot /></el-icon>
+          <el-avatar
+            :size="36"
+            class="message-avatar"
+          >
+            <el-icon v-if="msg.type === 'user'">
+              <User />
+            </el-icon>
+            <el-icon v-else>
+              <Bot />
+            </el-icon>
           </el-avatar>
           <div class="message-bubble">
             <div class="message-header">
               <span class="message-sender">{{ msg.type === 'user' ? '用户' : 'AI助手' }}</span>
               <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
             </div>
-            <div class="message-content">{{ msg.text }}</div>
-            <div v-if="msg.actions && msg.actions.length > 0" class="message-actions">
+            <div class="message-content">
+              {{ msg.text }}
+            </div>
+            <div
+              v-if="msg.actions && msg.actions.length > 0"
+              class="message-actions"
+            >
               <el-icon><Lightning /></el-icon>
               <el-tag
                 v-for="action in msg.actions"
@@ -40,14 +60,23 @@
                 {{ action }}
               </el-tag>
             </div>
-            <div v-if="msg.latency" class="message-meta">
+            <div
+              v-if="msg.latency"
+              class="message-meta"
+            >
               <el-icon><Clock /></el-icon>
               <span>{{ msg.latency }}ms</span>
             </div>
           </div>
-          <div v-if="msg.sentToRobot !== undefined" class="robot-status">
+          <div
+            v-if="msg.sentToRobot !== undefined"
+            class="robot-status"
+          >
             <div class="robot-tools">
-              <el-tooltip content="播放语音" placement="top">
+              <el-tooltip
+                content="播放语音"
+                placement="top"
+              >
                 <el-button
                   :disabled="!isConnected"
                   size="small"
@@ -64,7 +93,9 @@
               type="info"
               effect="plain"
             >
-              <el-icon class="is-loading"><Loading /></el-icon>
+              <el-icon class="is-loading">
+                <Loading />
+              </el-icon>
               发送中...
             </el-tag>
             <el-tag
@@ -81,7 +112,13 @@
               content="未发送到机器狗"
               placement="top"
             >
-              <el-icon size="18" color="#E6A23C" style="cursor: help;"><WarningFilled /></el-icon>
+              <el-icon
+                size="18"
+                color="#E6A23C"
+                style="cursor: help;"
+              >
+                <WarningFilled />
+              </el-icon>
             </el-tooltip>
           </div>
         </div>
@@ -93,24 +130,24 @@
           type="textarea"
           :rows="3"
           placeholder="输入消息... (按 Ctrl+Enter 发送给大模型, Shift+Enter 发送给机器狗）"
+          resize="none"
           @keydown.ctrl.enter="() => sendMessage('ai')"
           @keydown.shift.enter.prevent="() => sendMessage('robot')"
-          resize="none"
         />
         <div class="button-group">
           <el-button
             type="success"
-            @click="() => sendMessage('robot')"
             :disabled="!isConnected || !inputText.trim()"
             :icon="Bot"
+            @click="() => sendMessage('robot')"
           >
             发送给机器狗
           </el-button>
           <el-button
             type="primary"
-            @click="() => sendMessage('ai')"
             :disabled="!isConnected || !inputText.trim()"
             :icon="Promotion"
+            @click="() => sendMessage('ai')"
           >
             发送给大模型
           </el-button>

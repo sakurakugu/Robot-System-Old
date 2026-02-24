@@ -6,36 +6,67 @@
       <div class="timeline-toolbar">
         <div class="toolbar-left">
           <el-button-group>
-            <el-button size="small" @click="addTrack(TrackType.ACTION)">
+            <el-button
+              size="small"
+              @click="addTrack(TrackType.ACTION)"
+            >
               <el-icon><Plus /></el-icon> 动作轨道
             </el-button>
-            <el-button size="small" @click="addTrack(TrackType.AUDIO)">
+            <el-button
+              size="small"
+              @click="addTrack(TrackType.AUDIO)"
+            >
               <el-icon><Plus /></el-icon> 音频轨道
             </el-button>
           </el-button-group>
         </div>
         <div class="toolbar-center">
-          <el-button size="small" :type="isPlaying ? 'primary' : 'default'" @click="togglePlay">
-            <el-icon v-if="!isPlaying"><VideoPlayIcon /></el-icon>
-            <el-icon v-else><VideoPauseIcon /></el-icon>
+          <el-button
+            size="small"
+            :type="isPlaying ? 'primary' : 'default'"
+            @click="togglePlay"
+          >
+            <el-icon v-if="!isPlaying">
+              <VideoPlayIcon />
+            </el-icon>
+            <el-icon v-else>
+              <VideoPauseIcon />
+            </el-icon>
             {{ isPlaying ? '暂停' : '播放' }}
           </el-button>
           <span class="time-display">
-            <span class="time-editable" @click="editCurrentTime">{{ formatTime(config.currentTime) }}</span>
+            <span
+              class="time-editable"
+              @click="editCurrentTime"
+            >{{ formatTime(config.currentTime) }}</span>
             <span> / </span>
-            <span class="time-editable" @click="editDuration">{{ formatTime(config.duration) }}</span>
+            <span
+              class="time-editable"
+              @click="editDuration"
+            >{{ formatTime(config.duration) }}</span>
           </span>
         </div>
         <div class="toolbar-right">
           <el-button-group>
-            <el-button size="small" @click="zoomIn">
+            <el-button
+              size="small"
+              @click="zoomIn"
+            >
               <el-icon><ZoomIn /></el-icon>
             </el-button>
-            <el-button size="small" @click="zoomOut">
+            <el-button
+              size="small"
+              @click="zoomOut"
+            >
               <el-icon><ZoomOut /></el-icon>
             </el-button>
           </el-button-group>
-          <el-checkbox v-model="config.snapToGrid" size="small">吸附网格</el-checkbox>
+          <el-checkbox
+            v-model="config.snapToGrid"
+            size="small"
+          >
+            吸附网格
+          </el-checkbox>
           <span class="separator">|</span>
           <span class="zoom-level">缩放: {{ Math.round(config.pixelsPerSecond) }}px/s</span>
         </div>
@@ -45,9 +76,17 @@
       <div class="timeline-content">
         <!-- 时间标尺 -->
         <div class="timeline-ruler">
-          <div class="ruler-track-label">时间</div>
-          <div class="ruler-wrapper" ref="rulerWrapper">
-            <div class="ruler-content" :style="{ width: timelineWidth + 'px' }">
+          <div class="ruler-track-label">
+            时间
+          </div>
+          <div
+            ref="rulerWrapper"
+            class="ruler-wrapper"
+          >
+            <div
+              class="ruler-content"
+              :style="{ width: timelineWidth + 'px' }"
+            >
               <div
                 v-for="tick in timeTicks"
                 :key="tick.time"
@@ -55,59 +94,126 @@
                 :class="{ major: tick.isMajor }"
                 :style="{ left: timeToPixel(tick.time) + 'px' }"
               >
-                <div class="tick-line"></div>
-                <div class="tick-label" v-if="tick.isMajor">{{ formatTime(tick.time) }}</div>
+                <div class="tick-line" />
+                <div
+                  v-if="tick.isMajor"
+                  class="tick-label"
+                >
+                  {{ formatTime(tick.time) }}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- 轨道列表容器 -->
-        <div class="tracks-wrapper" ref="tracksWrapper">
+        <div
+          ref="tracksWrapper"
+          class="tracks-wrapper"
+        >
           <!-- 轨道列表 -->
           <div class="timeline-tracks">
-            <div v-for="track in tracks" :key="track.id" class="track-row" :style="{ height: track.height + 'px' }">
+            <div
+              v-for="track in tracks"
+              :key="track.id"
+              class="track-row"
+              :style="{ height: track.height + 'px' }"
+            >
               <!-- 轨道标签 -->
               <div class="track-label">
                 <div class="track-controls">
-                  <el-button size="small" circle @click="toggleTrackVisibility(track.id)" :type="track.visible ? 'primary' : 'default'">
+                  <el-button
+                    size="small"
+                    circle
+                    :type="track.visible ? 'primary' : 'default'"
+                    @click="toggleTrackVisibility(track.id)"
+                  >
                     <el-icon><View v-if="track.visible" /><Hide v-else /></el-icon>
                   </el-button>
-                  <el-button size="small" circle @click="toggleTrackLock(track.id)" :type="track.locked ? 'warning' : 'default'">
+                  <el-button
+                    size="small"
+                    circle
+                    :type="track.locked ? 'warning' : 'default'"
+                    @click="toggleTrackLock(track.id)"
+                  >
                     <el-icon><Lock v-if="track.locked" /><Unlock v-else /></el-icon>
                   </el-button>
                   <!-- 动作轨道的添加/删除按钮 -->
                   <template v-if="track.type === TrackType.ACTION">
-                    <el-button size="small" circle @click="addActionBlock(track.id)" :disabled="track.locked">
+                    <el-button
+                      size="small"
+                      circle
+                      :disabled="track.locked"
+                      @click="addActionBlock(track.id)"
+                    >
                       <el-icon><Plus /></el-icon>
                     </el-button>
-                    <el-button size="small" circle @click="deleteSelectedBlock(track.id)" :disabled="track.locked || !getSelectedBlock(track.id)">
+                    <el-button
+                      size="small"
+                      circle
+                      :disabled="track.locked || !getSelectedBlock(track.id)"
+                      @click="deleteSelectedBlock(track.id)"
+                    >
                       <el-icon><Minus /></el-icon>
                     </el-button>
                   </template>
-                  <el-button size="small" circle @click="deleteTrack(track.id)">
+                  <el-button
+                    size="small"
+                    circle
+                    @click="deleteTrack(track.id)"
+                  >
                     <el-icon><Delete /></el-icon>
                   </el-button>
                 </div>
-                <div class="track-name" @dblclick="editTrackName(track.id)">{{ track.name }}</div>
+                <div
+                  class="track-name"
+                  @dblclick="editTrackName(track.id)"
+                >
+                  {{ track.name }}
+                </div>
                 <div class="track-badges">
-                  <div class="track-type-badge" :class="track.type">
+                  <div
+                    class="track-type-badge"
+                    :class="track.type"
+                  >
                     {{ track.type === TrackType.AUDIO ? '音频' : '动作' }}
                   </div>
                   <!-- 动作轨道的机器狗绑定状态 -->
-                  <div v-if="track.type === TrackType.ACTION" class="robot-binding" @click.stop="selectRobotForTrack(track.id)">
-                    <el-icon v-if="!track.robotId" style="color: #ffc107;"><Warning /></el-icon>
-                    <el-icon v-else style="color: #4caf50;"><Check /></el-icon>
+                  <div
+                    v-if="track.type === TrackType.ACTION"
+                    class="robot-binding"
+                    @click.stop="selectRobotForTrack(track.id)"
+                  >
+                    <el-icon
+                      v-if="!track.robotId"
+                      style="color: #ffc107;"
+                    >
+                      <Warning />
+                    </el-icon>
+                    <el-icon
+                      v-else
+                      style="color: #4caf50;"
+                    >
+                      <Check />
+                    </el-icon>
                     <span class="binding-text">{{ getRobotBindingText(track.robotId) }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- 轨道内容 -->
-              <div class="track-content" :style="{ width: timelineWidth + 'px' }">
+              <div
+                class="track-content"
+                :style="{ width: timelineWidth + 'px' }"
+              >
                 <!-- 网格线 -->
                 <div class="grid-lines">
-                  <div v-for="tick in gridTicks" :key="tick" class="grid-line" :style="{ left: timeToPixel(tick) + 'px' }"></div>
+                  <div
+                    v-for="tick in gridTicks"
+                    :key="tick"
+                    class="grid-line"
+                    :style="{ left: timeToPixel(tick) + 'px' }"
+                  />
                 </div>
 
                 <!-- 动作轨道 -->
@@ -127,37 +233,45 @@
                   v-if="track.type === TrackType.AUDIO"
                   :track="track"
                   :config="config"
-                  :isTimelinePlaying="isPlaying"
-                  :currentTime="config.currentTime"
-                  :projectUuid="props.projectUuid"
+                  :is-timeline-playing="isPlaying"
+                  :current-time="config.currentTime"
+                  :project-uuid="props.projectUuid"
                   @update:audio="updateTrackAudio(track.id, $event)"
                 />
               </div>
             </div>
 
             <!-- 空状态 -->
-            <div v-if="tracks.length === 0" class="empty-state">
-              <el-icon style="font-size: 48px"><Film /></el-icon>
+            <div
+              v-if="tracks.length === 0"
+              class="empty-state"
+            >
+              <el-icon style="font-size: 48px">
+                <Film />
+              </el-icon>
               <p>暂无轨道，点击上方按钮添加轨道</p>
             </div>
           </div>
         </div>
 
         <!-- 播放头层（贯穿整个时间轴） -->
-        <div class="playhead-layer" ref="playheadLayer">
+        <div
+          ref="playheadLayer"
+          class="playhead-layer"
+        >
           <div
             class="playhead"
             :style="{ left: (timeToPixel(config.currentTime) - scrollLeft + 200) + 'px' }"
             @mousedown="startDragPlayhead"
-          ></div>
+          />
         </div>
       </div>
 
       <!-- 动作选择器对话框 -->
       <ActionSelectorDialog
         v-model:visible="actionSelectorVisible"
-        :currentAction="editingActionData"
-        :maxDuration="maxDurationLimit"
+        :current-action="editingActionData"
+        :max-duration="maxDurationLimit"
         @confirm="handleActionSelected"
       />
 
@@ -169,16 +283,29 @@
         :close-on-click-modal="false"
         class="robot-selector-dialog"
       >
-        <div class="robot-selector-header">为此轨道选择一个机器狗：</div>
+        <div class="robot-selector-header">
+          为此轨道选择一个机器狗：
+        </div>
         <div class="robot-selector-container">
           <!-- 取消绑定卡片 -->
-          <div class="robot-select-card" :class="{ active: !selectedRobotId }" @click="selectedRobotId = ''">
+          <div
+            class="robot-select-card"
+            :class="{ active: !selectedRobotId }"
+            @click="selectedRobotId = ''"
+          >
             <div class="card-icon">
               <el-icon><CircleClose /></el-icon>
             </div>
-            <div class="card-name">取消绑定</div>
-            <div class="card-desc">解除当前关联</div>
-            <div class="selection-mark" v-if="!selectedRobotId">
+            <div class="card-name">
+              取消绑定
+            </div>
+            <div class="card-desc">
+              解除当前关联
+            </div>
+            <div
+              v-if="!selectedRobotId"
+              class="selection-mark"
+            >
               <el-icon><Check /></el-icon>
             </div>
           </div>
@@ -191,20 +318,40 @@
             :class="{ active: selectedRobotId === robot.uuid }"
             @click="selectedRobotId = robot.uuid"
           >
-            <div class="card-status-dot" :class="robot.status" :title="robot.status === 'online' ? '在线' : '离线'"></div>
-            <div class="card-icon robot-icon">🐕</div>
-            <div class="card-info">
-              <div class="card-name">{{ robot.name }}</div>
-              <div class="card-ip">{{ robot.robot_ip }}</div>
+            <div
+              class="card-status-dot"
+              :class="robot.status"
+              :title="robot.status === 'online' ? '在线' : '离线'"
+            />
+            <div class="card-icon robot-icon">
+              🐕
             </div>
-            <div class="selection-mark" v-if="selectedRobotId === robot.uuid">
+            <div class="card-info">
+              <div class="card-name">
+                {{ robot.name }}
+              </div>
+              <div class="card-ip">
+                {{ robot.robot_ip }}
+              </div>
+            </div>
+            <div
+              v-if="selectedRobotId === robot.uuid"
+              class="selection-mark"
+            >
               <el-icon><Check /></el-icon>
             </div>
           </div>
         </div>
         <template #footer>
-          <el-button @click="robotSelectorVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmRobotSelection">确定</el-button>
+          <el-button @click="robotSelectorVisible = false">
+            取消
+          </el-button>
+          <el-button
+            type="primary"
+            @click="confirmRobotSelection"
+          >
+            确定
+          </el-button>
         </template>
       </el-dialog>
     </div>

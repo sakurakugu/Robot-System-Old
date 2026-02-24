@@ -2,70 +2,149 @@
   <div class="action-list-container">
     <div class="action-list-content">
       <el-collapse v-model="activePanels">
-        <el-collapse-item title="基础动作" name="basic">
+        <el-collapse-item
+          title="基础动作"
+          name="basic"
+        >
           <div class="actions-grid">
-            <div v-for="action in basicActions" :key="action.method" class="action-card">
-              <div class="action-icon">🐕</div>
+            <div
+              v-for="action in basicActions"
+              :key="action.method"
+              class="action-card"
+            >
+              <div class="action-icon">
+                🐕
+              </div>
               <div class="action-info">
-                <div class="action-name">{{ action.name }}</div>
-                <div class="action-desc">{{ action.description }}</div>
-                <div class="action-method">{{ action.method }}</div>
+                <div class="action-name">
+                  {{ action.name }}
+                </div>
+                <div class="action-desc">
+                  {{ action.description }}
+                </div>
+                <div class="action-method">
+                  {{ action.method }}
+                </div>
               </div>
             </div>
           </div>
         </el-collapse-item>
 
-        <el-collapse-item title="姿态控制" name="attitude">
+        <el-collapse-item
+          title="姿态控制"
+          name="attitude"
+        >
           <div class="actions-grid">
-            <div v-for="action in attitudeActions" :key="action.method" class="action-card">
-              <div class="action-icon">🎯</div>
+            <div
+              v-for="action in attitudeActions"
+              :key="action.method"
+              class="action-card"
+            >
+              <div class="action-icon">
+                🎯
+              </div>
               <div class="action-info">
-                <div class="action-name">{{ action.name }}</div>
-                <div class="action-desc">{{ action.description }}</div>
-                <div class="action-method">{{ action.method }}</div>
+                <div class="action-name">
+                  {{ action.name }}
+                </div>
+                <div class="action-desc">
+                  {{ action.description }}
+                </div>
+                <div class="action-method">
+                  {{ action.method }}
+                </div>
               </div>
             </div>
           </div>
         </el-collapse-item>
 
-        <el-collapse-item title="移动" name="movement">
+        <el-collapse-item
+          title="移动"
+          name="movement"
+        >
           <div class="actions-grid">
-            <div v-for="action in movementActions" :key="action.method" class="action-card">
-              <div class="action-icon">🏃</div>
+            <div
+              v-for="action in movementActions"
+              :key="action.method"
+              class="action-card"
+            >
+              <div class="action-icon">
+                🏃
+              </div>
               <div class="action-info">
-                <div class="action-name">{{ action.name }}</div>
-                <div class="action-desc">{{ action.description }}</div>
-                <div class="action-method">{{ action.method }}</div>
+                <div class="action-name">
+                  {{ action.name }}
+                </div>
+                <div class="action-desc">
+                  {{ action.description }}
+                </div>
+                <div class="action-method">
+                  {{ action.method }}
+                </div>
               </div>
             </div>
           </div>
         </el-collapse-item>
 
-        <el-collapse-item title="特技" name="tricks">
+        <el-collapse-item
+          title="特技"
+          name="tricks"
+        >
           <div class="actions-grid">
-            <div v-for="action in trickActions" :key="action.method" class="action-card">
-              <div class="action-icon">⭐</div>
+            <div
+              v-for="action in trickActions"
+              :key="action.method"
+              class="action-card"
+            >
+              <div class="action-icon">
+                ⭐
+              </div>
               <div class="action-info">
-                <div class="action-name">{{ action.name }}</div>
-                <div class="action-desc">{{ action.description }}</div>
-                <div class="action-method">{{ action.method }}</div>
+                <div class="action-name">
+                  {{ action.name }}
+                </div>
+                <div class="action-desc">
+                  {{ action.description }}
+                </div>
+                <div class="action-method">
+                  {{ action.method }}
+                </div>
               </div>
             </div>
           </div>
         </el-collapse-item>
 
-        <el-collapse-item title="自定义动作" name="custom">
+        <el-collapse-item
+          title="自定义动作"
+          name="custom"
+        >
           <div class="actions-grid">
-            <div v-for="action in customActions" :key="action.uuid" class="action-card">
-              <div class="action-icon">🧩</div>
+            <div
+              v-for="action in customActions"
+              :key="action.uuid"
+              class="action-card"
+            >
+              <div class="action-icon">
+                🧩
+              </div>
               <div class="action-info">
-                <div class="action-name">{{ action.name }}</div>
-                <div class="action-desc">{{ action.description || '无描述' }}</div>
-                <div class="action-method">自定义</div>
+                <div class="action-name">
+                  {{ action.name }}
+                </div>
+                <div class="action-desc">
+                  {{ action.description || '无描述' }}
+                </div>
+                <div class="action-method">
+                  自定义
+                </div>
               </div>
             </div>
           </div>
-          <el-empty v-if="customActions.length === 0" description="暂无自定义动作" :image-size="60" />
+          <el-empty
+            v-if="customActions.length === 0"
+            description="暂无自定义动作"
+            :image-size="60"
+          />
         </el-collapse-item>
       </el-collapse>
     </div>

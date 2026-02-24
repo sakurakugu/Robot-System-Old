@@ -1,14 +1,24 @@
 <template>
   <div class="audio-track">
     <!-- 音频波形容器 -->
-    <div v-if="track.audioUrl" class="waveform-container" ref="waveformContainer">
+    <div
+      v-if="track.audioUrl"
+      ref="waveformContainer"
+      class="waveform-container"
+    >
       <div class="audio-controls">
         <span class="audio-name">{{ getAudioName(track.audioUrl) }}</span>
-        <el-button size="small" @click="removeAudio">
+        <el-button
+          size="small"
+          @click="removeAudio"
+        >
           <el-icon><Delete /></el-icon>
         </el-button>
       </div>
-      <div ref="waveformEl" class="waveform"></div>
+      <div
+        ref="waveformEl"
+        class="waveform"
+      />
     </div>
 
     <!-- 上传音频 -->
@@ -21,16 +31,20 @@
       @dragleave.prevent="handleDragLeave"
       @drop.prevent="handleDrop"
     >
-      <el-icon style="font-size: 32px"><Upload /></el-icon>
+      <el-icon style="font-size: 32px">
+        <Upload />
+      </el-icon>
       <p>点击或拖拽上传音频文件</p>
-      <p class="upload-hint">支持 MP3, WAV, OGG 格式</p>
+      <p class="upload-hint">
+        支持 MP3, WAV, OGG 格式
+      </p>
       <input
         ref="fileInput"
         type="file"
         accept="audio/*"
         style="display: none"
         @change="handleFileUpload"
-      />
+      >
     </div>
   </div>
 </template>

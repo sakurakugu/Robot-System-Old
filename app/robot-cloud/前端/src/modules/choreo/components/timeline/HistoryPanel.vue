@@ -3,18 +3,42 @@
     <!-- 顶部操作按钮 -->
     <div class="history-header">
       <div class="history-actions">
-        <el-tooltip content="撤回 (Ctrl+Z)" placement="top">
-          <el-button size="small" :disabled="!canUndo" @click="handleUndo" circle>
+        <el-tooltip
+          content="撤回 (Ctrl+Z)"
+          placement="top"
+        >
+          <el-button
+            size="small"
+            :disabled="!canUndo"
+            circle
+            @click="handleUndo"
+          >
             <el-icon><Back /></el-icon>
           </el-button>
         </el-tooltip>
-        <el-tooltip content="重做 (Ctrl+Shift+Z)" placement="top">
-          <el-button size="small" :disabled="!canRedo" @click="handleRedo" circle>
+        <el-tooltip
+          content="重做 (Ctrl+Shift+Z)"
+          placement="top"
+        >
+          <el-button
+            size="small"
+            :disabled="!canRedo"
+            circle
+            @click="handleRedo"
+          >
             <el-icon><Right /></el-icon>
           </el-button>
         </el-tooltip>
-        <el-tooltip content="清空历史" placement="top">
-          <el-button size="small" :disabled="historyRecords.length === 0" @click="handleClear" circle>
+        <el-tooltip
+          content="清空历史"
+          placement="top"
+        >
+          <el-button
+            size="small"
+            :disabled="historyRecords.length === 0"
+            circle
+            @click="handleClear"
+          >
             <el-icon><Delete /></el-icon>
           </el-button>
         </el-tooltip>
@@ -39,21 +63,32 @@
           </el-icon>
         </div>
         <div class="history-item-content">
-          <div class="history-item-description">{{ record.description }}</div>
+          <div class="history-item-description">
+            {{ record.description }}
+          </div>
           <div class="history-item-meta">
-            <span class="history-item-track" v-if="record.trackName">
+            <span
+              v-if="record.trackName"
+              class="history-item-track"
+            >
               {{ record.trackName }}
             </span>
             <span class="history-item-time">{{ formatTime(record.timestamp) }}</span>
           </div>
         </div>
-        <div class="history-item-indicator" v-if="index === currentIndex">
+        <div
+          v-if="index === currentIndex"
+          class="history-item-indicator"
+        >
           <el-icon><CircleCheckFilled /></el-icon>
         </div>
       </div>
 
       <!-- 空状态 -->
-      <div v-if="historyRecords.length === 0" class="history-empty">
+      <div
+        v-if="historyRecords.length === 0"
+        class="history-empty"
+      >
         <el-icon><DocumentCopy /></el-icon>
         <p>暂无操作记录</p>
       </div>

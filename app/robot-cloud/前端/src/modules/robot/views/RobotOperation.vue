@@ -1,10 +1,18 @@
 <template>
   <div class="robot-operation">
     <!-- Top Toolbar -->
-    <div v-if="!props.embedded" class="top-bar">
+    <div
+      v-if="!props.embedded"
+      class="top-bar"
+    >
       <div class="left-tools">
-        <el-button link @click="goBack">
-          <el-icon :size="20"><Back /></el-icon>
+        <el-button
+          link
+          @click="goBack"
+        >
+          <el-icon :size="20">
+            <Back />
+          </el-icon>
         </el-button>
         
         <el-divider direction="vertical" />
@@ -49,15 +57,27 @@
 
         <el-divider direction="vertical" />
         
-        <el-popover placement="bottom" :width="200" trigger="click">
+        <el-popover
+          placement="bottom"
+          :width="200"
+          trigger="click"
+        >
           <template #reference>
-            <el-button size="small" text>
+            <el-button
+              size="small"
+              text
+            >
               速度: {{ speed }}
             </el-button>
           </template>
           <div style="display: flex; align-items: center; gap: 10px; padding: 0 10px;">
             <span style="white-space: nowrap;">速度</span>
-            <el-slider v-model="speed" :min="1" :max="10" size="small" />
+            <el-slider
+              v-model="speed"
+              :min="1"
+              :max="10"
+              size="small"
+            />
           </div>
         </el-popover>
 
@@ -72,13 +92,24 @@
 
         <el-divider direction="vertical" />
 
-        <el-button size="small" @click="handleCapturePhoto" :loading="isCapturing" :icon="Camera">
+        <el-button
+          size="small"
+          :loading="isCapturing"
+          :icon="Camera"
+          @click="handleCapturePhoto"
+        >
           拍照
         </el-button>
 
         <el-divider direction="vertical" />
 
-        <el-button type="danger" size="small" @click="emergencyStop" class="estop-btn" :icon="SwitchButton">
+        <el-button
+          type="danger"
+          size="small"
+          class="estop-btn"
+          :icon="SwitchButton"
+          @click="emergencyStop"
+        >
           急停
         </el-button>
       </div>
@@ -88,16 +119,29 @@
           <el-icon><Bot /></el-icon>
           <span>{{ robotBattery }}%</span>
         </div>
-        <div class="info-item" v-if="phoneBattery !== null">
+        <div
+          v-if="phoneBattery !== null"
+          class="info-item"
+        >
           <el-icon><Cellphone /></el-icon>
           <span>{{ phoneBattery }}%</span>
         </div>
         <div class="info-item time-display">
           <span>{{ currentTime }}</span>
         </div>
-        <div class="info-item" style="position: relative;">
-          <el-button circle :icon="Setting" @click="openSettings" />
-          <div v-if="hasUpdate" class="setting-dot"></div>
+        <div
+          class="info-item"
+          style="position: relative;"
+        >
+          <el-button
+            circle
+            :icon="Setting"
+            @click="openSettings"
+          />
+          <div
+            v-if="hasUpdate"
+            class="setting-dot"
+          />
         </div>
       </div>
     </div>
@@ -106,11 +150,29 @@
 
     <!-- Middle Video Area -->
     <div class="video-area">
-      <div class="video-container" v-if="showVideo && currentVideoFrame">
-        <img :src="currentVideoFrame" class="video-feed" alt="Live Feed" draggable="false" @dragstart.prevent  @pointerdown.prevent/>
+      <div
+        v-if="showVideo && currentVideoFrame"
+        class="video-container"
+      >
+        <img
+          :src="currentVideoFrame"
+          class="video-feed"
+          alt="Live Feed"
+          draggable="false"
+          @dragstart.prevent
+          @pointerdown.prevent
+        >
       </div>
-      <div class="video-placeholder" v-else>
-        <el-icon :size="60" color="#909399"><VideoCamera /></el-icon>
+      <div
+        v-else
+        class="video-placeholder"
+      >
+        <el-icon
+          :size="60"
+          color="#909399"
+        >
+          <VideoCamera />
+        </el-icon>
         <p>{{ showVideo ? '等待视频信号...' : '视频已关闭' }}</p>
       </div>
 
@@ -199,14 +261,21 @@
     >
       <div class="chat-drawer">
         <div class="chat-drawer__header">
-          <el-button link @click="closeChatPanel">
-            <el-icon :size="20"><Back /></el-icon>
+          <el-button
+            link
+            @click="closeChatPanel"
+          >
+            <el-icon :size="20">
+              <Back />
+            </el-icon>
           </el-button>
-          <div class="chat-drawer__title">对话</div>
-          <div class="chat-drawer__spacer"></div>
+          <div class="chat-drawer__title">
+            对话
+          </div>
+          <div class="chat-drawer__spacer" />
         </div>
         <div class="chat-drawer__body">
-          <ChatView :robotUuid="selectedUuid" />
+          <ChatView :robot-uuid="selectedUuid" />
         </div>
       </div>
     </el-drawer>

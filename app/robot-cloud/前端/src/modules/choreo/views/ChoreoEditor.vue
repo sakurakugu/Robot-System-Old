@@ -3,7 +3,10 @@
     <!-- 顶部工具栏 -->
     <div class="editor-toolbar">
       <div class="toolbar-left">
-        <el-button text @click="goBack">
+        <el-button
+          text
+          @click="goBack"
+        >
           <el-icon><ArrowLeft /></el-icon>
           返回
         </el-button>
@@ -11,25 +14,39 @@
         <span class="project-name">{{ project?.name || '加载中...' }}</span>
 
         <!-- 菜单栏 -->
-        <el-dropdown trigger="click" @command="handleEditCommand">
+        <el-dropdown
+          trigger="click"
+          @command="handleEditCommand"
+        >
           <span class="menu-item">
             编辑 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="save">保存</el-dropdown-item>
-              <el-dropdown-item command="save-as-action">保存为自定义动作</el-dropdown-item>
+              <el-dropdown-item command="save">
+                保存
+              </el-dropdown-item>
+              <el-dropdown-item command="save-as-action">
+                保存为自定义动作
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-dropdown trigger="click" @command="handleHelpCommand">
+        <el-dropdown
+          trigger="click"
+          @command="handleHelpCommand"
+        >
           <span class="menu-item">
             帮助 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="help">打开帮助</el-dropdown-item>
-              <el-dropdown-item command="about">关于</el-dropdown-item>
+              <el-dropdown-item command="help">
+                打开帮助
+              </el-dropdown-item>
+              <el-dropdown-item command="about">
+                关于
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -39,18 +56,37 @@
       </div>
       <div class="toolbar-right">
         <el-button-group class="panel-toggles">
-          <el-button :type="showLeftPanel ? 'primary' : ''" size="small" @click="showLeftPanel = !showLeftPanel" title="左侧面板">
+          <el-button
+            :type="showLeftPanel ? 'primary' : ''"
+            size="small"
+            title="左侧面板"
+            @click="showLeftPanel = !showLeftPanel"
+          >
             <el-icon><Fold /></el-icon>
           </el-button>
-          <el-button :type="showRightPanel ? 'primary' : ''" size="small" @click="showRightPanel = !showRightPanel" title="右侧预览">
+          <el-button
+            :type="showRightPanel ? 'primary' : ''"
+            size="small"
+            title="右侧预览"
+            @click="showRightPanel = !showRightPanel"
+          >
             <el-icon><Expand /></el-icon>
           </el-button>
         </el-button-group>
-        <el-button size="small" @click="saveTimeline" :loading="saving">
+        <el-button
+          size="small"
+          :loading="saving"
+          @click="saveTimeline"
+        >
           <el-icon><DocumentChecked /></el-icon>
           保存
         </el-button>
-        <el-button size="small" type="primary" @click="executeTimeline" :disabled="!canExecute">
+        <el-button
+          size="small"
+          type="primary"
+          :disabled="!canExecute"
+          @click="executeTimeline"
+        >
           <el-icon><Zap /></el-icon>
           执行
         </el-button>
@@ -64,48 +100,66 @@
           <div 
             class="activity-icon" 
             :class="{ active: activeView === 'robots' }"
-            @click="toggleView('robots')"
             title="机器人列表"
+            @click="toggleView('robots')"
           >
             <el-icon><Setting /></el-icon>
           </div>
           <div 
             class="activity-icon" 
             :class="{ active: activeView === 'actions' }"
-            @click="toggleView('actions')"
             title="动作列表"
+            @click="toggleView('actions')"
           >
             <el-icon><VideoPlay /></el-icon>
           </div>
           <div 
             class="activity-icon" 
             :class="{ active: activeView === 'history' }"
-            @click="toggleView('history')"
             title="历史记录"
+            @click="toggleView('history')"
           >
             <el-icon><Clock /></el-icon>
           </div>
         </div>
         <div class="activity-bottom">
-          <div class="activity-icon" @click="goToSettings" title="设置">
+          <div
+            class="activity-icon"
+            title="设置"
+            @click="goToSettings"
+          >
             <el-icon><Setting /></el-icon>
           </div>
         </div>
       </div>
 
       <!-- 左侧面板 -->
-      <div v-show="showLeftPanel" class="side-panel left-panel" :style="{ width: leftPanelWidth + 'px' }">
+      <div
+        v-show="showLeftPanel"
+        class="side-panel left-panel"
+        :style="{ width: leftPanelWidth + 'px' }"
+      >
         <div class="panel-header">
           <span>{{ getPanelTitle }}</span>
-          <div class="header-actions" v-if="activeView === 'robots'">
-            <el-button size="small" text @click="showAddRobotDialog = true">
+          <div
+            v-if="activeView === 'robots'"
+            class="header-actions"
+          >
+            <el-button
+              size="small"
+              text
+              @click="showAddRobotDialog = true"
+            >
               <el-icon><Plus /></el-icon>
             </el-button>
           </div>
         </div>
 
         <!-- 机器人列表 -->
-        <div v-show="activeView === 'robots'" class="robot-list">
+        <div
+          v-show="activeView === 'robots'"
+          class="robot-list"
+        >
           <div
             v-for="robot in projectRobots"
             :key="robot.uuid"
@@ -113,27 +167,50 @@
             :class="{ selected: selectedRobotId === robot.robot_id }"
             @click="selectRobot(robot.robot_id)"
           >
-            <div class="robot-status" :class="getRobotStatus(robot.robot_id)"></div>
+            <div
+              class="robot-status"
+              :class="getRobotStatus(robot.robot_id)"
+            />
             <span class="robot-name">{{ robot.name }}</span>
-            <el-button size="small" text @click.stop="removeRobotFromProject(robot.uuid)">
+            <el-button
+              size="small"
+              text
+              @click.stop="removeRobotFromProject(robot.uuid)"
+            >
               <el-icon><Close /></el-icon>
             </el-button>
           </div>
-          <el-empty v-if="projectRobots.length === 0" description="暂无机器人" :image-size="60">
-            <el-button size="small" type="primary" @click="showAddRobotDialog = true">添加机器人</el-button>
+          <el-empty
+            v-if="projectRobots.length === 0"
+            description="暂无机器人"
+            :image-size="60"
+          >
+            <el-button
+              size="small"
+              type="primary"
+              @click="showAddRobotDialog = true"
+            >
+              添加机器人
+            </el-button>
           </el-empty>
         </div>
 
         <!-- 动作列表 -->
-        <div v-show="activeView === 'actions'" class="actions-panel">
+        <div
+          v-show="activeView === 'actions'"
+          class="actions-panel"
+        >
           <ActionList />
         </div>
 
         <!-- 历史记录 -->
-        <div v-show="activeView === 'history'" class="history-panel">
+        <div
+          v-show="activeView === 'history'"
+          class="history-panel"
+        >
           <HistoryPanel
-            :historyRecords="historyRecords"
-            :currentIndex="historyCurrentIndex"
+            :history-records="historyRecords"
+            :current-index="historyCurrentIndex"
             @undo="handleUndo"
             @redo="handleRedo"
             @jump-to="handleJumpTo"
@@ -148,18 +225,21 @@
         v-show="showLeftPanel" 
         class="vertical-resizer" 
         @mousedown="startResizeLeft"
-      ></div>
+      />
 
       <!-- 中间时间轴编辑器 -->
       <div class="center-content">
-        <div class="timeline-area" v-loading="loading">
+        <div
+          v-loading="loading"
+          class="timeline-area"
+        >
           <TimelineEditor
             ref="timelineEditorRef"
             :duration="config.duration"
-            :projectUuid="projectUuid"
-            :selectedRobot="selectedRobotId"
+            :project-uuid="projectUuid"
+            :selected-robot="selectedRobotId"
             :robots="robotsForTimeline"
-            @update:currentTime="updateCurrentTime"
+            @update:current-time="updateCurrentTime"
             @update:tracks="updateTracks"
             @history-change="onHistoryChange"
           />
@@ -170,22 +250,39 @@
           v-show="showBottomPanel" 
           class="horizontal-resizer" 
           @mousedown="startResizeBottom"
-        ></div>
+        />
 
         <!-- 底部日志面板 -->
-        <div v-show="showBottomPanel" class="bottom-panel" :style="{ height: bottomPanelHeight + 'px' }">
+        <div
+          v-show="showBottomPanel"
+          class="bottom-panel"
+          :style="{ height: bottomPanelHeight + 'px' }"
+        >
           <div class="panel-header">
             <span>日志输出</span>
             <div class="header-actions">
-              <el-button size="small" text @click="clearLogs" title="清空日志">
+              <el-button
+                size="small"
+                text
+                title="清空日志"
+                @click="clearLogs"
+              >
                 <el-icon><Delete /></el-icon>
               </el-button>
-              <el-button size="small" text @click="showBottomPanel = false" title="关闭面板">
+              <el-button
+                size="small"
+                text
+                title="关闭面板"
+                @click="showBottomPanel = false"
+              >
                 <el-icon><Close /></el-icon>
               </el-button>
             </div>
           </div>
-          <div class="logs-content" ref="logsContainerRef">
+          <div
+            ref="logsContainerRef"
+            class="logs-content"
+          >
             <div 
               v-for="(log, index) in logs" 
               :key="index" 
@@ -195,7 +292,12 @@
               <span class="log-time">{{ log.time }}</span>
               <span class="log-message">{{ log.message }}</span>
             </div>
-            <div v-if="logs.length === 0" class="no-logs">暂无日志</div>
+            <div
+              v-if="logs.length === 0"
+              class="no-logs"
+            >
+              暂无日志
+            </div>
           </div>
         </div>
       </div>
@@ -205,15 +307,21 @@
         v-show="showRightPanel" 
         class="vertical-resizer" 
         @mousedown="startResizeRight"
-      ></div>
+      />
 
       <!-- 右侧预览面板 -->
-      <div v-show="showRightPanel" class="side-panel right-panel" :style="{ width: rightPanelWidth + 'px' }">
-        <div class="panel-header">实时预览</div>
+      <div
+        v-show="showRightPanel"
+        class="side-panel right-panel"
+        :style="{ width: rightPanelWidth + 'px' }"
+      >
+        <div class="panel-header">
+          实时预览
+        </div>
         <div class="preview-content">
           <RobotPreview
-            :currentTime="config.currentTime"
-            :isPlaying="isPlaying"
+            :current-time="config.currentTime"
+            :is-playing="isPlaying"
             :tracks="tracks"
           />
         </div>
@@ -233,7 +341,11 @@
         </span>
       </div>
       <div class="status-right">
-        <span class="status-item" @click="showBottomPanel = !showBottomPanel" style="cursor: pointer;">
+        <span
+          class="status-item"
+          style="cursor: pointer;"
+          @click="showBottomPanel = !showBottomPanel"
+        >
           <el-icon><Document /></el-icon>
           日志 ({{ logs.length }})
         </span>
@@ -243,10 +355,18 @@
     </div>
 
     <!-- 添加机器人对话框 -->
-    <el-dialog v-model="showAddRobotDialog" title="添加机器人" width="500px">
+    <el-dialog
+      v-model="showAddRobotDialog"
+      title="添加机器人"
+      width="500px"
+    >
       <el-form label-width="100px">
         <el-form-item label="选择机器人">
-          <el-select v-model="addRobotForm.robot_id" placeholder="请选择机器人" style="width: 100%">
+          <el-select
+            v-model="addRobotForm.robot_id"
+            placeholder="请选择机器人"
+            style="width: 100%"
+          >
             <el-option
               v-for="robot in availableRobots"
               :key="robot.uuid"
@@ -259,25 +379,51 @@
           </el-select>
         </el-form-item>
         <el-form-item label="显示名称">
-          <el-input v-model="addRobotForm.name" placeholder="可选，留空使用默认名称" />
+          <el-input
+            v-model="addRobotForm.name"
+            placeholder="可选，留空使用默认名称"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddRobotDialog = false">取消</el-button>
-        <el-button type="primary" @click="addRobotToProjectHandler" :disabled="!addRobotForm.robot_id">确定</el-button>
+        <el-button @click="showAddRobotDialog = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :disabled="!addRobotForm.robot_id"
+          @click="addRobotToProjectHandler"
+        >
+          确定
+        </el-button>
       </template>
     </el-dialog>
 
     <!-- 保存为自定义动作对话框 -->
-    <el-dialog v-model="showSaveAsActionDialog" title="保存为自定义动作" width="450px">
+    <el-dialog
+      v-model="showSaveAsActionDialog"
+      title="保存为自定义动作"
+      width="450px"
+    >
       <el-form label-width="80px">
         <el-form-item label="动作名称">
-          <el-input v-model="customActionName" placeholder="请输入自定义动作名称" />
+          <el-input
+            v-model="customActionName"
+            placeholder="请输入自定义动作名称"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showSaveAsActionDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveAsCustomAction" :disabled="!customActionName.trim()">保存</el-button>
+        <el-button @click="showSaveAsActionDialog = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :disabled="!customActionName.trim()"
+          @click="saveAsCustomAction"
+        >
+          保存
+        </el-button>
       </template>
     </el-dialog>
   </div>

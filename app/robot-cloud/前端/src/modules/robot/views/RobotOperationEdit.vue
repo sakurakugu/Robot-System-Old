@@ -1,9 +1,14 @@
 <template>
   <div class="robot-operation-edit">
-    <el-page-header @back="() => router.push('/operation')" class="page-header">
+    <el-page-header
+      class="page-header"
+      @back="() => router.push('/operation')"
+    >
       <template #content>
         <div class="header-content">
-          <el-icon :size="24"><Bot /></el-icon>
+          <el-icon :size="24">
+            <Bot />
+          </el-icon>
           <span class="title">机器人操作编辑</span>
         </div>
       </template>
@@ -25,43 +30,118 @@
         />
       </el-select>
 
-      <div class="layout-editor" v-if="activeTab === 'layout'">
-        <el-button v-if="!layoutEditMode" size="small" :icon="EditPen" @click="startLayoutEdit">
+      <div
+        v-if="activeTab === 'layout'"
+        class="layout-editor"
+      >
+        <el-button
+          v-if="!layoutEditMode"
+          size="small"
+          :icon="EditPen"
+          @click="startLayoutEdit"
+        >
           编辑布局
         </el-button>
         <template v-else>
-          <el-button size="small" type="success" :icon="Check" @click="saveLayout">
+          <el-button
+            size="small"
+            type="success"
+            :icon="Check"
+            @click="saveLayout"
+          >
             保存
           </el-button>
-          <el-button size="small" type="default" :icon="Close" @click="cancelLayoutEdit">
+          <el-button
+            size="small"
+            type="default"
+            :icon="Close"
+            @click="cancelLayoutEdit"
+          >
             取消
           </el-button>
         </template>
       </div>
     </div>
 
-    <el-tabs v-model="activeTab" tab-position="left" class="edit-tabs">
-      <el-tab-pane label="操作编辑" name="layout" lazy>
+    <el-tabs
+      v-model="activeTab"
+      tab-position="left"
+      class="edit-tabs"
+    >
+      <el-tab-pane
+        label="操作编辑"
+        name="layout"
+        lazy
+      >
         <div class="layout-pane">
           <div class="layout-preview">
-            <RobotOperation ref="operationRef" :embedded="true" :robotUuid="selectedUuid" />
+            <RobotOperation
+              ref="operationRef"
+              :embedded="true"
+              :robot-uuid="selectedUuid"
+            />
           </div>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="基本信息" name="basic" lazy>
-        <RobotSettings :embedded="true" :robotUuid="selectedUuid" :hideTabs="true" activeTab="basic" />
+      <el-tab-pane
+        label="基本信息"
+        name="basic"
+        lazy
+      >
+        <RobotSettings
+          :embedded="true"
+          :robot-uuid="selectedUuid"
+          :hide-tabs="true"
+          active-tab="basic"
+        />
       </el-tab-pane>
-      <el-tab-pane label="网络配置" name="network" lazy>
-        <RobotSettings :embedded="true" :robotUuid="selectedUuid" :hideTabs="true" activeTab="network" />
+      <el-tab-pane
+        label="网络配置"
+        name="network"
+        lazy
+      >
+        <RobotSettings
+          :embedded="true"
+          :robot-uuid="selectedUuid"
+          :hide-tabs="true"
+          active-tab="network"
+        />
       </el-tab-pane>
-      <el-tab-pane label="日志管理" name="logs" lazy>
-        <RobotSettings :embedded="true" :robotUuid="selectedUuid" :hideTabs="true" activeTab="logs" />
+      <el-tab-pane
+        label="日志管理"
+        name="logs"
+        lazy
+      >
+        <RobotSettings
+          :embedded="true"
+          :robot-uuid="selectedUuid"
+          :hide-tabs="true"
+          active-tab="logs"
+        />
       </el-tab-pane>
-      <el-tab-pane label="AI 配置" name="ai" lazy>
-        <RobotSettings :embedded="true" :robotUuid="selectedUuid" :hideTabs="true" activeTab="ai" />
+      <el-tab-pane
+        label="AI 配置"
+        name="ai"
+        lazy
+      >
+        <RobotSettings
+          :embedded="true"
+          :robot-uuid="selectedUuid"
+          :hide-tabs="true"
+          active-tab="ai"
+        />
       </el-tab-pane>
-      <el-tab-pane label="系统升级" name="upgrade" lazy>
-        <RobotSettings :embedded="true" :robotUuid="selectedUuid" :hideTabs="true" activeTab="upgrade" />
+      <el-tab-pane
+        label="系统升级"
+        name="upgrade"
+        lazy
+      >
+        <RobotSettings
+          :embedded="true"
+          :robot-uuid="selectedUuid"
+          :hide-tabs="true"
+          active-tab="upgrade"
+        />
       </el-tab-pane>
     </el-tabs>
   </div>

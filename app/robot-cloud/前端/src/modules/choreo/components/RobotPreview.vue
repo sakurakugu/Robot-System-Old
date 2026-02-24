@@ -3,10 +3,18 @@
     <div ref="canvasContainer" class="canvas-container">
       <!-- 当没有 three.js 时显示占位内容 -->
       <div v-if="!hasThreeJS" class="preview-placeholder">
-        <el-icon :size="80"><VideoPlay /></el-icon>
-        <p class="placeholder-text">3D 预览</p>
-        <p class="placeholder-hint">需要安装 three.js 依赖</p>
-        <el-button size="small" @click="showInstallInfo = true">查看安装说明</el-button>
+        <el-icon :size="80">
+          <VideoPlay />
+        </el-icon>
+        <p class="placeholder-text">
+          3D 预览
+        </p>
+        <p class="placeholder-hint">
+          需要安装 three.js 依赖
+        </p>
+        <el-button size="small" @click="showInstallInfo = true">
+          查看安装说明
+        </el-button>
       </div>
     </div>
     <div class="preview-controls">
@@ -18,9 +26,13 @@
         <span class="label">当前动作:</span>
         <span class="value">{{ currentActionName || '无' }}</span>
       </div>
-      <div class="control-row" v-if="hasThreeJS">
-        <el-button size="small" @click="resetView">重置视角</el-button>
-        <el-button size="small" @click="toggleGrid">{{ showGrid ? '隐藏网格' : '显示网格' }}</el-button>
+      <div v-if="hasThreeJS" class="control-row">
+        <el-button size="small" @click="resetView">
+          重置视角
+        </el-button>
+        <el-button size="small" @click="toggleGrid">
+          {{ showGrid ? '隐藏网格' : '显示网格' }}
+        </el-button>
       </div>
     </div>
 
@@ -28,7 +40,9 @@
     <el-dialog v-model="showInstallInfo" title="安装 Three.js" width="500px">
       <p>要启用 3D 机器人预览，请安装以下依赖：</p>
       <el-code>npm install three @types/three</el-code>
-      <p style="margin-top: 16px;">安装后重启开发服务器即可启用 3D 预览功能。</p>
+      <p style="margin-top: 16px;">
+        安装后重启开发服务器即可启用 3D 预览功能。
+      </p>
     </el-dialog>
   </div>
 </template>
@@ -54,7 +68,7 @@ let OrbitControls: any = null
 interface Props {
   currentTime: number // 当前时间
   isPlaying: boolean  // 是否正在播放
-  tracks?: Track[]    // 动作轨道 
+  tracks?: Track[]    // 动作轨道
 }
 
 const props = withDefaults(defineProps<Props>(), {

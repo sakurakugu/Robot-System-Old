@@ -1,7 +1,11 @@
 <template>
   <div class="about-page">
     <div class="page-header">
-      <el-button text @click="goBack" class="back-btn">
+      <el-button
+        text
+        class="back-btn"
+        @click="goBack"
+      >
         <el-icon><ArrowLeft /></el-icon>
         返回
       </el-button>
@@ -11,11 +15,19 @@
       <el-card class="about-card">
         <div class="app-info">
           <div class="app-logo">
-            <el-icon :size="64"><VideoPlay /></el-icon>
+            <el-icon :size="64">
+              <VideoPlay />
+            </el-icon>
           </div>
-          <h1 class="app-name">机器狗编舞系统</h1>
-          <p class="app-version">版本 1.0.0</p>
-          <p class="app-desc">一个用于控制机器狗执行编舞动作的可视化编辑系统</p>
+          <h1 class="app-name">
+            机器狗编舞系统
+          </h1>
+          <p class="app-version">
+            版本 1.0.0
+          </p>
+          <p class="app-desc">
+            一个用于控制机器狗执行编舞动作的可视化编辑系统
+          </p>
         </div>
 
         <el-divider />
@@ -50,10 +62,20 @@
 
         <div class="info-section">
           <h3>环境信息</h3>
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="运行模式">{{ isDev ? '开发模式' : '生产模式' }}</el-descriptions-item>
-            <el-descriptions-item label="浏览器">{{ browserInfo }}</el-descriptions-item>
-            <el-descriptions-item label="平台">{{ platformInfo }}</el-descriptions-item>
+          <el-descriptions
+            :column="1"
+            border
+            size="small"
+          >
+            <el-descriptions-item label="运行模式">
+              {{ isDev ? '开发模式' : '生产模式' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="浏览器">
+              {{ browserInfo }}
+            </el-descriptions-item>
+            <el-descriptions-item label="平台">
+              {{ platformInfo }}
+            </el-descriptions-item>
           </el-descriptions>
         </div>
       </el-card>

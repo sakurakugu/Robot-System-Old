@@ -1,7 +1,11 @@
 <template>
   <div class="settings-page">
     <div class="page-header">
-      <el-button text @click="goBack" class="back-btn">
+      <el-button
+        text
+        class="back-btn"
+        @click="goBack"
+      >
         <el-icon><ArrowLeft /></el-icon>
         返回
       </el-button>
@@ -21,42 +25,93 @@
           </div>
         </div>
         <div class="settings-content">
-          <section id="appearance" class="settings-section">
-            <h3 class="section-title">外观</h3>
-            <el-form label-width="140px" class="settings-form">
+          <section
+            id="appearance"
+            class="settings-section"
+          >
+            <h3 class="section-title">
+              外观
+            </h3>
+            <el-form
+              label-width="140px"
+              class="settings-form"
+            >
               <el-form-item label="跟随系统主题">
                 <el-switch v-model="settings.followSystem" />
               </el-form-item>
               <el-form-item label="主题">
-                <el-select v-model="settings.theme" style="width: 220px" :disabled="settings.followSystem">
-                  <el-option label="浅色" value="light" />
-                  <el-option label="深色" value="dark" />
+                <el-select
+                  v-model="settings.theme"
+                  style="width: 220px"
+                  :disabled="settings.followSystem"
+                >
+                  <el-option
+                    label="浅色"
+                    value="light"
+                  />
+                  <el-option
+                    label="深色"
+                    value="dark"
+                  />
                 </el-select>
               </el-form-item>
             </el-form>
           </section>
 
-          <section id="timeline" class="settings-section">
-            <h3 class="section-title">时间轴</h3>
-            <el-form label-width="140px" class="settings-form">
+          <section
+            id="timeline"
+            class="settings-section"
+          >
+            <h3 class="section-title">
+              时间轴
+            </h3>
+            <el-form
+              label-width="140px"
+              class="settings-form"
+            >
               <el-form-item label="默认时长（秒）">
-                <el-input-number v-model="settings.defaultDuration" :min="10" :max="600" :step="10" />
+                <el-input-number
+                  v-model="settings.defaultDuration"
+                  :min="10"
+                  :max="600"
+                  :step="10"
+                />
               </el-form-item>
               <el-form-item label="默认缩放级别">
-                <el-slider v-model="settings.defaultZoom" :min="20" :max="200" :step="10" show-input />
+                <el-slider
+                  v-model="settings.defaultZoom"
+                  :min="20"
+                  :max="200"
+                  :step="10"
+                  show-input
+                />
               </el-form-item>
               <el-form-item label="网格吸附">
                 <el-switch v-model="settings.snapToGrid" />
               </el-form-item>
               <el-form-item label="网格大小（秒）">
-                <el-input-number v-model="settings.gridSize" :min="0.1" :max="5" :step="0.1" :precision="1" />
+                <el-input-number
+                  v-model="settings.gridSize"
+                  :min="0.1"
+                  :max="5"
+                  :step="0.1"
+                  :precision="1"
+                />
               </el-form-item>
             </el-form>
           </section>
 
-          <section id="playback" class="settings-section">
-            <h3 class="section-title">播放</h3>
-            <el-form label-width="140px" class="settings-form">
+          <section
+            id="playback"
+            class="settings-section"
+          >
+            <h3 class="section-title">
+              播放
+            </h3>
+            <el-form
+              label-width="140px"
+              class="settings-form"
+            >
               <el-form-item label="自动播放预览">
                 <el-switch v-model="settings.autoPlayPreview" />
               </el-form-item>
@@ -66,9 +121,17 @@
             </el-form>
           </section>
 
-          <section id="preview" class="settings-section">
-            <h3 class="section-title">3D 预览</h3>
-            <el-form label-width="140px" class="settings-form">
+          <section
+            id="preview"
+            class="settings-section"
+          >
+            <h3 class="section-title">
+              3D 预览
+            </h3>
+            <el-form
+              label-width="140px"
+              class="settings-form"
+            >
               <el-form-item label="显示网格">
                 <el-switch v-model="settings.showGrid" />
               </el-form-item>
@@ -76,30 +139,62 @@
                 <el-switch v-model="settings.antiAlias" />
               </el-form-item>
               <el-form-item label="阴影质量">
-                <el-select v-model="settings.shadowQuality" style="width: 220px">
-                  <el-option label="低" value="low" />
-                  <el-option label="中" value="medium" />
-                  <el-option label="高" value="high" />
+                <el-select
+                  v-model="settings.shadowQuality"
+                  style="width: 220px"
+                >
+                  <el-option
+                    label="低"
+                    value="low"
+                  />
+                  <el-option
+                    label="中"
+                    value="medium"
+                  />
+                  <el-option
+                    label="高"
+                    value="high"
+                  />
                 </el-select>
               </el-form-item>
             </el-form>
           </section>
 
-          <section id="execution" class="settings-section">
-            <h3 class="section-title">执行</h3>
-            <el-form label-width="140px" class="settings-form">
+          <section
+            id="execution"
+            class="settings-section"
+          >
+            <h3 class="section-title">
+              执行
+            </h3>
+            <el-form
+              label-width="140px"
+              class="settings-form"
+            >
               <el-form-item label="执行前确认">
                 <el-switch v-model="settings.confirmBeforeExecute" />
               </el-form-item>
               <el-form-item label="执行超时（秒）">
-                <el-input-number v-model="settings.executionTimeout" :min="30" :max="600" :step="30" />
+                <el-input-number
+                  v-model="settings.executionTimeout"
+                  :min="30"
+                  :max="600"
+                  :step="30"
+                />
               </el-form-item>
             </el-form>
           </section>
 
           <div class="actions">
-            <el-button @click="resetSettings">重置默认</el-button>
-            <el-button type="primary" @click="saveSettings">保存设置</el-button>
+            <el-button @click="resetSettings">
+              重置默认
+            </el-button>
+            <el-button
+              type="primary"
+              @click="saveSettings"
+            >
+              保存设置
+            </el-button>
           </div>
         </div>
       </div>

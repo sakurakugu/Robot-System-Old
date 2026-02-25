@@ -3,17 +3,9 @@
 // API 基础地址
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000'
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:9000'
-export const WS_CONTROL_BASE_URL = import.meta.env.VITE_WS_CONTROL_BASE_URL || 'ws://localhost:9000'
-export const WS_BIZ_BASE_URL = import.meta.env.VITE_WS_BIZ_BASE_URL || 'ws://localhost:9000'
-export const WS_AUDIO_UPLOAD_BASE_URL = import.meta.env.VITE_WS_AUDIO_UPLOAD_BASE_URL || 'ws://localhost:9000'
-export const WS_AUDIO_DOWNLOAD_BASE_URL = import.meta.env.VITE_WS_AUDIO_DOWNLOAD_BASE_URL || 'ws://localhost:9000'
 
-// WebSocket 路径
-export const WS_PATH = '/api/v1/interaction/connect' // WebSocket 连接基础路径
-export const WS_CONTROL_PATH = '/api/v1/interaction/connect/control' // 控制通道
-export const WS_BUSINESS_PATH = '/api/v1/interaction/connect/business' // 业务通道
-export const WS_AUDIO_UPLOAD_PATH = '/api/v1/interaction/connect/audio_upload' // 音频上传通道
-export const WS_AUDIO_DOWNLOAD_PATH = '/api/v1/interaction/connect/audio_download' // 音频下载通道
+// WebSocket 连接基础路径（与后端 server.ts 中的 basePath 一致）
+export const WS_PATH = '/api/v1/interaction/connect'
 
 // 机器人状态
 export const ROBOT_STATUS = {

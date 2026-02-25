@@ -107,10 +107,9 @@ export const LLM供应商列表: LLM供应商选项[] = [
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
     models: [
-      { value: 'gpt-4o', label: 'GPT-4o' },
-      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-      { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-      { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+      { value: 'gpt-5', label: 'GPT-5' },
+      { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
+      { value: 'gpt-5-turbo', label: 'GPT-5 Turbo' },
     ],
   },
   {
@@ -118,9 +117,9 @@ export const LLM供应商列表: LLM供应商选项[] = [
     label: 'Anthropic Claude',
     baseUrl: 'https://api.anthropic.com/v1',
     models: [
-      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-      { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-      { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+      { value: 'claude-4-6-sonnet', label: 'Claude 4.6 Sonnet' },
+      { value: 'claude-4-6-haiku', label: 'Claude 4.6 Haiku' },
+      { value: 'claude-4-6-opus', label: 'Claude 4.6 Opus' },
     ],
   },
   {
@@ -149,9 +148,9 @@ export const LLM供应商列表: LLM供应商选项[] = [
     label: '智谱 GLM',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     models: [
-      { value: 'glm-4-flash', label: 'GLM-4 Flash' },
-      { value: 'glm-4-plus', label: 'GLM-4 Plus' },
-      { value: 'glm-4', label: 'GLM-4' },
+      { value: 'glm-5-flash', label: 'GLM-5 Flash' },
+      { value: 'glm-5-plus', label: 'GLM-5 Plus' },
+      { value: 'glm-5', label: 'GLM-5' },
     ],
   },
 ];

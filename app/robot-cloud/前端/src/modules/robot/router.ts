@@ -13,6 +13,15 @@ export const robotRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/robots/add',
+    name: 'RobotAdd',
+    component: () => import('@/modules/robot/views/RobotAdd.vue'),
+    meta: {
+      title: '新增机器人',
+      hidden: true,
+    },
+  },
+  {
     path: '/robots/:uuid',
     name: 'RobotDetail',
     component: () => import('@/modules/robot/views/RobotSettings.vue'),

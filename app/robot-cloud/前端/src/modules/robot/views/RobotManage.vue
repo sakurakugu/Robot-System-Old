@@ -26,7 +26,7 @@
           <el-button
             type="primary"
             :icon="Plus"
-            @click="openAddDialog"
+            @click="goAddRobot"
           >
             添加机器人
           </el-button>
@@ -136,7 +136,7 @@
       >
         <el-button
           type="primary"
-          @click="openAddDialog"
+          @click="goAddRobot"
         >
           添加第一个机器人
         </el-button>
@@ -255,168 +255,12 @@
       >
         <el-button
           type="primary"
-          @click="openAddDialog"
+          @click="goAddRobot"
         >
           添加第一个机器人
         </el-button>
       </el-empty>
     </div>
-
-    <!-- 添加机器人对话框 -->
-    <el-dialog
-      v-model="showAddDialog"
-      title="添加机器人"
-      width="600px"
-      :close-on-click-modal="false"
-    >
-      <!-- 自动发现区域 -->
-      <div class="discover-section">
-        <div class="discover-header">
-          <el-text
-            type="info"
-            size="small"
-          >
-            自动发现局域网内的机器人
-          </el-text>
-          <el-button
-            type="primary"
-            size="small"
-            :icon="Refresh"
-            :loading="discovering"
-            @click="discoverRobots"
-          >
-            {{ discovering ? '扫描中...' : '扫描' }}
-          </el-button>
-        </div>
-
-        <div
-          v-if="discoveredRobots.length > 0"
-          class="discovered-list"
-        >
-          <el-card
-            v-for="robot in discoveredRobots"
-            :key="robot.uuid"
-            shadow="hover"
-            class="discovered-robot"
-            :class="{ selected: selectedDiscoveredRobot?.uuid === robot.uuid }"
-            @click="selectDiscoveredRobot(robot)"
-          >
-            <div class="robot-info">
-              <div class="robot-main">
-                <el-icon
-                  :size="20"
-                  color="var(--el-color-primary)"
-                >
-                  <Bot />
-                </el-icon>
-                <div class="robot-details">
-                  <span class="robot-name">{{ robot.name }}</span>
-                  <span class="robot-model">{{ robot.model }} · {{ robot.version }}</span>
-                </div>
-              </div>
-              <div class="robot-ip">
-                <el-tag
-                  size="small"
-                  type="success"
-                >
-                  {{ robot.ip }}:{{ robot.port }}
-                </el-tag>
-              </div>
-            </div>
-            <div class="robot-uuid">
-              <el-text
-                class="mono"
-                size="small"
-                type="info"
-              >
-                {{ robot.uuid }}
-              </el-text>
-            </div>
-          </el-card>
-        </div>
-
-        <el-empty
-          v-else-if="!discovering && hasScanned"
-          description="未发现机器人"
-          :image-size="60"
-        />
-      </div>
-
-      <el-divider>或手动输入</el-divider>
-
-      <el-form
-        :model="formData"
-        label-width="100px"
-      >
-        <el-form-item
-          label="名称"
-          required
-        >
-          <el-input
-            v-model="formData.name"
-            placeholder="例如：机器狗1"
-          />
-        </el-form-item>
-        <el-form-item label="机器人IP">
-          <el-input
-            v-model="formData.robot_ip"
-            placeholder="例如：192.168.1.110"
-          />
-          <el-text
-            v-if="formData.robot_ip && !isValidIp(formData.robot_ip)"
-            type="danger"
-            size="small"
-          >
-            IP格式不正确
-          </el-text>
-        </el-form-item>
-        <el-form-item label="分组">
-          <el-select
-            v-model="formData.group_name"
-            placeholder="选择分组"
-            allow-create
-            filterable
-            default-first-option
-          >
-            <el-option
-              label="默认分组"
-              value="Default"
-            />
-            <el-option
-              label="开发测试"
-              value="Dev"
-            />
-            <el-option
-              label="演示展厅"
-              value="Demo"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="closeDialog">
-          取消
-        </el-button>
-        <el-button
-          v-if="selectedDiscoveredRobot"
-          type="success"
-          :loading="adding"
-          @click="addDiscoveredRobot"
-        >
-          添加已发现的机器人
-        </el-button>
-        <el-button
-          v-else
-          type="primary"
-          :disabled="!isFormValid"
-          :loading="adding"
-          @click="saveRobot"
-        >
-          手动添加
-        </el-button>
-      </template>
-    </el-dialog>
-
   </div>
 </template>
 
@@ -428,14 +272,12 @@ import {
   Edit,
   Grid, List,
   Plus,
-  Refresh,
-  Upload,
-  Warning
+  Upload
 } from '@element-plus/icons-vue'
 import type { TagProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 type Robot = {
@@ -450,53 +292,13 @@ type Robot = {
   group_name?: string | null
 }
 
-type DiscoveredRobot = {
-  uuid: string
-  name: string
-  model: string
-  version: string
-  ip: string
-  port: number
-}
-
 const router = useRouter()
 
 const robots = ref<Robot[]>([])
 const viewMode = ref<'card' | 'list'>('card')
-const showAddDialog = ref(false)
 const updating = ref<Record<string, boolean>>({})
 const error = ref('')
 const loading = ref(false)
-
-// 自动发现相关
-const discovering = ref(false)
-const hasScanned = ref(false)
-const discoveredRobots = ref<DiscoveredRobot[]>([])
-const selectedDiscoveredRobot = ref<DiscoveredRobot | null>(null)
-const adding = ref(false)
-
-type FormData = {
-  name: string
-  robot_ip: string
-  group_name: string
-}
-const formData = ref<FormData>({
-  name: '',
-  robot_ip: '',
-  group_name: ''
-})
-
-const isValidIp = (ip: string) => {
-  const ipv4 = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/
-  return ipv4.test(ip)
-}
-
-const isFormValid = computed(() => {
-  return Boolean(
-    formData.value.name &&
-    (!formData.value.robot_ip || isValidIp(formData.value.robot_ip))
-  )
-})
 
 function statusText(status: string): string {
   const map: Record<string, string> = {
@@ -577,6 +379,10 @@ function editRobot(robot: Robot) {
   router.push(`/robots/${robot.uuid}`)
 }
 
+function goAddRobot() {
+  router.push('/robots/add')
+}
+
 async function updateFirmware(robot: Robot) {
   try {
     await ElMessageBox.confirm(
@@ -624,46 +430,8 @@ function openChat(robot: Robot) {
 function notifyRobotsUpdated() {
   try {
     window.dispatchEvent(new CustomEvent('robots_updated'))
-  } catch { }
-}
-
-async function saveRobot() {
-  const payload = {
-    name: formData.value.name,
-    robot_ip: formData.value.robot_ip,
-    group_name: formData.value.group_name || ''
-  }
-  try {
-    const res = await fetch('/api/v1/robots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
-    const saved = json.data
-    let meta: any = {}
-    try {
-      meta = saved.metadata ? JSON.parse(saved.metadata) : {}
-    } catch {
-      meta = {}
-    }
-    robots.value.push({
-      uuid: saved.uuid,
-      name: saved.name || '',
-      model: saved.model || '',
-      status: saved.status || 'offline',
-      last_connected: saved.last_connected || null,
-      robot_ip: saved.robot_ip ?? meta.robot_ip ?? '',
-      local_ip: saved.local_ip ?? meta.local_ip ?? '',
-      local_port: saved.local_port ?? meta.local_port ?? 10000,
-      group_name: saved.group_name ?? meta.group_name ?? ''
-    })
-    notifyRobotsUpdated()
-    closeDialog()
-    ElMessage.success('添加成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+    ElMessage.error(e?.message || '通知失败')
   }
 }
 
@@ -687,133 +455,17 @@ async function deleteRobotConfirm(robot: Robot) {
   }
 }
 
-function closeDialog() {
-  showAddDialog.value = false
-  formData.value = {
-    name: '',
-    robot_ip: '',
-    group_name: ''
-  }
-  selectedDiscoveredRobot.value = null
-  hasScanned.value = false
-  discoveredRobots.value = []
-}
-
-const openAddDialog = () => {
-  showAddDialog.value = true
-  formData.value = {
-    name: '',
-    robot_ip: '',
-    group_name: ''
-  }
-  selectedDiscoveredRobot.value = null
-  // 打开对话框时自动扫描
-  discoverRobots()
-}
-
-async function discoverRobots() {
-  discovering.value = true
-  hasScanned.value = true
-  discoveredRobots.value = []
-  selectedDiscoveredRobot.value = null
-
-  try {
-    const res = await fetch('/api/v1/robots/discover?timeout=3')
-    const json = await res.json().catch(() => ({}))
-
-    if (res.ok && json.success) {
-      // 过滤掉已经添加过的机器人
-      const existingUuids = new Set(robots.value.map(r => r.uuid))
-      discoveredRobots.value = (json.data?.robots || []).filter(
-        (r: DiscoveredRobot) => !existingUuids.has(r.uuid)
-      )
-
-      if (discoveredRobots.value.length === 0 && json.data?.robots?.length > 0) {
-        ElMessage.info('所有发现的机器人都已添加')
-      } else if (discoveredRobots.value.length > 0) {
-        ElMessage.success(`发现 ${discoveredRobots.value.length} 个新机器人`)
-      }
-    } else {
-      ElMessage.warning(json.error || '扫描失败')
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '扫描失败')
-  } finally {
-    discovering.value = false
-  }
-}
-
-function selectDiscoveredRobot(robot: DiscoveredRobot) {
-  if (selectedDiscoveredRobot.value?.uuid === robot.uuid) {
-    selectedDiscoveredRobot.value = null
-  } else {
-    selectedDiscoveredRobot.value = robot
-    // 自动填充表单
-    formData.value.name = robot.name
-    formData.value.robot_ip = robot.ip
-  }
-}
-
-async function addDiscoveredRobot() {
-  if (!selectedDiscoveredRobot.value) return
-
-  adding.value = true
-  const robot = selectedDiscoveredRobot.value
-
-  try {
-    const payload = {
-      name: robot.name,
-      robot_ip: robot.ip,
-      group_name: formData.value.group_name || ''
-    }
-
-    const res = await fetch('/api/v1/robots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
-
-    const saved = json.data
-    let meta: any = {}
-    try {
-      meta = saved.metadata ? JSON.parse(saved.metadata) : {}
-    } catch {
-      meta = {}
-    }
-
-    robots.value.push({
-      uuid: saved.uuid,
-      name: saved.name || '',
-      model: saved.model || '',
-      status: saved.status || 'offline',
-      last_connected: saved.last_connected || null,
-      robot_ip: saved.robot_ip ?? meta.robot_ip ?? '',
-      local_ip: saved.local_ip ?? meta.local_ip ?? '',
-      local_port: saved.local_port ?? meta.local_port ?? 10000,
-      group_name: saved.group_name ?? meta.group_name ?? ''
-    })
-
-    notifyRobotsUpdated()
-    closeDialog()
-    ElMessage.success(`机器人 "${robot.name}" 添加成功`)
-  } catch (e: any) {
-    ElMessage.error(e?.message || '添加失败')
-  } finally {
-    adding.value = false
-  }
+function handleRobotsUpdated() {
+  loadRobots()
 }
 
 onMounted(() => {
   loadRobots()
+  window.addEventListener('robots_updated', handleRobotsUpdated)
 })
 
 onUnmounted(() => {
-  // if (countdownTimer) {
-  //   clearInterval(countdownTimer)
-  // }
+  window.removeEventListener('robots_updated', handleRobotsUpdated)
 })
 </script>
 
@@ -898,78 +550,5 @@ onUnmounted(() => {
 .mono {
   font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
   font-size: 12px;
-}
-
-/* 自动发现样式 */
-.discover-section {
-  margin-bottom: 16px;
-}
-
-.discover-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.discovered-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.discovered-robot {
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 2px solid transparent;
-}
-
-.discovered-robot:hover {
-  border-color: var(--el-color-primary-light-5);
-}
-
-.discovered-robot.selected {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-}
-
-.discovered-robot :deep(.el-card__body) {
-  padding: 12px;
-}
-
-.robot-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.robot-main {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.robot-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.robot-name {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.robot-model {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.robot-uuid {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--el-border-color-lighter);
 }
 </style>

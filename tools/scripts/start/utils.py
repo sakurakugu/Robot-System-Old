@@ -349,6 +349,17 @@ def is_managed_process(pid: int, cmdline: str) -> bool:
     return any(m in cmdline for m in markers)
 
 
+def kill_port(port: int) -> bool:
+    """终止在指定端口上监听的进程"""
+    listeners = find_listeners(port)
+    any_killed = False
+    for pid, cmd in listeners:
+        print(f"🔪 Killing process on port {port}: PID={pid}")
+        if terminate_pid(pid):
+            any_killed = True
+    return any_killed
+
+
 def 确保端口可用(ports: dict, interactive: bool = True) -> bool:
     """确保端口可用。若为本项目进程则自动清理；否则询问确认。"""
     blocked = []

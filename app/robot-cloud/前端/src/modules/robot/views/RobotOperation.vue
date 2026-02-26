@@ -288,13 +288,13 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import ChatView from '@/modules/conversation/views/ChatView.vue'
 import ActionButton from '@/modules/robot/components/ActionButton.vue'
 import {
-    Back,
-    Camera,
-    Cellphone,
-    ChatLineSquare,
-    Setting,
-    SwitchButton,
-    VideoCamera
+  Back,
+  Camera,
+  Cellphone,
+  ChatLineSquare,
+  Setting,
+  SwitchButton,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot, Mic, MicOff } from 'lucide-vue-next'
@@ -335,6 +335,10 @@ const rightJoystickDisabled = ref(false)
 const isCapturing = ref(false)
 const sdkMode = ref(true) // SDK模式开关，默认开启
 const sdkModeLoading = ref(false) // SDK模式切换加载状态
+/** 切换前的开关状态，切换失败时回滚用 */
+const sdkModePrevValue = ref(true)
+/** 超时保护计时器，避免开关永久卡住 */
+let sdkModeSwitchTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch(twoLegStandActive, (val) => {
   rightJoystickDisabled.value = val
@@ -501,7 +505,7 @@ const handleCapturePhoto = async () => {
 }
 
 // 处理SDK模式切换
-const handleSdkModeChange = async (value: boolean) => {
+const handleSdkModeChange = (value: boolean) => {
   if (!selectedUuid.value) {
     ElMessage.warning('请先选择机器人')
     sdkMode.value = !value // 恢复原值
@@ -514,28 +518,28 @@ const handleSdkModeChange = async (value: boolean) => {
     return
   }
 
+  // 保存切换前的值，备失败时回滚
+  sdkModePrevValue.value = !value
+
   sdkModeLoading.value = true
-  try {
-    // 发送SDK模式切换消息到服务端
-    wsSendMessage({
-      type: 'sdk_mode_set',
-      robotId: selectedUuid.value,
-      timestamp: Date.now(),
-      data: { sdkMode: value },
-    })
 
-    // 等待响应
-    // 这里简化处理，实际应该等待服务端的 sdk_mode_response 消息
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  // 发送SDK模式切换消息到服务端
+  wsSendMessage({
+    type: 'sdk_mode_set',
+    robotId: selectedUuid.value,
+    timestamp: Date.now(),
+    data: { sdkMode: value },
+  })
 
-    ElMessage.success(value ? 'SDK模式已开启' : '遥控模式已开启')
-  } catch (error: any) {
-    console.error('SDK模式切换错误:', error)
-    ElMessage.error(error.message || 'SDK模式切换失败')
-    sdkMode.value = !value // 恢复原值
-  } finally {
-    sdkModeLoading.value = false
-  }
+  // 30 秒超时保护，避免开关永久卡住
+  if (sdkModeSwitchTimeout !== null) clearTimeout(sdkModeSwitchTimeout)
+  sdkModeSwitchTimeout = setTimeout(() => {
+    if (sdkModeLoading.value) {
+      sdkModeLoading.value = false
+      sdkMode.value = sdkModePrevValue.value // 回滚
+      ElMessage.error('SDK模式切换超时，请重试')
+    }
+  }, 30000)
 }
 
 type JoystickPayload = { x: number; y: number }
@@ -731,13 +735,17 @@ onMessage((data) => {
     }
   } else if (data.type === 'sdk_mode_response') {
     // 处理SDK模式响应
+    if (sdkModeSwitchTimeout !== null) {
+      clearTimeout(sdkModeSwitchTimeout)
+      sdkModeSwitchTimeout = null
+    }
     sdkModeLoading.value = false
     if (data.data?.success) {
       sdkMode.value = data.data.sdkMode ?? sdkMode.value
       ElMessage.success(sdkMode.value ? 'SDK模式已开启' : '遥控模式已开启')
     } else {
       ElMessage.error(data.data?.error || 'SDK模式切换失败')
-      sdkMode.value = !sdkMode.value // 恢复原值
+      sdkMode.value = sdkModePrevValue.value // 回滚到切换前的值
     }
   } else if (data.type === 'error') {
     const msg = data.data?.message || '发生错误'

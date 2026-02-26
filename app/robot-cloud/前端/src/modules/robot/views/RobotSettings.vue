@@ -299,6 +299,43 @@
             <h3 class="section-title">
               日志管理
             </h3>
+
+            <div class="log-mark-section">
+              <h4 class="subsection-title">
+                日志标记
+              </h4>
+              <el-form label-width="80px">
+                <el-form-item label="标记内容">
+                  <el-input
+                    v-model="markMessage"
+                    placeholder="可选，空则使用默认标记"
+                    clearable
+                    style="max-width: 360px;"
+                  />
+                </el-form-item>
+                <el-form-item>
+                  <el-button
+                    type="warning"
+                    :loading="markingLog"
+                    :disabled="!status.connected"
+                    @click="markLog"
+                  >
+                    打日志标记
+                  </el-button>
+                  <el-text
+                    v-if="!status.connected"
+                    type="info"
+                    size="small"
+                    style="margin-left: 8px;"
+                  >
+                    机器人未连接
+                  </el-text>
+                </el-form-item>
+              </el-form>
+            </div>
+
+            <el-divider />
+
             <el-form label-position="top">
               <el-form-item label="时间范围">
                 <el-date-picker
@@ -636,6 +673,8 @@ const volumeData = reactive({
 const logDateRange = ref('')
 const logType = ref('all')
 const uploadingLogs = ref(false)
+const markingLog = ref(false)
+const markMessage = ref('')
 type LogHistoryEntry = { time: string; type: string; size: string }
 const logHistory = ref<LogHistoryEntry[]>([])
 
@@ -821,6 +860,31 @@ const uploadLogs = () => {
 // AI
 const saveAIConfig = () => {
     ElMessage.success('AI配置已保存')
+}
+
+const markLog = async () => {
+  if (!uuid.value) {
+    ElMessage.warning('请先选择机器人')
+    return
+  }
+  markingLog.value = true
+  try {
+    const response = await fetch(`/api/v1/robots/${uuid.value}/logs/mark`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: markMessage.value })
+    })
+    const json = await response.json().catch(() => ({}))
+    if (response.ok && json.success) {
+      ElMessage.success('日志标记已写入')
+    } else {
+      ElMessage.error('写入标记失败: ' + (json.error || '未知错误'))
+    }
+  } catch (e: any) {
+    ElMessage.error('写入标记失败: ' + (e?.message || '网络错误'))
+  } finally {
+    markingLog.value = false
+  }
 }
 
 const openWifiSettings = () => {
@@ -1074,6 +1138,10 @@ watch(
   margin-top: 30px;
 }
 .log-history h4 {
+  margin-bottom: 10px;
+}
+
+.log-mark-section {
   margin-bottom: 10px;
 }
 

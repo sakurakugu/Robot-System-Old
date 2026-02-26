@@ -21,7 +21,7 @@ export interface AudioChunk {
   sessionId?: string;
   seq?: number;
   frameDurationMs?: number;
-  buffer: string; // base64编码的音频数据
+  buffer: string; // base64 编码的音频数据
 }
 
 export interface AudioStart {
@@ -39,7 +39,7 @@ export interface AudioEnd {
 
 export interface AudioResponse {
   format: 'opus' | 'mp3';
-  buffer: string; // base64编码
+  buffer: string; // base64 编码的音频数据
   duration: number;
 }
 
@@ -316,7 +316,7 @@ export interface VideoFrameMessage {
   robotId: string;
   timestamp: number;
   data: {
-    frame: string; // base64 encoded JPEG
+    frame: string; // base64 编码的 JPEG 图像
   };
 }
 

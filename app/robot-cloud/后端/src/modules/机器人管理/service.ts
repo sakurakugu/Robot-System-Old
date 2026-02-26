@@ -482,6 +482,27 @@ export class 机器人服务 {
     return { robotIp: robot.ip };
   }
 
+  async 写入日志标记(uuid: string, message: string): Promise<{ marker?: string }> {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
+    }
+
+    try {
+      const result = await this.websocketService.请求日志标记(uuid, message);
+      if (!result.success) {
+        throw new Error(result.error || '写入日志标记失败');
+      }
+      return { marker: result.marker };
+    } catch (error: any) {
+      throw new Error(`写入日志标记失败: ${error.message}`);
+    }
+  }
+
   /**
    * 获取机器人音量（通过WebSocket）
    */

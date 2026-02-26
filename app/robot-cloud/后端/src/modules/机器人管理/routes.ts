@@ -20,6 +20,9 @@ export function createRobotRoutes(controller: 机器人控制器): Router {
   // router.post('/:uuid/connect', controller.connectRobot);
   router.post('/:uuid/update-firmware', controller.updateFirmware);
 
+  // 日志标记
+  router.post('/:uuid/logs/mark', controller.markLog);
+
   // 音量控制
   router.get('/:uuid/volume', controller.getVolume);
   router.post('/:uuid/volume', controller.setVolume);

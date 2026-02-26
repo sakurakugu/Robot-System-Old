@@ -65,16 +65,16 @@ export interface ConversationRecord {
   type: 'audio' | 'text';
   user_input: string;
   ai_response: string;
-  actions?: string; // JSON string
+  actions?: string; // JSON 字符串
   processing_time: number;
-  metadata?: string; // JSON string
+  metadata?: string; // JSON 字符串
 }
 
 export interface ActionLogRecord {
   uuid: number;
   robot_id: string;
   action_name: string;
-  parameters?: string; // JSON string
+  parameters?: string; // JSON 字符串
   status: 'success' | 'failed' | 'rejected';
   executed_at: Date;
 }

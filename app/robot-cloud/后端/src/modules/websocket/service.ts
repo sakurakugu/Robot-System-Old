@@ -2180,6 +2180,50 @@ class WebSocket服务 {
       connection.websocket.on('message', checkResponse);
     });
   }
+
+  /**
+   * 请求写入日志标记（用于API调用）
+   */
+  async 请求日志标记(robotId: string, message: string = ''): Promise<{ success: boolean; marker?: string; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+
+    const success = this.sendToRobot(robotId, {
+      type: 'log_mark',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId, message },
+    }, 'business');
+
+    if (!success) {
+      throw new Error('发送日志标记命令失败');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('日志标记请求超时'));
+      }, 10000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'log_mark_response' && msg.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(msg.data);
+          }
+        } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
 }
 
 export default WebSocket服务;

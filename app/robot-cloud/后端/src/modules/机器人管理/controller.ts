@@ -169,6 +169,21 @@ export class 机器人控制器 {
   };
 
   /**
+   * 写入日志标记
+   */
+  markLog = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const { message = '' } = req.body || {};
+      const result = await this.机器人服务.写入日志标记(uuid, String(message));
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('未连接') || error.message.includes('未初始化') ? 503 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
    * 获取机器人音量
    */
   getVolume = async (req: Request, res: Response) => {

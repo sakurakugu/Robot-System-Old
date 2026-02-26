@@ -437,7 +437,7 @@ onMounted(async () => {
     console.log('参数配置响应:', cfgRes)
     if (cfgRes?.success && cfgRes.data && cfgRes.data.providers) {
       const providers = cfgRes.data.providers
-      // OpenAI
+      // OpenAI 配置
       if (providers.openai) {
         openaiConfig.value.hasKey = !!providers.openai.hasApiKey
         openaiConfig.value.keyLength = providers.openai.apiKeyLength || 0
@@ -448,7 +448,7 @@ onMounted(async () => {
         }
       }
 
-      // BigModel
+      // BigModel 配置
       if (providers.bigmodel) {
         bigmodelConfig.value.hasKey = !!providers.bigmodel.hasApiKey
         bigmodelConfig.value.keyLength = providers.bigmodel.apiKeyLength || 0
@@ -459,7 +459,7 @@ onMounted(async () => {
         }
       }
 
-      // Anthropic
+      // Anthropic 配置
       if (providers.anthropic) {
         anthropicConfig.value.hasKey = !!providers.anthropic.hasApiKey
         anthropicConfig.value.keyLength = providers.anthropic.apiKeyLength || 0
@@ -470,7 +470,7 @@ onMounted(async () => {
         }
       }
 
-      // DeepSeek
+      // DeepSeek 配置
       if (providers.deepseek) {
         deepseekConfig.value.hasKey = !!providers.deepseek.hasApiKey
         deepseekConfig.value.keyLength = providers.deepseek.apiKeyLength || 0
@@ -481,7 +481,7 @@ onMounted(async () => {
         }
       }
 
-      // 千问
+      // 千问 配置
       if (providers.aliyun) {
         aliyunConfig.value.hasKey = !!providers.aliyun.hasApiKey
         aliyunConfig.value.keyLength = providers.aliyun.apiKeyLength || 0
@@ -608,27 +608,27 @@ const enableXunfeiEdit = (field: 'appId' | 'apiKey' | 'apiSecret') => {
 const saveLLMConfig = async () => {
   const llmPayload: any = {}
 
-  // OpenAI
+  // OpenAI 配置
   if ((openaiConfig.value.apiKey || '').trim().length > 0 && openaiConfig.value.apiKey !== getMaskedText(openaiConfig.value.keyLength)) {
     llmPayload.openai = { apiKey: openaiConfig.value.apiKey.trim() }
   }
 
-  // BigModel
+  // BigModel 配置
   if ((bigmodelConfig.value.apiKey || '').trim().length > 0 && bigmodelConfig.value.apiKey !== getMaskedText(bigmodelConfig.value.keyLength)) {
     llmPayload.bigmodel = { apiKey: bigmodelConfig.value.apiKey.trim() }
   }
 
-  // Anthropic
+  // Anthropic 配置
   if ((anthropicConfig.value.apiKey || '').trim().length > 0 && anthropicConfig.value.apiKey !== getMaskedText(anthropicConfig.value.keyLength)) {
     llmPayload.anthropic = { apiKey: anthropicConfig.value.apiKey.trim() }
   }
 
-  // DeepSeek
+  // DeepSeek 配置
   if ((deepseekConfig.value.apiKey || '').trim().length > 0 && deepseekConfig.value.apiKey !== getMaskedText(deepseekConfig.value.keyLength)) {
     llmPayload.deepseek = { apiKey: deepseekConfig.value.apiKey.trim() }
   }
 
-  // 千问
+  // 千问 配置
   if ((aliyunConfig.value.apiKey || '').trim().length > 0 && aliyunConfig.value.apiKey !== getMaskedText(aliyunConfig.value.keyLength)) {
     llmPayload.aliyun = { apiKey: aliyunConfig.value.apiKey.trim() }
   }

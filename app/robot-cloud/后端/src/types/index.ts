@@ -20,9 +20,9 @@ export interface ConversationRecord {
   type: 对话类型;
   user_input: string;
   ai_response: string;
-  actions: string | null; // JSON string
+  actions: string | null; // JSON 字符串
   processing_time: number | null;
-  metadata: string | null; // JSON string
+  metadata: string | null; // JSON 字符串
 }
 
 /**
@@ -32,7 +32,7 @@ export interface ActionLogRecord {
   uuid: number;
   robot_id: string;
   action_name: string;
-  parameters: string | null; // JSON string
+  parameters: string | null; // JSON 字符串
   status: ActionStatus;
   executed_at: string;
 }
@@ -89,7 +89,7 @@ export interface AudioChunk {
   sessionId?: string;
   seq?: number;
   frameDurationMs?: number;
-  buffer: string; // base64
+  buffer: string; // base64 编码
 }
 
 export interface AudioStart {
@@ -260,7 +260,7 @@ export interface ServerMessage {
  * 音频响应
  */
 export interface AudioResponse {
-  buffer: string;  // base64 encoded
+  buffer: string;  // base64 编码
   format: string;
   duration?: number;
   sampleRate?: number;

@@ -10,7 +10,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色 (No Color)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR=$ROOT_DIR/tools/scripts
@@ -218,8 +218,8 @@ main() {
 }
 
 # 管理员权限（windows）
-# cmd /c "assoc .py=Python.File"
-# cmd /c "ftype Python.File=""C:\Software\Deps\Python\Python313\python.exe"" ""%1"" %*"
+# cmd /c "assoc .py=Python.File" # 关联 Python 文件
+# cmd /c "ftype Python.File=""C:\Software\Deps\Python\Python313\python.exe"" ""%1"" %*" # 设置打开方式
 
 # 执行主函数
 main

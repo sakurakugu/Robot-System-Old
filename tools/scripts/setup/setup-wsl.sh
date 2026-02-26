@@ -163,7 +163,7 @@ show_network_info() {
     print_info "网络信息:"
     echo "----------------------------------------"
 
-    # WSL IP
+    # WSL IP 地址
     WSL_IP=$(hostname -I | awk '{print $1}')
     echo "WSL IP: $WSL_IP"
 

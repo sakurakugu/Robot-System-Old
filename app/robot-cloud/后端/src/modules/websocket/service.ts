@@ -372,6 +372,7 @@ class WebSocket服务 {
         'sdk_mode_response',
         'volume_response',
         'config_response',
+        'log_mark_response',
       ]),
       audio_upload: new Set(['audio_start', 'audio_chunk', 'audio_end', 'heartbeat']),
       audio_download: new Set(['heartbeat']),

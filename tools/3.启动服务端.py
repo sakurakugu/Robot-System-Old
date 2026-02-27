@@ -7,7 +7,7 @@ from scripts.start.orchestrator import start_all, stop_all, test_all
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="tools/3.启动前后端.py", add_help=False)
+    parser = argparse.ArgumentParser(prog="tools/3.启动服务端.py", add_help=False)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--start", "-s", action="store_true")
     group.add_argument("--stop", "-x", action="store_true")
@@ -35,7 +35,7 @@ def show_help() -> None:
     print("机器狗控制系统 - 统一启动脚本 (Python)")
     print("")
     print("用法：")
-    print("  python3 tools/3.启动前后端.py [ACTION]")
+    print("  python3 tools/3.启动服务端.py [ACTION]")
     print("")
     print("操作参数 (ACTION):")
     print("  --start, -s       启动服务")

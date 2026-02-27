@@ -8,7 +8,6 @@ const HTTP服务 = createServer(应用.应用);
 
 // 初始化WebSocket服务（单端口，不同路径）
 const basePath = 配置.ws.path || "/api/v1/interaction/connect";
-应用.WebSocket服务.init(HTTP服务, { path: `${basePath}/control`, channel: "control", });
 应用.WebSocket服务.init(HTTP服务, { path: `${basePath}/business`, channel: "business", });
 应用.WebSocket服务.init(HTTP服务, { path: `${basePath}/audio_upload`, channel: "audio_upload", });
 应用.WebSocket服务.init(HTTP服务, { path: `${basePath}/audio_download`, channel: "audio_download", });

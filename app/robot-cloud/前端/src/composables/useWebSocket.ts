@@ -4,8 +4,7 @@
  * Web UI 端连接后端服务器的 WebSocket composable。
  *
  * 连接路径（均携带 ?robotId={uuid}&role=ui）：
- *   业务通道  /api/v1/interaction/connect/business  —— AI 对话、TTS、动作指令
- *   控制通道  /api/v1/interaction/connect/control   —— 摇杆控制指令
+ *   业务通道  /api/v1/interaction/connect/business  —— AI 对话、TTS、动作指令、摇杆控制指令
  *   音频上传  /api/v1/interaction/connect/audio_upload
  *   音频下载  /api/v1/interaction/connect/audio_download
  *
@@ -21,7 +20,6 @@ import { ref } from 'vue'
 // WebSocket 通道路径（与后端 server.ts 中的 basePath 一致）
 const WS_PATHS = {
   business:      '/api/v1/interaction/connect/business',
-  control:       '/api/v1/interaction/connect/control',
   audioUpload:   '/api/v1/interaction/connect/audio_upload',
   audioDownload: '/api/v1/interaction/connect/audio_download',
 } as const
@@ -106,12 +104,10 @@ function connectSocket(
 
 export function useWebSocket() {
   const wsBusiness      = ref<WebSocket | null>(null)
-  const wsControl       = ref<WebSocket | null>(null)
   const wsAudioUpload   = ref<WebSocket | null>(null)
   const wsAudioDownload = ref<WebSocket | null>(null)
 
   const isConnected             = ref(false)
-  const isControlConnected      = ref(false)
   const isAudioUploadConnected  = ref(false)
   const isAudioDownloadConnected = ref(false)
 
@@ -131,7 +127,6 @@ export function useWebSocket() {
 
   const disconnect = () => {
     closeSocket(wsBusiness,      isConnected)
-    closeSocket(wsControl,       isControlConnected)
     closeSocket(wsAudioUpload,   isAudioUploadConnected)
     closeSocket(wsAudioDownload, isAudioDownloadConnected)
   }
@@ -163,7 +158,6 @@ export function useWebSocket() {
     }
 
     Promise.all([
-      tryConnect(WS_PATHS.control,       wsControl,       isControlConnected),
       tryConnect(WS_PATHS.audioUpload,   wsAudioUpload,   isAudioUploadConnected),
       tryConnect(WS_PATHS.audioDownload, wsAudioDownload, isAudioDownloadConnected),
     ])
@@ -187,11 +181,6 @@ export function useWebSocket() {
 
   const sendMessage = (message: any) => {
     const type = message?.type
-    if (type === 'control_input' || type === 'status' || type === 'heartbeat') {
-      if (!wsControl.value || !isControlConnected.value) { console.error('控制通道未连接'); return }
-      wsControl.value.send(JSON.stringify(message))
-      return
-    }
     if (type === 'audio_chunk') {
       if (!wsAudioUpload.value) { console.error('音频上传通道未连接'); return }
       wsAudioUpload.value.send(JSON.stringify(message))
@@ -203,7 +192,6 @@ export function useWebSocket() {
   return {
     // 状态
     isConnected,
-    isControlConnected,
     isAudioDownloadConnected,
     robotId,
     // 方法

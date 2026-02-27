@@ -308,7 +308,6 @@ const router = useRouter()
 // WebSocket & Robot State
 const {
   isConnected,
-  isControlConnected,
   robotId,
   connect: wsConnect,
   disconnect: wsDisconnect,
@@ -391,8 +390,8 @@ const updateTime = () => {
 }
 
 const emergencyStop = () => {
-  if (!isControlConnected.value) {
-    ElMessage.warning('控制通道未连接')
+  if (!isConnected.value) {
+    ElMessage.warning('连接未建立')
     return
   }
   ElMessage.error('触发急停！')
@@ -546,7 +545,7 @@ type JoystickPayload = { x: number; y: number }
 
 const sendJoystick = (channel: 'move' | 'look' | 'pose', payload: JoystickPayload) => {
   if (layoutEditMode.value) return
-  if (!isControlConnected.value) return
+  if (!isConnected.value) return
   const effectiveMode = twoLegStandActive.value ? 'two_leg' : controlMode.value
   wsSendMessage({
     type: 'control_input',
@@ -565,7 +564,7 @@ const sendJoystick = (channel: 'move' | 'look' | 'pose', payload: JoystickPayloa
 
 const stopJoystick = (channel: 'move' | 'look' | 'pose', modeOverride?: 'move' | 'pose') => {
   if (layoutEditMode.value) return
-  if (!isControlConnected.value) return
+  if (!isConnected.value) return
   const effectiveMode = twoLegStandActive.value ? 'two_leg' : (modeOverride || controlMode.value)
   wsSendMessage({
     type: 'control_input',

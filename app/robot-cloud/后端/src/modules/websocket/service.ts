@@ -356,7 +356,7 @@ class WebSocket服务 {
 
   private isAllowedMessageType(channel: Channel, type: string): boolean {
     const map: Record<Channel, Set<string>> = {
-      control: new Set(['control_input', 'heartbeat', 'status']),
+      control: new Set([]),
       business: new Set([
         'text_input',
         'tts_input',
@@ -366,6 +366,8 @@ class WebSocket服务 {
         'video_subscribe',
         'video_unsubscribe',
         'heartbeat',
+        'status',
+        'control_input',
         'camera_response',
         'sdk_mode_set',
         'sdk_mode_get',
@@ -377,7 +379,7 @@ class WebSocket服务 {
       audio_upload: new Set(['audio_start', 'audio_chunk', 'audio_end', 'heartbeat']),
       audio_download: new Set(['heartbeat']),
     };
-    return map[channel].has(type);
+    return map[channel]?.has(type) ?? false;
   }
 
   /**
@@ -849,12 +851,12 @@ class WebSocket服务 {
     try {
       const command = data?.command;
       if (!command || typeof command !== 'string') {
-        this.sendError(robotId, 'INVALID_CONTROL', '控制指令无效', 'control');
+        this.sendError(robotId, 'INVALID_CONTROL', '控制指令无效', 'business');
         return;
       }
 
       if (!['joystick', 'joystick_stop', 'estop'].includes(command)) {
-        this.sendError(robotId, 'INVALID_CONTROL', '控制指令无效', 'control');
+        this.sendError(robotId, 'INVALID_CONTROL', '控制指令无效', 'business');
         return;
       }
 
@@ -872,14 +874,14 @@ class WebSocket服务 {
         robotId,
         timestamp: Date.now(),
         data: payload,
-      }, 'control');
+      }, 'business');
 
       if (!sent) {
-        this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'control');
+        this.sendError(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
       }
     } catch (error: any) {
       logger.error('处理控制输入失败', error, { robotId });
-      this.sendError(robotId, 'CONTROL_ERROR', error.message || '控制处理失败', 'control');
+      this.sendError(robotId, 'CONTROL_ERROR', error.message || '控制处理失败', 'business');
     }
   }
 

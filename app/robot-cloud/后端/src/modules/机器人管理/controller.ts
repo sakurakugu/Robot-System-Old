@@ -148,27 +148,6 @@ export class 机器人控制器 {
   };
 
   /**
-   * 发现局域网内的机器人（mDNS）
-   */
-  discoverRobots = async (req: Request, res: Response) => {
-    try {
-      const timeout = Math.max(1, Math.min(10, parseFloat(req.query.timeout as string) || 3));
-      const result = await this.机器人服务.发现机器人(timeout);
-
-      if (result.success) {
-        res.json({
-          success: true,
-          data: { robots: result.robots, count: result.robots.length },
-        });
-      } else {
-        res.status(500).json({ success: false, error: result.error || '发现失败' });
-      }
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
-
-  /**
    * 写入日志标记
    */
   markLog = async (req: Request, res: Response) => {

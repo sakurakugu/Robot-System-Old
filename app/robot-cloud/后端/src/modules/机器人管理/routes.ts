@@ -4,10 +4,9 @@ import type { 机器人控制器 } from './controller';
 export function createRobotRoutes(controller: 机器人控制器): Router {
   const router = Router();
 
-  // 列表与发现
+  // 列表
   router.get('/', controller.getAllRobots);
   router.get('/groups', controller.getGroups);
-  router.get('/discover', controller.discoverRobots);
 
   // CRUD
   router.get('/:uuid', controller.getRobot);

@@ -236,54 +236,6 @@ export class 机器人服务 {
     return { connected: false, message: `SSH端口不可达: ${robot.ip}` };
   }
 
-  /**
-   * 通过 mDNS 发现机器人
-   */
-  async 发现机器人(timeout = 3): Promise<{
-    success: boolean;
-    robots: Array<{
-      uuid: string;
-      name: string;
-      model: string;
-      version: string;
-      ip: string;
-      port: number;
-    }>;
-    error?: string;
-  }> {
-    const pythonScript = path.resolve(__dirname, '../../core/scripts/mdns_discover.py');
-
-    return new Promise((resolve) => {
-      const p = spawn(this.pythonCommand, [pythonScript, timeout.toString()], {
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
-      });
-      let stdout = '';
-      let stderr = '';
-
-      const timer = setTimeout(() => {
-        p.kill();
-        resolve({ success: false, robots: [], error: '扫描超时' });
-      }, (timeout + 2) * 1000);
-
-      p.stdout.on('data', (d) => { stdout += d.toString(); });
-      p.stderr.on('data', (d) => { stderr += d.toString(); });
-
-      p.on('close', (code) => {
-        clearTimeout(timer);
-        if (code === 0 && stdout) {
-          try {
-            const result = JSON.parse(stdout);
-            resolve({ success: true, robots: result.robots || [] });
-          } catch {
-            resolve({ success: false, robots: [], error: '解析结果失败' });
-          }
-        } else {
-          resolve({ success: false, robots: [], error: stderr || '发现失败' });
-        }
-      });
-    });
-  }
-
   // ==================== SSH 辅助方法 ====================
 
   private async 测试SSH连接(pythonScript: string, ip: string): Promise<boolean> {

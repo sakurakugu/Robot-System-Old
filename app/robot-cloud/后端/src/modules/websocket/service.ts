@@ -134,7 +134,14 @@ class WebSocket服务 {
     // 从查询参数获取 robotId 与角色
     const url = new URL(req.url!, `http://${req.headers.host}`);
     let robotId = url.searchParams.get('robotId');
-    const role = (url.searchParams.get('role') || '').toLowerCase();
+    let role = (url.searchParams.get('role') || '').toLowerCase();
+
+    // 优先从路径推断角色
+    if (url.pathname.includes('/api/v1/robot')) {
+      role = 'robot';
+    } else if (url.pathname.includes('/api/v1/web') || url.pathname.includes('/api/v1/phone')) {
+      role = 'ui';
+    }
 
     if (!robotId || !isValidRobotId(robotId)) {
       robotId = uuidv7();

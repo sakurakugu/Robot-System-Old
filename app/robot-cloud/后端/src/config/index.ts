@@ -11,7 +11,9 @@ export interface 配置 {
 
   // WebSocket配置
   ws: {
-    path: string;
+    robotPath: string;
+    phonePath: string;
+    webPath: string;
     maxConnections: number;
   };
 
@@ -102,7 +104,9 @@ const 配置: 配置 = {
   nodeEnv: process.env.NODE_ENV || 'development',
 
   ws: {
-    path: process.env.WS_PATH || '/api/v1/interaction/connect',
+    robotPath: process.env.WS_ROBOT_PATH || '/api/v1/robot',
+    phonePath: process.env.WS_PHONE_PATH || '/api/v1/phone',
+    webPath: process.env.WS_WEB_PATH || '/api/v1/web',
     maxConnections: parseInt(process.env.WS_MAX_CONNECTIONS || '100', 10),
   },
 

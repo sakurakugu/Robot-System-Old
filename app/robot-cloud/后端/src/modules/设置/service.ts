@@ -80,7 +80,7 @@ export class 设置服务 {
    */
   getUIConfig(): UIConfig {
     const serverUrl = this.database.getSetting('ui.serverUrl') || '';
-    const wsPath = this.database.getSetting('ui.wsPath') || 配置.ws.path;
+    const wsPath = this.database.getSetting('ui.wsPath') || 配置.ws.webPath;
     const wsControlUrl = this.database.getSetting('ui.wsControlUrl') || '';
     const wsBusinessUrl = this.database.getSetting('ui.wsBusinessUrl') || '';
     const wsAudioUploadUrl = this.database.getSetting('ui.wsAudioUploadUrl') || '';

@@ -19,9 +19,9 @@ import { ref } from 'vue'
 
 // WebSocket 通道路径（与后端 server.ts 中的 basePath 一致）
 const WS_PATHS = {
-  business:      '/api/v1/interaction/connect/business',
-  audioUpload:   '/api/v1/interaction/connect/audio_upload',
-  audioDownload: '/api/v1/interaction/connect/audio_download',
+  business:      '/api/v1/web/business',
+  audioUpload:   '/api/v1/web/audio_upload',
+  audioDownload: '/api/v1/web/audio_download',
 } as const
 
 const CONNECT_TIMEOUT_MS = 8000

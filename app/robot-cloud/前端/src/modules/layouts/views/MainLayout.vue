@@ -54,6 +54,12 @@
               参数管理
             </template>
           </el-menu-item>
+          <el-menu-item index="/update-manage">
+            <el-icon><UploadFilled /></el-icon>
+            <template #title>
+              更新管理
+            </template>
+          </el-menu-item>
           <el-menu-item index="/kb">
             <el-icon><Collection /></el-icon>
             <template #title>
@@ -82,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { Collection, DArrowLeft, DArrowRight, Film, List, Setting, Tools, UserFilled, VideoPlay } from '@element-plus/icons-vue'
+import { Collection, DArrowLeft, DArrowRight, Film, List, Setting, Tools, UploadFilled, UserFilled, VideoPlay } from '@element-plus/icons-vue'
 import { Bot } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -99,6 +105,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/operation')) return '/operation'
   if (path.startsWith('/choreo')) return '/choreo'
   if (path.startsWith('/params')) return '/params'
+  if (path.startsWith('/update-manage')) return '/update-manage'
   if (path.startsWith('/kb')) return '/kb'
   if (path.startsWith('/settings')) return '/settings'
   return path

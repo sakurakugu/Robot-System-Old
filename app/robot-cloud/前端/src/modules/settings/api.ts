@@ -2,17 +2,18 @@
 
 import { http } from '@/api/request'
 import type {
-    ApiResponse,
-    AIConfig,
-    LLMConfig,
-    LLMProvider,
-    NetworkInfo,
-    SystemStatus,
-    UIConfig,
-    UpdateInfo,
-    UpdateAIConfigDTO,
-    UpdateLLMConfigDTO,
-    UpdateUIConfigDTO,
+  AIConfig,
+  ApiResponse,
+  AppVersionInfo,
+  LLMConfig,
+  LLMProvider,
+  NetworkInfo,
+  ReleaseChannel,
+  SystemStatus,
+  UIConfig,
+  UpdateAIConfigDTO,
+  UpdateLLMConfigDTO,
+  UpdateUIConfigDTO,
 } from './types'
 
 /**
@@ -86,17 +87,52 @@ export function getLocalIP() {
 }
 
 /**
- * 检查更新
+ * 上传 APP 安装包
  */
-export function checkUpdate(robotId?: string) {
-  return http.get<ApiResponse<UpdateInfo>>('/api/v1/updates/check', {
-    params: robotId ? { robotId } : undefined,
+export function uploadAppPackage(payload: {
+  apk: File
+  version: string
+  versionCode: number
+  fileHash: string
+  channel: ReleaseChannel
+  changelog?: string
+}) {
+  const formData = new FormData()
+  formData.append('apk', payload.apk)
+  formData.append('version', payload.version)
+  formData.append('versionCode', String(payload.versionCode))
+  formData.append('fileHash', payload.fileHash)
+  formData.append('channel', payload.channel)
+  if (payload.changelog) {
+    formData.append('changelog', payload.changelog)
+  }
+
+  return http.post<ApiResponse<AppVersionInfo>>('/api/v1/updates/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
   })
 }
 
 /**
- * 升级应用
+ * 获取 APP 版本列表
  */
-export function upgradeApp() {
-  return http.post<ApiResponse>('/api/v1/updates/upgrade/app')
+export function getAppVersions(channel?: ReleaseChannel) {
+  return http.get<ApiResponse<AppVersionInfo[]>>('/api/v1/updates/versions', {
+    params: channel ? { channel } : undefined,
+  })
+}
+
+/**
+ * 回滚到指定版本
+ */
+export function rollbackAppVersion(id: number) {
+  return http.post<ApiResponse<AppVersionInfo>>(`/api/v1/updates/rollback/${id}`)
+}
+
+/**
+ * 删除版本
+ */
+export function deleteAppVersion(id: number) {
+  return http.delete<ApiResponse>(`/api/v1/updates/versions/${id}`)
 }

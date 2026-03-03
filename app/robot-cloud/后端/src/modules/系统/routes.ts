@@ -68,36 +68,5 @@ export function createSystemRoutes(
     }
   });
 
-  /**
-   * 检查更新
-   */
-  router.get('/updates/check', (req: Request, res: Response) => {
-    try {
-      const robotId = req.query.robotId as string;
-      const robot = robotId ? database.getRobot(robotId) : undefined;
-      res.json({
-        success: true,
-        data: {
-          checkedAt: new Date().toISOString(),
-          app: { currentVersion: '', latestVersion: '', hasUpdate: false },
-          firmware: { currentVersion: '', latestVersion: '', hasUpdate: false },
-        },
-      });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  /**
-   * 升级APP
-   */
-  router.post('/updates/upgrade/app', async (_req: Request, res: Response) => {
-    try {
-      res.json({ success: true, message: '已触发APP升级（预留接口）' });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
   return router;
 }

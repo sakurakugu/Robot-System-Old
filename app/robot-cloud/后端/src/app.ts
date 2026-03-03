@@ -9,6 +9,9 @@ import { createConversationRoutes } from './modules/大模型交互/routes';
 import { 大模型管理控制器 } from './modules/大模型管理/controller';
 import { createLLMRoutes } from './modules/大模型管理/routes';
 import { 大模型配置服务 } from './modules/大模型管理/service';
+import { 更新控制器 } from './modules/更新管理/controller';
+import { createUpdateRoutes } from './modules/更新管理/routes';
+import { 更新服务 } from './modules/更新管理/service';
 import { 机器人控制器 } from './modules/机器人管理/controller';
 import { createRobotRoutes } from './modules/机器人管理/routes';
 import { 机器人服务 } from './modules/机器人管理/service';
@@ -35,6 +38,7 @@ export class 应用程序 {
   private 设置服务: 设置服务;
   private 角色服务: 角色服务;
   private 编舞服务: ChoreoService;
+  private 更新服务: 更新服务;
 
   // 控制器实例
   private 机器人控制器: 机器人控制器;
@@ -43,6 +47,7 @@ export class 应用程序 {
   private 设置控制器: 设置控制器;
   private 角色控制器: 角色控制器;
   private 编舞控制器: ChoreoController;
+  private 更新控制器: 更新控制器;
 
   constructor() {
     this.应用 = express();
@@ -57,6 +62,7 @@ export class 应用程序 {
     this.设置服务 = new 设置服务(this.数据库);
     this.角色服务 = new 角色服务(this.数据库);
     this.编舞服务 = new ChoreoService(this.数据库);
+    this.更新服务 = new 更新服务(this.数据库);
 
     // 初始化控制器
     this.机器人控制器 = new 机器人控制器(this.机器人服务);
@@ -65,6 +71,7 @@ export class 应用程序 {
     this.设置控制器 = new 设置控制器(this.设置服务);
     this.角色控制器 = new 角色控制器(this.角色服务);
     this.编舞控制器 = new ChoreoController(this.编舞服务);
+    this.更新控制器 = new 更新控制器(this.更新服务);
 
     // 加载持久化配置
     this.加载持久化配置();
@@ -133,6 +140,7 @@ export class 应用程序 {
     路由器.use('/config', createSettingsRoutes(this.设置控制器));
     路由器.use('/roles', createRoleRoutes(this.角色控制器));
     路由器.use('/choreo', createChoreoRoutes(this.编舞控制器));
+    路由器.use('/updates', createUpdateRoutes(this.更新控制器));
     路由器.use('/', createSystemRoutes(this.数据库, this.WebSocket服务));
 
     // 兼容旧路由

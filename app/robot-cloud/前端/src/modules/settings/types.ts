@@ -105,18 +105,19 @@ export interface NetworkInfo {
   all: string[]
 }
 
-export interface UpdateInfo {
-  checkedAt: string
-  app: {
-    currentVersion: string
-    latestVersion: string
-    hasUpdate: boolean
-  }
-  firmware: {
-    currentVersion: string
-    latestVersion: string
-    hasUpdate: boolean
-  }
+export type ReleaseChannel = 'stable' | 'beta'
+
+export interface AppVersionInfo {
+  id: number
+  versionName: string
+  versionCode: number
+  channel: ReleaseChannel
+  fileName: string
+  fileSize: number
+  fileHash: string
+  changelog: string | null
+  isActive: boolean
+  uploadedAt: string
 }
 
 export interface ApiResponse<T = any> {

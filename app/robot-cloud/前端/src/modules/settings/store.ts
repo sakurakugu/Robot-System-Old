@@ -103,16 +103,6 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function checkUpdate(robotId?: string) {
-    try {
-      const res = await settingsApi.checkUpdate(robotId)
-      return res.data
-    } catch (error) {
-      console.error('检查更新失败:', error)
-      throw error
-    }
-  }
-
   return {
     // 状态
     llmConfig,
@@ -120,7 +110,7 @@ export const useSettingsStore = defineStore('settings', () => {
     uiConfig,
     systemStatus,
     loading,
-    
+
     // 方法
     fetchLLMConfig,
     fetchLLMProviders,
@@ -129,6 +119,5 @@ export const useSettingsStore = defineStore('settings', () => {
     updateUIConfig,
     fetchSystemStatus,
     getLocalIP,
-    checkUpdate,
   }
 })

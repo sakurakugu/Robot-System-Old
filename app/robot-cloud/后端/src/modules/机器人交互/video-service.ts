@@ -1,4 +1,4 @@
-// TODO: 到时候要移动到手机端
+// TODO: 已经移动到手机端，现在不需要了（到时候服务端无法通过局域网连接机器狗），前端部分要改成让手机把webrtc视频流转发到前端
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import { logger } from '../../core/logger';
@@ -37,7 +37,6 @@ export class VideoStreamService extends EventEmitter {
 
     // GStreamer pipeline for low-latency RTSP to JPEG
     // 使用TCP传输、零延迟、最小缓冲
-    // TODO:从RTSP改成视频而非图片
     const pipeline = [
       'rtspsrc',
       `location=${rtspUrl}`,

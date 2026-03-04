@@ -34,7 +34,6 @@ export class 设置控制器 {
       const data = this.settingsService.getUIConfig();
       const host = (req.headers.host || '').trim();
       const serverUrl = data.serverUrl && String(data.serverUrl).length > 0 ? data.serverUrl : host;
-      const wsPath = data.wsPath && String(data.wsPath).length > 0 ? data.wsPath : '/api/v1/interaction/connect';
 
       const resolveWsBaseUrl = (input: string, port: number) => {
         const hasScheme = /^https?:\/\//i.test(input);
@@ -48,21 +47,24 @@ export class 设置控制器 {
         }
       };
 
-      const wsControlUrl = data.wsControlUrl || resolveWsBaseUrl(serverUrl, 配置.port);
-      const wsBusinessUrl = data.wsBusinessUrl || resolveWsBaseUrl(serverUrl, 配置.port);
-      const wsAudioUploadUrl = data.wsAudioUploadUrl || resolveWsBaseUrl(serverUrl, 配置.port);
-      const wsAudioDownloadUrl = data.wsAudioDownloadUrl || resolveWsBaseUrl(serverUrl, 配置.port);
+      const baseWsUrl = resolveWsBaseUrl(serverUrl, 配置.port);
+
+      // Web 前端专用 WebSocket URL（已移除手改支持，自动派生）
+      // 注意：service 层已不再返回 webWsBusinessUrl 等字段，所以这里会回退到自动派生
+      // 实际上前端 useWebSocket.ts 并没有使用这里返回的 wsBusinessUrl，而是直接使用默认路径
+      // 但为了兼容可能的调试需求，这里仍保留完整 URL 的生成
+      const wsBusinessUrl = `${baseWsUrl}/api/v1/web/business`;
+      const wsAudioUploadUrl = `${baseWsUrl}/api/v1/web/audio/upload`;
+      const wsAudioDownloadUrl = `${baseWsUrl}/api/v1/web/audio/download`;
 
       res.json({
         success: true,
         data: {
           ...data,
           serverUrl,
-          wsPath,
-          wsControlUrl,
           wsBusinessUrl,
           wsAudioUploadUrl,
-          wsAudioDownloadUrl,
+          wsAudioDownloadUrl
         },
       });
     } catch (error: any) {

@@ -247,7 +247,6 @@ const connectToRobot = async (uuid?: string) => {
   } catch (e) {
     try {
       localStorage.removeItem('rc_server_url')
-      localStorage.removeItem('rc_ws_path')
       await wsConnect()
     } catch {
       ElMessage.error('连接失败，请检查后端服务或网络')

@@ -80,11 +80,6 @@ export class 设置服务 {
    */
   getUIConfig(): UIConfig {
     const serverUrl = this.database.getSetting('ui.serverUrl') || '';
-    const wsPath = this.database.getSetting('ui.wsPath') || 配置.ws.webPath;
-    const wsControlUrl = this.database.getSetting('ui.wsControlUrl') || '';
-    const wsBusinessUrl = this.database.getSetting('ui.wsBusinessUrl') || '';
-    const wsAudioUploadUrl = this.database.getSetting('ui.wsAudioUploadUrl') || '';
-    const wsAudioDownloadUrl = this.database.getSetting('ui.wsAudioDownloadUrl') || '';
 
     const mhRaw = this.database.getSetting('ui.maxHistory');
     const maxHistory = mhRaw ? parseInt(mhRaw, 10) || 10 : 10;
@@ -99,13 +94,10 @@ export class 设置服务 {
       }
     }
 
+    // Web 前端专用 WebSocket 配置（已移除手改支持，由 controller 层自动派生）
+
     return {
       serverUrl,
-      wsPath,
-      wsControlUrl,
-      wsBusinessUrl,
-      wsAudioUploadUrl,
-      wsAudioDownloadUrl,
       maxHistory,
       controlLayout,
     };
@@ -116,24 +108,22 @@ export class 设置服务 {
    */
   updateUIConfig(data: Partial<{
     serverUrl: string;
-    wsPath: string;
-    wsControlUrl: string;
-    wsBusinessUrl: string;
-    wsAudioUploadUrl: string;
-    wsAudioDownloadUrl: string;
+    webWsBusinessUrl: string;
+    webWsAudioUploadUrl: string;
+    webWsAudioDownloadUrl: string;
     maxHistory: number | number[];
     controlLayout: Record<string, { x: number; y: number }> | string;
   }>): void {
-    const stringFields = [
-      'serverUrl', 'wsPath', 'wsControlUrl',
-      'wsBusinessUrl', 'wsAudioUploadUrl', 'wsAudioDownloadUrl'
-    ] as const;
-
-    for (const field of stringFields) {
-      if (typeof data[field] === 'string') {
-        this.database.setSetting(`ui.${field}`, data[field] as string);
+    if (typeof data.serverUrl === 'string') {
+      const value = data.serverUrl.trim();
+      if (value.length > 0) {
+        this.database.setSetting('ui.serverUrl', value);
+      } else {
+        this.database.deleteSetting('ui.serverUrl');
       }
     }
+
+    // Web 前端专用 WebSocket 配置（已移除手改支持，改为自动派生）
 
     if (data.maxHistory !== undefined) {
       const mh = Array.isArray(data.maxHistory)

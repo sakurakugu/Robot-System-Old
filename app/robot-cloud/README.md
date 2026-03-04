@@ -150,11 +150,10 @@ npm run dev
 
 | 端点 | 用途 |
 |------|------|
-| `/api/v1/interaction/connect` | 主连接 |
-| `/api/v1/interaction/connect/control` | 控制通道 |
-| `/api/v1/interaction/connect/business` | 业务通道 |
-| `/api/v1/interaction/connect/audio_upload` | 音频上传 |
-| `/api/v1/interaction/connect/audio_download` | 音频下载 |
+| `/api/v1/robot/connect` | 主连接 |
+| `/api/v1/robot/business` | 业务通道 |
+| `/api/v1/robot/audio/upload` | 音频上传 |
+| `/api/v1/robot/audio/download` | 音频下载 |
 
 ### 大模型交互流程
 

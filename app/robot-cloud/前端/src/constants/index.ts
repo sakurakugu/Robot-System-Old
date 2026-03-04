@@ -4,7 +4,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || ''
 
-// WebSocket 连接基础路径（与后端 server.ts 中的 webPath + '/business' 一致）
+// WebSocket 连接基础路径（从后端 /api/v1/config/ui 动态获取 serverUrl，4 个 WS URL 自动派生）
 export const WS_PATH = '/api/v1/web/business'
 
 // 机器人状态

@@ -422,12 +422,9 @@ onMounted(async () => {
     const uiRes = await fetch('/api/v1/config/ui').then(r => r.json()).catch(() => null)
     if (uiRes?.success && uiRes.data) {
       serverUrl.value = uiRes.data.serverUrl || ''
-      wsPath.value = uiRes.data.wsPath || '/api/v1/interaction/connect'
       localStorage.setItem('rc_server_url', serverUrl.value || '')
-      localStorage.setItem('rc_ws_path', wsPath.value || '/api/v1/interaction/connect')
     } else {
       serverUrl.value = localStorage.getItem('rc_server_url') || ''
-      wsPath.value = localStorage.getItem('rc_ws_path') || '/api/v1/interaction/connect'
     }
   } catch {}
 
@@ -672,11 +669,9 @@ const saveLLMConfig = async () => {
 
 const saveConnectionConfig = async () => {
   localStorage.setItem('rc_server_url', serverUrl.value || '')
-  localStorage.setItem('rc_ws_path', wsPath.value || '/api/v1/interaction/connect')
 
   const uiPayload = {
     serverUrl: serverUrl.value || '',
-    wsPath: wsPath.value || '/api/v1/interaction/connect',
   }
 
   try {
@@ -728,3 +723,4 @@ const saveConnectionConfig = async () => {
   background-color: transparent;
 }
 </style>
+

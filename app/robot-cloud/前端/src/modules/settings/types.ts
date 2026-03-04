@@ -74,22 +74,20 @@ export interface LLMModel {
 
 export interface UIConfig {
   serverUrl: string
-  wsPath: string
-  wsControlUrl?: string
-  wsBusinessUrl?: string
-  wsAudioUploadUrl?: string
-  wsAudioDownloadUrl?: string
+  /** Web 前端专用 WebSocket 配置（可选，未设置时自动派生） */
+  webWsBusinessUrl?: string
+  webWsAudioUploadUrl?: string
+  webWsAudioDownloadUrl?: string
   maxHistory: number
   controlLayout?: Record<string, { x: number; y: number }> | null
 }
 
 export interface UpdateUIConfigDTO {
   serverUrl?: string
-  wsPath?: string
-  wsControlUrl?: string
-  wsBusinessUrl?: string
-  wsAudioUploadUrl?: string
-  wsAudioDownloadUrl?: string
+  /** Web 前端专用 WebSocket 配置（可选） */
+  webWsBusinessUrl?: string
+  webWsAudioUploadUrl?: string
+  webWsAudioDownloadUrl?: string
   maxHistory?: number
   controlLayout?: Record<string, { x: number; y: number }>
 }

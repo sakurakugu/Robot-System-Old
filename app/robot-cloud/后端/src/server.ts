@@ -13,16 +13,16 @@ const webPath = 配置.ws.webPath;
 
 // 机器人连接通道
 应用.WebSocket服务.init(HTTP服务, { path: `${robotPath}/business`, channel: "business" });
-应用.WebSocket服务.init(HTTP服务, { path: `${robotPath}/audio_upload`, channel: "audio_upload" });
-应用.WebSocket服务.init(HTTP服务, { path: `${robotPath}/audio_download`, channel: "audio_download" });
+应用.WebSocket服务.init(HTTP服务, { path: `${robotPath}/audio/upload`, channel: "audio_upload" });
+应用.WebSocket服务.init(HTTP服务, { path: `${robotPath}/audio/download`, channel: "audio_download" });
 
 // 手机端连接通道
 应用.WebSocket服务.init(HTTP服务, { path: `${phonePath}/business`, channel: "business" });
 
 // 前端 Web 连接通道
 应用.WebSocket服务.init(HTTP服务, { path: `${webPath}/business`, channel: "business" });
-应用.WebSocket服务.init(HTTP服务, { path: `${webPath}/audio_upload`, channel: "audio_upload" });
-应用.WebSocket服务.init(HTTP服务, { path: `${webPath}/audio_download`, channel: "audio_download" });
+应用.WebSocket服务.init(HTTP服务, { path: `${webPath}/audio/upload`, channel: "audio_upload" });
+应用.WebSocket服务.init(HTTP服务, { path: `${webPath}/audio/download`, channel: "audio_download" });
 
 // 启动服务器
 HTTP服务.listen(配置.port, () => {

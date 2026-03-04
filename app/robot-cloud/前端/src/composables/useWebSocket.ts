@@ -4,30 +4,29 @@
  * Web UI 端连接后端服务器的 WebSocket composable。
  *
  * 连接路径（均携带 ?robotId={uuid}&role=ui）：
- *   业务通道  /api/v1/interaction/connect/business  —— AI 对话、TTS、动作指令、摇杆控制指令
- *   音频上传  /api/v1/interaction/connect/audio_upload
- *   音频下载  /api/v1/interaction/connect/audio_download
+ *   业务通道  /api/v1/web/business  —— AI 对话、TTS、动作指令、摇杆控制指令
+ *   音频上传  /api/v1/web/audio/upload
+ *   音频下载  /api/v1/web/audio/download
  *
  * 服务器地址解析优先级：
  *   1. 后端 /api/v1/config/ui 返回的 serverUrl（可在设置页面修改）
  *   2. localStorage 缓存
  *   3. 当前页面同源地址
+ *
+ * WebSocket 路径自动派生，不再支持手改
  */
 
 import { v7 as uuidv7 } from 'uuid'
 import { ref } from 'vue'
 
-// WebSocket 通道路径（与后端 server.ts 中的 basePath 一致）
-const WS_PATHS = {
-  business:      '/api/v1/web/business',
-  audioUpload:   '/api/v1/web/audio_upload',
-  audioDownload: '/api/v1/web/audio_download',
-} as const
-
 const CONNECT_TIMEOUT_MS = 8000
 const LS_SERVER_KEY = 'rc_server_url'
 
 type MessageHandler = (data: any) => void
+
+interface UIConfig {
+  serverUrl: string
+}
 
 /** 将 http/https/ws/wss 或纯 host 地址统一转为 ws:// 或 wss:// 前缀 */
 function toWsOrigin(server: string): string {
@@ -49,16 +48,19 @@ function buildWsUrl(server: string, path: string, robotId: string): string {
 }
 
 /** 从后端拉取 UI 配置（serverUrl 可在设置页面修改） */
-async function fetchServerUrl(): Promise<string> {
+async function fetchUIConfig(): Promise<UIConfig> {
   try {
     const res = await fetch('/api/v1/config/ui').then(r => r.json())
-    if (res?.success && res.data?.serverUrl) {
-      const url = String(res.data.serverUrl)
-      localStorage.setItem(LS_SERVER_KEY, url)
-      return url
+    if (res?.success && res.data) {
+      const data = res.data
+      if (data.serverUrl) {
+        localStorage.setItem(LS_SERVER_KEY, data.serverUrl)
+      }
+      return data
     }
   } catch { /* 忽略，使用缓存或同源 */ }
-  return localStorage.getItem(LS_SERVER_KEY) || ''
+  const serverUrl = localStorage.getItem(LS_SERVER_KEY) || ''
+  return { serverUrl }
 }
 
 /**
@@ -134,33 +136,29 @@ export function useWebSocket() {
   const connect = async (): Promise<void> => {
     if (!robotId.value) robotId.value = uuidv7()
 
-    const server = await fetchServerUrl()
+    const config = await fetchUIConfig()
+    const server = config.serverUrl
 
-    // 业务通道：必须成功（失败则 throw，调用方处理）
-    const bizUrl = buildWsUrl(server, WS_PATHS.business, robotId.value)
+    // 业务通道：使用后端返回的 wsBusinessUrl（已自动派生）
+    // 注意：已移除 webWsBusinessUrl 手改支持
+    const businessPath = '/api/v1/web/business'
+    const bizUrl = buildWsUrl(server, businessPath, robotId.value)
     wsBusiness.value = await connectSocket(bizUrl, dispatchMessage)
     wsBusiness.value.onclose = () => { isConnected.value = false; wsBusiness.value = null }
     isConnected.value = true
 
-    // 控制通道 / 音频通道：失败时静默忽略
-    const tryConnect = async (
-      path: string,
-      wsRef: { value: WebSocket | null },
-      connRef: { value: boolean },
-    ) => {
-      try {
-        const url = buildWsUrl(server, path, robotId.value)
-        const ws = await connectSocket(url, () => { /* 控制/音频通道不转发消息到 messageHandlers */ })
-        wsRef.value = ws
-        connRef.value = true
-        ws.onclose = () => { connRef.value = false; wsRef.value = null }
-      } catch { /* 静默 */ }
-    }
+    // 音频通道
+    const upPath = '/api/v1/web/audio/upload'
+    const upUrl = buildWsUrl(server, upPath, robotId.value)
+    connectSocket(upUrl, () => {}) // 上传不需要收消息
+      .then(ws => { wsAudioUpload.value = ws; isAudioUploadConnected.value = true; ws.onclose = () => isAudioUploadConnected.value = false })
+      .catch(() => console.error('音频上传通道连接失败'))
 
-    Promise.all([
-      tryConnect(WS_PATHS.audioUpload,   wsAudioUpload,   isAudioUploadConnected),
-      tryConnect(WS_PATHS.audioDownload, wsAudioDownload, isAudioDownloadConnected),
-    ])
+    const downPath = '/api/v1/web/audio/download'
+    const downUrl = buildWsUrl(server, downPath, robotId.value)
+    connectSocket(downUrl, dispatchMessage)
+      .then(ws => { wsAudioDownload.value = ws; isAudioDownloadConnected.value = true; ws.onclose = () => isAudioDownloadConnected.value = false })
+      .catch(() => console.error('音频下载通道连接失败'))
   }
 
   // ── 发送方法 ──────────────────────────────────────────────

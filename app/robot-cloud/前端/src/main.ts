@@ -4,6 +4,7 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import App from './App.vue'
+import { useAuthStore } from './modules/auth/store'
 import { router } from './modules/layouts/router'
 import './style.css'
 // 导入编舞系统样式
@@ -23,5 +24,8 @@ app.use(ElementPlus)
 // 初始化主题
 const themeStore = useThemeStore(pinia)
 themeStore.init()
+
+const authStore = useAuthStore(pinia)
+authStore.restoreProfileIfNeeded()
 
 app.mount('#app')

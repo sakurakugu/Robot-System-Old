@@ -10,6 +10,34 @@
         </el-icon>
         <h1>机器狗管理应用</h1>
       </div>
+      <div class="header-actions">
+        <el-tag
+          v-if="authStore.isAuthenticated && authStore.user"
+          type="success"
+        >
+          {{ authStore.user.username }} / {{ roleName }}
+        </el-tag>
+        <el-tag
+          v-else
+          type="info"
+        >
+          游客模式
+        </el-tag>
+        <el-button
+          v-if="authStore.isAuthenticated"
+          text
+          @click="logout"
+        >
+          退出
+        </el-button>
+        <el-button
+          v-else
+          text
+          @click="goAuth"
+        >
+          登录/注册
+        </el-button>
+      </div>
     </el-header>
     <el-container class="main-container">
       <el-aside
@@ -48,24 +76,60 @@
               编舞系统
             </template>
           </el-menu-item>
-          <el-menu-item index="/params">
+          <el-menu-item
+            v-if="authStore.isAdmin"
+            index="/params"
+          >
             <el-icon><Setting /></el-icon>
             <template #title>
               参数管理
             </template>
           </el-menu-item>
-          <el-menu-item index="/update-manage">
+          <el-menu-item
+            v-if="authStore.isAdmin"
+            index="/update-manage"
+          >
             <el-icon><UploadFilled /></el-icon>
             <template #title>
               更新管理
             </template>
           </el-menu-item>
-          <el-menu-item index="/kb">
+          <el-menu-item
+            v-if="authStore.isAdmin"
+            index="/kb"
+          >
             <el-icon><Collection /></el-icon>
             <template #title>
               知识库
             </template>
           </el-menu-item>
+          <el-menu-item
+            v-if="authStore.isSuperAdmin"
+            index="/users"
+          >
+            <el-icon><UserFilled /></el-icon>
+            <template #title>
+              用户权限
+            </template>
+          </el-menu-item>
+          <el-sub-menu index="personal-center">
+            <template #title>
+              <el-icon><User /></el-icon>
+              <span>个人中心</span>
+            </template>
+            <el-menu-item index="/personal">
+              <el-icon><User /></el-icon>
+              <template #title>
+                个人资料
+              </template>
+            </el-menu-item>
+            <el-menu-item index="/sessions">
+              <el-icon><Monitor /></el-icon>
+              <template #title>
+                登录设备
+              </template>
+            </el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/settings">
             <el-icon><Tools /></el-icon>
             <template #title>
@@ -88,14 +152,31 @@
 </template>
 
 <script setup lang="ts">
-import { Collection, DArrowLeft, DArrowRight, Film, List, Setting, Tools, UploadFilled, UserFilled, VideoPlay } from '@element-plus/icons-vue'
+import { Collection, DArrowLeft, DArrowRight, Film, List, Monitor, Setting, Tools, UploadFilled, User, UserFilled, VideoPlay } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/modules/auth/store'
 import { Bot } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()      // 获取当前路由信息
+const router = useRouter()
+const authStore = useAuthStore()
 const isCollapse = ref(false) // 是否折叠侧边栏
 const asideWidth = computed(() => isCollapse.value ? 64 : 200) // 侧边栏宽度
+
+const roleName = computed(() => {
+  const role = authStore.user?.role
+  switch (role) {
+    case 'super_admin':
+      return '超级管理员'
+    case 'admin':
+      return '管理员'
+    case 'user':
+      return '普通用户'
+    default:
+      return role
+  }
+})
 
 // 计算当前激活的菜单项
 const activeMenu = computed(() => {
@@ -107,6 +188,9 @@ const activeMenu = computed(() => {
   if (path.startsWith('/params')) return '/params'
   if (path.startsWith('/update-manage')) return '/update-manage'
   if (path.startsWith('/kb')) return '/kb'
+  if (path.startsWith('/users')) return '/users'
+  if (path.startsWith('/personal')) return '/personal'
+  if (path.startsWith('/sessions')) return '/sessions'
   if (path.startsWith('/settings')) return '/settings'
   return path
 })
@@ -114,6 +198,13 @@ const activeMenu = computed(() => {
 // 切换侧边栏折叠状态
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
+}
+
+const goAuth = () => router.push('/auth')
+
+const logout = async () => {
+  await authStore.logout()
+  router.push('/auth')
 }
 </script>
 
@@ -129,6 +220,7 @@ const toggleCollapse = () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -149,6 +241,12 @@ const toggleCollapse = () => {
   font-size: 20px;
   font-weight: 600;
   color: white;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .main-container {
@@ -216,5 +314,22 @@ const toggleCollapse = () => {
   background: var(--el-bg-color-page);
   padding: 0;
   overflow: auto;
+}
+
+/* 头部按钮和标签在深色渐变背景上的显示样式 */
+.header-actions :deep(.el-button) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.header-actions :deep(.el-button:hover) {
+  color: white;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.header-actions :deep(.el-tag) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  font-weight: 500;
 }
 </style>

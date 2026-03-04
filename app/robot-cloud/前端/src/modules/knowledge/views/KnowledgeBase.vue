@@ -6,6 +6,12 @@
     >
       <template #extra>
         <el-button
+          type="primary"
+          @click="openCreate"
+        >
+          新增知识
+        </el-button>
+        <el-button
           :icon="Refresh"
           :loading="loading"
           @click="refresh"
@@ -30,7 +36,7 @@
       >
         <el-col
           v-for="doc in docs"
-          :key="doc.uuid"
+          :key="doc.id"
           :xs="24"
           :sm="12"
           :md="8"
@@ -51,13 +57,13 @@
                 size="small"
                 type="info"
               >
-                {{ doc.category || '未分类' }}
+                {{ doc.tags.join(', ') || '未分类' }}
               </el-tag>
               <el-text
                 size="small"
                 type="info"
               >
-                {{ formatTime(doc.updated_at) }}
+                {{ formatTime(doc.updatedAt) }}
               </el-text>
             </div>
             <el-text
@@ -66,40 +72,135 @@
             >
               {{ doc.content }}
             </el-text>
+
+            <div class="doc-actions">
+              <el-button
+                size="small"
+                @click="openEdit(doc)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                plain
+                @click="removeDoc(doc.id)"
+              >
+                删除
+              </el-button>
+            </div>
           </el-card>
         </el-col>
       </el-row>
     </div>
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingId ? '编辑知识' : '新增知识'"
+      width="560px"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="标题">
+          <el-input v-model="form.title" />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-input
+            v-model="form.tags"
+            placeholder="逗号分隔"
+          />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="8"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          @click="save"
+        >
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
+import { createKnowledge, deleteKnowledge, listKnowledge, updateKnowledge, type KnowledgeItem } from '@/modules/knowledge/api'
 import { Collection, Document, Refresh } from '@element-plus/icons-vue'
-import { ref } from 'vue'
-
-type Doc = {
-  uuid: string
-  title: string
-  content: string
-  category?: string | null
-  tags?: string | null
-  updated_at?: string | null
-}
+import { ElMessage } from 'element-plus'
+import { onMounted, reactive, ref } from 'vue'
 
 const loading = ref(false)
-const docs = ref<Doc[]>([])
+const docs = ref<KnowledgeItem[]>([])
+const dialogVisible = ref(false)
+const editingId = ref<string>('')
+const form = reactive({ title: '', tags: '', content: '' })
 
 const refresh = async () => {
   loading.value = true
-  docs.value = []
-  loading.value = false
+  try {
+    const res = await listKnowledge()
+    docs.value = res.data || []
+  } finally {
+    loading.value = false
+  }
+}
+
+const openCreate = () => {
+  editingId.value = ''
+  form.title = ''
+  form.tags = ''
+  form.content = ''
+  dialogVisible.value = true
+}
+
+const openEdit = (doc: KnowledgeItem) => {
+  editingId.value = doc.id
+  form.title = doc.title
+  form.tags = doc.tags.join(',')
+  form.content = doc.content
+  dialogVisible.value = true
+}
+
+const save = async () => {
+  const payload = {
+    title: form.title,
+    content: form.content,
+    tags: form.tags.split(',').map((x) => x.trim()).filter(Boolean),
+  }
+
+  if (editingId.value) {
+    await updateKnowledge(editingId.value, payload)
+  } else {
+    await createKnowledge(payload)
+  }
+
+  ElMessage.success('保存成功')
+  dialogVisible.value = false
+  await refresh()
+}
+
+const removeDoc = async (id: string) => {
+  await deleteKnowledge(id)
+  ElMessage.success('已删除')
+  await refresh()
 }
 
 const formatTime = (val?: string | null) => {
   if (!val) return '-'
   try { return new Date(val).toLocaleString('zh-CN') } catch { return val }
 }
+
+onMounted(refresh)
 </script>
 
 <style scoped>
@@ -116,7 +217,12 @@ const formatTime = (val?: string | null) => {
 
 .doc-card {
   margin-bottom: 20px;
-  height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.doc-card .el-card__body) {
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -145,5 +251,13 @@ const formatTime = (val?: string | null) => {
 .doc-excerpt {
   color: var(--el-text-color-secondary);
   line-height: 1.6;
+  flex: 1;
+}
+
+.doc-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

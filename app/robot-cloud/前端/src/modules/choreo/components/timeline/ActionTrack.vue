@@ -1,21 +1,41 @@
 <template>
-  <div class="action-track" @click="handleTrackClick">
+  <div
+    class="action-track"
+    @click="handleTrackClick"
+  >
     <!-- 动作块列表 -->
-    <div v-for="block in blocks" :key="block.id" class="action-block" :class="{ selected: isSelected(block) }"
-      :style="getBlockStyle(block)" @mousedown="startDragBlock($event, block)" @dblclick.stop="editBlock(block)"
-      @click.stop="selectBlock(block)" @contextmenu.prevent="editBlock(block)">
+    <div
+      v-for="block in blocks"
+      :key="block.id"
+      class="action-block"
+      :class="{ selected: isSelected(block) }"
+      :style="getBlockStyle(block)"
+      @mousedown="startDragBlock($event, block)"
+      @dblclick.stop="editBlock(block)"
+      @click.stop="selectBlock(block)"
+      @contextmenu.prevent="editBlock(block)"
+    >
       <div class="block-content">
         <span class="block-name">{{ block.name }}</span>
         <span class="block-duration">{{ block.duration.toFixed(1) }}s</span>
       </div>
       <!-- 左侧调整手柄 -->
-      <div class="resize-handle left" @mousedown.stop="startResize($event, block, 'left')" />
+      <div
+        class="resize-handle left"
+        @mousedown.stop="startResize($event, block, 'left')"
+      />
       <!-- 右侧调整手柄 -->
-      <div class="resize-handle right" @mousedown.stop="startResize($event, block, 'right')" />
+      <div
+        class="resize-handle right"
+        @mousedown.stop="startResize($event, block, 'right')"
+      />
     </div>
 
     <!-- 空状态提示 -->
-    <div v-if="blocks.length === 0" class="empty-hint">
+    <div
+      v-if="blocks.length === 0"
+      class="empty-hint"
+    >
       点击轨道空白处添加动作块
     </div>
   </div>

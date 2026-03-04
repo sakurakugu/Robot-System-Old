@@ -2,6 +2,13 @@ import cors from 'cors';
 import express from 'express';
 import DatabaseService from './core/database';
 import { logger } from './core/logger';
+import { AccountController } from './modules/account/controller';
+import { requireRole, withAuthContext } from './modules/account/middleware';
+import { createAccountRoutes } from './modules/account/routes';
+import { AccountService } from './modules/account/service';
+import { KnowledgeController } from './modules/knowledge/controller';
+import { createKnowledgeRoutes } from './modules/knowledge/routes';
+import { KnowledgeService } from './modules/knowledge/service';
 import WebSocketService from './modules/websocket/service';
 import { 对话服务 } from './modules/大模型交互/chat-service';
 import { 对话控制器 } from './modules/大模型交互/controller';
@@ -39,6 +46,8 @@ export class 应用程序 {
   private 角色服务: 角色服务;
   private 编舞服务: ChoreoService;
   private 更新服务: 更新服务;
+  private 账号服务: AccountService;
+  private 知识库服务: KnowledgeService;
 
   // 控制器实例
   private 机器人控制器: 机器人控制器;
@@ -48,6 +57,8 @@ export class 应用程序 {
   private 角色控制器: 角色控制器;
   private 编舞控制器: ChoreoController;
   private 更新控制器: 更新控制器;
+  private 账号控制器: AccountController;
+  private 知识库控制器: KnowledgeController;
 
   constructor() {
     this.应用 = express();
@@ -63,6 +74,8 @@ export class 应用程序 {
     this.角色服务 = new 角色服务(this.数据库);
     this.编舞服务 = new ChoreoService(this.数据库);
     this.更新服务 = new 更新服务(this.数据库);
+    this.账号服务 = new AccountService(this.数据库);
+    this.知识库服务 = new KnowledgeService(this.数据库);
 
     // 初始化控制器
     this.机器人控制器 = new 机器人控制器(this.机器人服务);
@@ -72,6 +85,8 @@ export class 应用程序 {
     this.角色控制器 = new 角色控制器(this.角色服务);
     this.编舞控制器 = new ChoreoController(this.编舞服务);
     this.更新控制器 = new 更新控制器(this.更新服务);
+    this.账号控制器 = new AccountController(this.账号服务);
+    this.知识库控制器 = new KnowledgeController(this.知识库服务);
 
     // 加载持久化配置
     this.加载持久化配置();
@@ -116,6 +131,7 @@ export class 应用程序 {
   private 设置中间件(): void {
     this.应用.use(cors());
     this.应用.use(express.json());
+    this.应用.use(withAuthContext(this.账号服务));
 
     // 请求日志
     this.应用.use((请求, 响应, 下一步) => {
@@ -134,13 +150,23 @@ export class 应用程序 {
     const 路由器 = express.Router();
 
     // 注册各模块路由
+    路由器.use('/auth', createAccountRoutes(this.账号控制器));
     路由器.use('/robots', createRobotRoutes(this.机器人控制器));
     路由器.use('/conversations', createConversationRoutes(this.对话控制器));
-    路由器.use('/config', createLLMRoutes(this.大模型控制器));
-    路由器.use('/config', createSettingsRoutes(this.设置控制器));
+    路由器.use('/config', createLLMRoutes(this.大模型控制器, {
+      updateLLM: requireRole('super_admin'),
+    }));
+    路由器.use('/config', createSettingsRoutes(this.设置控制器, {
+      updateAI: requireRole('super_admin'),
+      updateUI: requireRole('admin', 'super_admin'),
+    }));
+
     路由器.use('/roles', createRoleRoutes(this.角色控制器));
     路由器.use('/choreo', createChoreoRoutes(this.编舞控制器));
-    路由器.use('/updates', createUpdateRoutes(this.更新控制器));
+    路由器.use('/updates', createUpdateRoutes(this.更新控制器, {
+      manage: requireRole('admin', 'super_admin'),
+    }));
+    路由器.use('/knowledge', createKnowledgeRoutes(this.知识库控制器));
     路由器.use('/', createSystemRoutes(this.数据库, this.WebSocket服务));
 
     // 兼容旧路由

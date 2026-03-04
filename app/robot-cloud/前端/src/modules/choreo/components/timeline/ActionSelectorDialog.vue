@@ -1,13 +1,30 @@
 <template>
-  <el-dialog v-model="dialogVisible" title="选择机器狗动作" width="700px" :close-on-click-modal="false" @close="handleClose">
+  <el-dialog
+    v-model="dialogVisible"
+    title="选择机器狗动作"
+    width="700px"
+    :close-on-click-modal="false"
+    @close="handleClose"
+  >
     <div class="action-selector">
       <!-- 动作分类 -->
       <div class="action-categories">
-        <el-tabs v-model="activeCategory" type="border-card">
-          <el-tab-pane label="基础动作" name="basic">
+        <el-tabs
+          v-model="activeCategory"
+          type="border-card"
+        >
+          <el-tab-pane
+            label="基础动作"
+            name="basic"
+          >
             <div class="actions-grid">
-              <div v-for="action in basicActions" :key="action.method" class="action-card"
-                :class="{ selected: selectedAction?.method === action.method }" @click="selectAction(action)">
+              <div
+                v-for="action in basicActions"
+                :key="action.method"
+                class="action-card"
+                :class="{ selected: selectedAction?.method === action.method }"
+                @click="selectAction(action)"
+              >
                 <div class="action-icon">
                   🐕
                 </div>
@@ -23,10 +40,18 @@
             </div>
           </el-tab-pane>
 
-          <el-tab-pane label="姿态控制" name="attitude">
+          <el-tab-pane
+            label="姿态控制"
+            name="attitude"
+          >
             <div class="actions-grid">
-              <div v-for="action in attitudeActions" :key="action.method" class="action-card"
-                :class="{ selected: selectedAction?.method === action.method }" @click="selectAction(action)">
+              <div
+                v-for="action in attitudeActions"
+                :key="action.method"
+                class="action-card"
+                :class="{ selected: selectedAction?.method === action.method }"
+                @click="selectAction(action)"
+              >
                 <div class="action-icon">
                   🎯
                 </div>
@@ -42,10 +67,18 @@
             </div>
           </el-tab-pane>
 
-          <el-tab-pane label="移动" name="movement">
+          <el-tab-pane
+            label="移动"
+            name="movement"
+          >
             <div class="actions-grid">
-              <div v-for="action in movementActions" :key="action.method" class="action-card"
-                :class="{ selected: selectedAction?.method === action.method }" @click="selectAction(action)">
+              <div
+                v-for="action in movementActions"
+                :key="action.method"
+                class="action-card"
+                :class="{ selected: selectedAction?.method === action.method }"
+                @click="selectAction(action)"
+              >
                 <div class="action-icon">
                   🏃
                 </div>
@@ -61,10 +94,18 @@
             </div>
           </el-tab-pane>
 
-          <el-tab-pane label="特技" name="tricks">
+          <el-tab-pane
+            label="特技"
+            name="tricks"
+          >
             <div class="actions-grid">
-              <div v-for="action in trickActions" :key="action.method" class="action-card"
-                :class="{ selected: selectedAction?.method === action.method }" @click="selectAction(action)">
+              <div
+                v-for="action in trickActions"
+                :key="action.method"
+                class="action-card"
+                :class="{ selected: selectedAction?.method === action.method }"
+                @click="selectAction(action)"
+              >
                 <div class="action-icon">
                   ⭐
                 </div>
@@ -80,10 +121,18 @@
             </div>
           </el-tab-pane>
 
-          <el-tab-pane label="自定义动作" name="custom">
+          <el-tab-pane
+            label="自定义动作"
+            name="custom"
+          >
             <div class="actions-grid">
-              <div v-for="action in customActions" :key="action.uuid" class="action-card"
-                :class="{ selected: selectedAction?.method === action.uuid }" @click="selectCustom(action)">
+              <div
+                v-for="action in customActions"
+                :key="action.uuid"
+                class="action-card"
+                :class="{ selected: selectedAction?.method === action.uuid }"
+                @click="selectCustom(action)"
+              >
                 <div class="action-icon">
                   🧩
                 </div>
@@ -102,24 +151,55 @@
       </div>
 
       <!-- 参数配置 -->
-      <div v-if="selectedAction" class="action-params">
+      <div
+        v-if="selectedAction"
+        class="action-params"
+      >
         <el-divider>动作参数</el-divider>
-        <el-form :model="actionParams" label-width="120px" size="small">
+        <el-form
+          :model="actionParams"
+          label-width="120px"
+          size="small"
+        >
           <!-- 动态渲染参数表单 -->
-          <el-form-item v-for="param in selectedAction.params" :key="param.name" :label="param.label">
+          <el-form-item
+            v-for="param in selectedAction.params"
+            :key="param.name"
+            :label="param.label"
+          >
             <!-- 数字输入 -->
-            <el-input-number v-if="param.type === 'number'" v-model="actionParams[param.name]" :min="param.min"
+            <el-input-number
+              v-if="param.type === 'number'"
+              v-model="actionParams[param.name]"
+              :min="param.min"
               :max="param.name === 'duration' && maxDuration !== undefined ? Math.min(param.max || Infinity, maxDuration) : param.max"
-              :step="param.step || 0.1" :precision="param.precision || 2" controls-position="right"
-              style="width: 100%" />
+              :step="param.step || 0.1"
+              :precision="param.precision || 2"
+              controls-position="right"
+              style="width: 100%"
+            />
             <!-- 选择框 -->
-            <el-select v-else-if="param.type === 'select'" v-model="actionParams[param.name]" style="width: 100%">
-              <el-option v-for="option in param.options" :key="option.value" :label="option.label"
-                :value="option.value" />
+            <el-select
+              v-else-if="param.type === 'select'"
+              v-model="actionParams[param.name]"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="option in param.options"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
             </el-select>
             <!-- 文本输入 -->
-            <el-input v-else v-model="actionParams[param.name]" />
-            <div v-if="param.description" class="param-hint">
+            <el-input
+              v-else
+              v-model="actionParams[param.name]"
+            />
+            <div
+              v-if="param.description"
+              class="param-hint"
+            >
               {{ param.description }}
             </div>
           </el-form-item>
@@ -130,7 +210,11 @@
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" :disabled="!selectedAction" @click="handleConfirm">确定</el-button>
+        <el-button
+          type="primary"
+          :disabled="!selectedAction"
+          @click="handleConfirm"
+        >确定</el-button>
       </span>
     </template>
   </el-dialog>

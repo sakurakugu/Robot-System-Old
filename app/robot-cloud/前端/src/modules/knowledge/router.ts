@@ -10,6 +10,7 @@ export const knowledgeBase: RouteRecordRaw[] = [
     meta: {
       title: '知识库',
       icon: 'Document',
+      roles: ['admin', 'super_admin'],
     },
   },
 ]

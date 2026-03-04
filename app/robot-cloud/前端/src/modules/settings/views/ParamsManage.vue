@@ -290,51 +290,7 @@
           </div>
         </el-tab-pane>
 
-        <!-- 后端配置标签页 -->
-        <el-tab-pane
-          label="后端配置"
-          name="connection"
-        >
-          <div class="pane-content">
-            <h3 class="section-title">
-              后端连接配置
-            </h3>
-            <el-form
-              :model="formData"
-              label-width="120px"
-              label-position="left"
-            >
-              <el-form-item label="后端地址">
-                <el-input
-                  v-model="serverUrl"
-                  placeholder="http://localhost:3001"
-                />
-              </el-form-item>
-              <el-form-item label="WebSocket路径">
-                <el-input
-                  v-model="wsPath"
-                  placeholder="/api/v1/interaction/connect"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  :icon="Select"
-                  @click="saveConnectionConfig"
-                >
-                  保存后端配置
-                </el-button>
-                <el-text
-                  v-if="connectionSaved"
-                  type="success"
-                  style="margin-left: 12px"
-                >
-                  已保存
-                </el-text>
-              </el-form-item>
-            </el-form>
-          </div>
-        </el-tab-pane>
+
       </el-tabs>
     </div>
   </div>
@@ -342,17 +298,17 @@
 
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
+import { useAuthStore } from '@/modules/auth/store'
 import { CopyDocument, Edit, Select, Setting, View } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 
 const formData = ref({})
 const activeTab = ref('llm')
 const saved = ref(false)
+const authStore = useAuthStore()
 
-// 后端配置
-const serverUrl = ref('')
-const wsPath = ref('/api/v1/interaction/connect')
-const connectionSaved = ref(false)
+
 
 // 各服务商配置
 const openaiConfig = ref({
@@ -415,22 +371,27 @@ const xunfeiAsrConfig = ref({
 
 const getMaskedText = (len: number) => len > 0 ? Array(len).fill('•').join('') : ''
 
+const authJson = async (url: string, init?: RequestInit) => {
+  const token = localStorage.getItem('auth_token') || ''
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'x-client-type': 'web',
+      'x-device-name': navigator.userAgent,
+      ...(init?.headers || {}),
+    },
+  })
+  return response.json()
+}
 
 onMounted(async () => {
-  // 加载后端配置
-  try {
-    const uiRes = await fetch('/api/v1/config/ui').then(r => r.json()).catch(() => null)
-    if (uiRes?.success && uiRes.data) {
-      serverUrl.value = uiRes.data.serverUrl || ''
-      localStorage.setItem('rc_server_url', serverUrl.value || '')
-    } else {
-      serverUrl.value = localStorage.getItem('rc_server_url') || ''
-    }
-  } catch {}
+
 
   // 加载参数配置
   try {
-    const cfgRes = await fetch('/api/v1/config/llm').then(r => r.json())
+    const cfgRes = await authJson('/api/v1/config/llm')
     console.log('参数配置响应:', cfgRes)
     if (cfgRes?.success && cfgRes.data && cfgRes.data.providers) {
       const providers = cfgRes.data.providers
@@ -494,7 +455,7 @@ onMounted(async () => {
   }
 
   try {
-    const aiRes = await fetch('/api/v1/config/ai').then(r => r.json())
+    const aiRes = await authJson('/api/v1/config/ai')
     if (aiRes?.success && aiRes.data?.xunfeiAsr) {
       const xunfei = aiRes.data.xunfeiAsr
       xunfeiAsrConfig.value.hasAppId = !!xunfei.hasAppId
@@ -603,6 +564,10 @@ const enableXunfeiEdit = (field: 'appId' | 'apiKey' | 'apiSecret') => {
 }
 
 const saveLLMConfig = async () => {
+  if (!authStore.isSuperAdmin) {
+    ElMessage.error('仅主管理员可修改 API Key')
+    return
+  }
   const llmPayload: any = {}
 
   // OpenAI 配置
@@ -646,16 +611,14 @@ const saveLLMConfig = async () => {
 
   try {
     if (hasLLMUpdate) {
-      await fetch('/api/v1/config/llm', {
+      await authJson('/api/v1/config/llm', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(llmPayload)
       })
     }
     if (hasXunfeiUpdate) {
-      await fetch('/api/v1/config/ai', {
+      await authJson('/api/v1/config/ai', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xunfeiAsr: xunfeiPayload })
       })
     }
@@ -667,23 +630,7 @@ const saveLLMConfig = async () => {
   } catch {}
 }
 
-const saveConnectionConfig = async () => {
-  localStorage.setItem('rc_server_url', serverUrl.value || '')
 
-  const uiPayload = {
-    serverUrl: serverUrl.value || '',
-  }
-
-  try {
-    await fetch('/api/v1/config/ui', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(uiPayload)
-    })
-    connectionSaved.value = true
-    setTimeout(() => (connectionSaved.value = false), 1200)
-  } catch {}
-}
 </script>
 
 <style scoped>
@@ -716,11 +663,10 @@ const saveConnectionConfig = async () => {
   margin-bottom: 20px;
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 :deep(.el-divider__text) {
   background-color: transparent;
 }
 </style>
-

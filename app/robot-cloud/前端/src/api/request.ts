@@ -16,11 +16,12 @@ const request: AxiosInstance = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 可以在这里添加 token 等认证信息
-    // const token = storage.get(STORAGE_KEYS.TOKEN)
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    config.headers['x-client-type'] = 'web'
+    config.headers['x-device-name'] = navigator.userAgent
     return config
   },
   (error: AxiosError) => {

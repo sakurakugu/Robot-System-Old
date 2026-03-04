@@ -10,6 +10,7 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: {
       title: '更新管理',
       icon: 'UploadFilled',
+      roles: ['admin', 'super_admin'],
     },
   },
   {
@@ -19,6 +20,7 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: {
       title: '参数管理',
       icon: 'Setting',
+      roles: ['admin', 'super_admin'],
     },
   },
   {

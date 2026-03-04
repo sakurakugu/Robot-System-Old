@@ -143,7 +143,13 @@ class WebSocket服务 {
       role = 'ui';
     }
 
-    if (!robotId || !isValidRobotId(robotId)) {
+    // 手机端独立连接：phoneId 是手机侧会话 ID，与机器人无关
+    // 存在 phoneId 时，以它作为连接 key，跳过机器人数据库读写
+    const phoneId = url.searchParams.get('phoneId');
+    const isPhoneSession = !!(phoneId && role === 'ui');
+    if (isPhoneSession) {
+      robotId = phoneId!;
+    } else if (!robotId || !isValidRobotId(robotId)) {
       robotId = uuidv7();
       logger.info('生成新的机器狗ID', { robotId });
     }
@@ -190,19 +196,21 @@ class WebSocket服务 {
       this.robotConnections.get(robotId)!.set(channel, connection);
     }
 
-    // 更新数据库状态
-    const existing = this.database.getRobot(robotId);
-    if (existing) {
-      this.database.updateRobot(robotId, { status: 'online' });
-    } else {
-      this.database.upsertRobot({
-        uuid: robotId,
-        status: 'online',
-      });
+    // 仅机器人连接才需要更新数据库状态；手机端独立会话（phoneId）不写入机器人表
+    if (!isPhoneSession) {
+      const existing = this.database.getRobot(robotId);
+      if (existing) {
+        this.database.updateRobot(robotId, { status: 'online' });
+      } else {
+        this.database.upsertRobot({
+          uuid: robotId,
+          status: 'online',
+        });
+      }
     }
 
-    logger.info('机器人连接建立', {
-      robotId,
+    logger.info(isPhoneSession ? '手机端独立连接建立' : '机器人连接建立', {
+      [isPhoneSession ? 'phoneId' : 'robotId']: robotId,
       channel,
       ip: req.socket.remoteAddress,
       role: role || 'robot',

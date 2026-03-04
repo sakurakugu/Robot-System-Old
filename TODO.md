@@ -1,35 +1,30 @@
 ### 主要需求
 
-1. 让手机端可以自动重连，而不是连接失败后就不连接了，然后点击这朵云也可以手动连接
+1. 实现远程更新
 
-2. 实现远程更新
    - 服务端将机器狗的包下载到手机端，让手机端更新机器狗端
    - 服务器直接远程更新机器狗端
 
-4. 优化大模型的各种内容
+2. 优化大模型的各种内容
+
    - 比如：让 apikey 输入优化
    - 让使用的模型为真实的模型等等
 
-5. 机器狗端：
+3. 机器狗端：
+
    - 让摇杆指令编程如果有下一个指令，上一个还没执行的话就直接吞掉（udp？）
 
-6. aaa
-   1. 删除服务器端的 gstream 的视频流（这个原本是测试用的，现在不需要了）d:\elric\Code\Repos\robot-dog\app\robot-cloud\后端\src\modules\机器人交互\video-service.ts 改成成从手机发送webrtc视频流而到服务端（不是发送图片）（手机先拉机器狗视频，再转推到服务端，只有在手机进入机器狗操作页面是才可以拉，p2p转发到前端）
-   2. 让手机端可以通过ws自动连接并重连服务器端的ws ，方便服务端向手机端发送消息，然后要让这里显示连接成功 （是手机端向服务器连接ws，不是手机端连接机器狗）
-      d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\profile\screens\ProfileScreen.tsx
-   3. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-
+4. aaa
+
+   1. 删除服务器端的 gstream 的视频流（这个原本是测试用的，现在不需要了）d:\elric\Code\Repos\robot-dog\app\robot-cloud\后端\src\modules\机器人交互\video-service.ts 改成成从手机发送 webrtc 视频流而到服务端（不是发送图片）（手机先拉机器狗视频，再转推到服务端，只有在手机进入机器狗操作页面是才可以拉，p2p 转发到前端）
+   2. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-
       phone\RobotPhone\src\features\settings\screens\SettingsScreen.tsx
-   4. 然后手机端向服务器发送时，会在手机端的机器人操作的顶部显示向云端上传的图标 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\robots\screens\RobotOperationScreen.tsx
-   5. 点击后在右边显示弹窗正在向云端发送视频流（使用点击动作然后在右边显示的弹窗）（就是把手机的通过后端转发到前端）1. 删除服务器端的 gstream 的视频流（这个原本是测试用的，现在不需要了）d:\elric\Code\Repos\robot-dog\app\robot-cloud\后端\src\modules\机器人交互\video-
+   3. 然后手机端向服务器发送时，会在手机端的机器人操作的顶部显示向云端上传的图标 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\robots\screens\RobotOperationScreen.tsx
+   4. 点击后在右边显示弹窗正在向云端发送视频流（使用点击动作然后在右边显示的弹窗）（就是把手机的通过后端转发到前端）1. 删除服务器端的 gstream 的视频流（这个原本是测试用的，现在不需要了）d:\elric\Code\Repos\robot-dog\app\robot-cloud\后端\src\modules\机器人交互\video-
       service.ts
-   6. 让手机端可以通过ws自动连接并重连服务器端的ws ，方便服务端向手机端发送消息，然后要让这里显示连接成功 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\profile\screens\ProfileScreen.tsx
-   7. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-
-      phone\RobotPhone\src\features\settings\screens\SettingsScreen.tsx
-   8. 然后手机端向服务器发送时，会在手机端的机器人操作的顶部显示向云端上传的图标 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\robots\screens\RobotOperationScreen.tsx
-   9. 点击后在右边显示弹窗正在向云端发送视频流（就是把手机的通过后端转发到前端）
       可以全部重构，不要向前兼容。可以全部重构，不要向前兼容。可以全部重构，不要向前兼容。
 
-7. 将配置文件导出的功能，方便测试版回滚
+5. 将配置文件导出的功能，方便测试版回滚
 
    ```
    Android
@@ -81,7 +76,7 @@
     - iOS: 弹出系统分享菜单，用户可选择「存储到文件」或分享给其他人
    ```
 
-8. 当手机连上机器狗热点（机器狗为 192.168.234.1）时，支持使用 ssh 将文件上传到机器狗（主要是第一次上传没有机器狗本地跑的文件）
+6. 当手机连上机器狗热点（机器狗为 192.168.234.1）时，支持使用 ssh 将文件上传到机器狗（主要是第一次上传没有机器狗本地跑的文件）
 
 ### 次要需求
 

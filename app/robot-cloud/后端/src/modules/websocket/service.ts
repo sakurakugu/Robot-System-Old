@@ -11,7 +11,6 @@ import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import 语音识别服务 from '../大模型交互/asr-service';
 import 对话服务 from '../大模型交互/chat-service';
 import TTSService from '../大模型交互/tts-service';
-import { VideoStreamManager } from '../机器人交互/video-service';
 import type { 机器人服务 } from '../机器人管理/service';
 
 
@@ -48,7 +47,6 @@ class WebSocket服务 {
   private 对话服务?: 对话服务;
   private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
-  private videoStreamManager: VideoStreamManager;
   private asrService: 语音识别服务;
   private audioSessions: Map<string, AudioSession> = new Map();
   private inputMergeTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -69,7 +67,6 @@ class WebSocket服务 {
   constructor(database: DatabaseService) {
     this.database = database;
     this.ttsService = new TTSService();
-    this.videoStreamManager = new VideoStreamManager();
     this.asrService = new 语音识别服务();
   }
 
@@ -332,11 +329,9 @@ class WebSocket服务 {
           break;
 
         case 'video_subscribe':
-          await this.handleVideoSubscribe(robotId);
           break;
 
         case 'video_unsubscribe':
-          await this.handleVideoUnsubscribe(robotId);
           break;
 
         case 'action_input':
@@ -1588,53 +1583,6 @@ class WebSocket服务 {
   }
 
   /**
-   * 处理视频流订阅
-   */
-  private async handleVideoSubscribe(robotId: string): Promise<void> {
-    try {
-      // 从数据库获取机器人IP
-      const robot = this.database.getRobot(robotId);
-      if (!robot || !robot.ip) {
-        this.sendError(robotId, 'NO_ROBOT_IP', '机器人IP未配置');
-        return;
-      }
-
-      const rtspUrl = `rtsp://${robot.ip}:8554/test`;
-      const videoService = this.videoStreamManager.subscribe(robotId, rtspUrl, robotId);
-
-      // 监听视频帧并转发给UI客户端
-      videoService.on('frame', (frameBuffer: Buffer) => {
-        const base64Frame = frameBuffer.toString('base64');
-        this.sendToUI(robotId, {
-          type: 'video_frame',
-          robotId,
-          timestamp: Date.now(),
-          data: {
-            frame: base64Frame,
-          },
-        }, 'business');
-      });
-
-      logger.info('视频流订阅成功', { robotId, rtspUrl });
-    } catch (error: any) {
-      logger.error('视频流订阅失败', error, { robotId });
-      this.sendError(robotId, 'VIDEO_SUBSCRIBE_ERROR', '视频流订阅失败', 'business');
-    }
-  }
-
-  /**
-   * 处理视频流取消订阅
-   */
-  private async handleVideoUnsubscribe(robotId: string): Promise<void> {
-    try {
-      this.videoStreamManager.unsubscribe(robotId, robotId);
-      logger.info('视频流取消订阅', { robotId });
-    } catch (error: any) {
-      logger.error('视频流取消订阅失败', error, { robotId });
-    }
-  }
-
-  /**
    * 处理断开连接
    */
   private handleDisconnection(robotId: string, channel: Channel): void {
@@ -1747,7 +1695,6 @@ class WebSocket服务 {
    * 关闭WebSocket服务器
    */
   close(): void {
-    this.videoStreamManager.shutdown();
     for (const wss of this.wssMap.values()) {
       wss.close();
     }

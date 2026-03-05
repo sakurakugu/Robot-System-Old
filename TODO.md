@@ -1,23 +1,17 @@
 ### 主要需求
 
 1. 实现远程更新
-
    - 服务端将机器狗的包下载到手机端，让手机端更新机器狗端
-   - 服务器直接远程更新机器狗端
-   - 新增robot-updata用于更新
-   - 实现脚本，分别将 robot-agent、robot-server、robot-updata 打包
+   3. 支持手机端分别安装这三个（安装robot-server时自动安装sparkrobot-common，安装robot-agent时自动安装robot-server）
 
 2. 优化大模型的各种内容
-
    - 比如：让 apikey 输入优化
    - 让使用的模型为真实的模型等等
 
 3. 机器狗端：
-
    - 让摇杆指令编程如果有下一个指令，上一个还没执行的话就直接吞掉（udp？）
 
 4. aaa
-
    1. 删除服务器端的 gstream 的视频流（这个原本是测试用的，现在不需要了）d:\elric\Code\Repos\robot-dog\app\robot-cloud\后端\src\modules\机器人交互\video-service.ts 改成成从手机发送 webrtc 视频流而到服务端（不是发送图片）（手机先拉机器狗视频，再转推到服务端，只有在手机进入机器狗操作页面是才可以拉，p2p 转发到前端）
    2. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-
       phone\RobotPhone\src\features\settings\screens\SettingsScreen.tsx

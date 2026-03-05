@@ -150,23 +150,7 @@
 
     <!-- Middle Video Area -->
     <div class="video-area">
-      <div
-        v-if="showVideo && currentVideoFrame"
-        class="video-container"
-      >
-        <img
-          :src="currentVideoFrame"
-          class="video-feed"
-          alt="Live Feed"
-          draggable="false"
-          @dragstart.prevent
-          @pointerdown.prevent
-        >
-      </div>
-      <div
-        v-else
-        class="video-placeholder"
-      >
+      <div class="video-placeholder">
         <el-icon
           :size="60"
           color="#909399"
@@ -323,7 +307,6 @@ const showVideo = ref(true)
 const robotBattery = ref<number | undefined>(undefined) // Mock value
 const phoneBattery = ref<number | null>(null) // Mock value, null to hide
 const currentTime = ref('')
-const currentVideoFrame = ref<string | null>(null)
 const hasUpdate = ref(true)
 const showChatPanel = ref(false)
 const layoutEditMode = ref(false)
@@ -412,7 +395,6 @@ const toggleVideo = (val: boolean) => {
     if (isConnected.value) {
       wsSendMessage({ type: 'video_unsubscribe' })
     }
-    currentVideoFrame.value = null
   }
 }
 
@@ -718,14 +700,7 @@ const fetchControlLayout = async () => {
 
 // WebSocket Message Handling
 onMessage((data) => {
-  if (data.type === 'video_frame') {
-    try {
-      const frameBase64 = data.data.frame
-      currentVideoFrame.value = `data:image/jpeg;base64,${frameBase64}`
-    } catch (error) {
-      console.error('Video frame error', error)
-    }
-  } else if (data.type === 'battery_status') {
+  if (data.type === 'battery_status') {
     robotBattery.value = data.data.level
   } else if (data.type === 'status_update') {
     const level = typeof data.data?.battery === 'number' ? data.data.battery : Number(data.data?.battery)
@@ -775,9 +750,6 @@ watch(selectedUuid, async (val) => {
     robotId.value = val
     try {
       await wsConnect()
-      if (showVideo.value) {
-        wsSendMessage({ type: 'video_subscribe' })
-      }
       // 连接成功后查询SDK模式状态
       wsSendMessage({
         type: 'sdk_mode_get',
@@ -906,23 +878,6 @@ html, body, #app {
   position: relative;
   overflow: hidden;
   width: 100%;
-}
-
-.video-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.video-feed {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  user-select: none;
-  -webkit-user-drag: none;
-  touch-action: none;
 }
 
 .video-placeholder {

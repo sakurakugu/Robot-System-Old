@@ -14,11 +14,11 @@ export const useRobotStore = defineStore('robot', () => {
   const groups = ref<string[]>([])
 
   // 计算属性
-  const onlineRobots = computed(() => 
+  const onlineRobots = computed(() =>
     robots.value.filter(r => r.status === 'online')
   )
 
-  const offlineRobots = computed(() => 
+  const offlineRobots = computed(() =>
     robots.value.filter(r => r.status === 'offline')
   )
 
@@ -69,13 +69,13 @@ export const useRobotStore = defineStore('robot', () => {
     try {
       const res = await robotApi.getRobotDetail(uuid)
       currentRobot.value = res.data
-      
+
       // 更新列表中的机器人
       const index = robots.value.findIndex(r => r.uuid === uuid)
       if (index !== -1) {
         robots.value[index] = res.data
       }
-      
+
       return res.data
     } catch (error) {
       console.error('获取机器人详情失败:', error)
@@ -104,18 +104,18 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       const res = await robotApi.updateRobot(uuid, data)
-      
+
       // 更新列表中的机器人
       const index = robots.value.findIndex(r => r.uuid === uuid)
       if (index !== -1) {
         robots.value[index] = res.data
       }
-      
+
       // 更新当前机器人
       if (currentRobot.value?.uuid === uuid) {
         currentRobot.value = res.data
       }
-      
+
       ElMessage.success('更新成功')
       return res.data
     } catch (error) {
@@ -130,18 +130,18 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       await robotApi.deleteRobot(uuid)
-      
+
       // 从列表中移除
       const index = robots.value.findIndex(r => r.uuid === uuid)
       if (index !== -1) {
         robots.value.splice(index, 1)
       }
-      
+
       // 清除当前机器人
       if (currentRobot.value?.uuid === uuid) {
         currentRobot.value = null
       }
-      
+
       ElMessage.success('删除成功')
     } catch (error) {
       console.error('删除机器人失败:', error)
@@ -170,13 +170,13 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       const res = await robotApi.connectRobot(uuid)
-      
+
       // 更新列表中的机器人状态
       const index = robots.value.findIndex(r => r.uuid === uuid)
       if (index !== -1) {
         robots.value[index] = res.data
       }
-      
+
       ElMessage.success('连接成功')
       return res.data
     } catch (error) {
@@ -191,10 +191,10 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       const res = await robotApi.updateRobotFirmware(uuid)
-      ElMessage.success('固件更新成功')
+      ElMessage.success('固件推送成功')
       return res
     } catch (error) {
-      console.error('更新固件失败:', error)
+      console.error('推送固件失败:', error)
       throw error
     } finally {
       loading.value = false
@@ -219,14 +219,14 @@ export const useRobotStore = defineStore('robot', () => {
     currentRobot,
     loading,
     groups,
-    
+
     // 计算属性
     onlineRobots,
     offlineRobots,
     onlineCount,
     totalCount,
     robotsByGroup,
-    
+
     // 方法
     fetchRobots,
     fetchGroups,

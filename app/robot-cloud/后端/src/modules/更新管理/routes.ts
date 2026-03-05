@@ -1,5 +1,5 @@
-import { Router } from 'express';
 import type { RequestHandler } from 'express';
+import { Router } from 'express';
 import multer from 'multer';
 import type { 更新控制器 } from './controller';
 

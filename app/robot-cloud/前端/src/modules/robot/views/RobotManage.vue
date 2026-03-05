@@ -106,10 +106,10 @@
               size="small"
               :icon="Upload"
               :loading="updating[robot.uuid]"
-              title="更新客户端代码到机器人"
+              title="推送最新安装包到机器人"
               @click="updateFirmware(robot)"
             >
-              {{ updating[robot.uuid] ? '更新中' : '更新固件' }}
+              {{ updating[robot.uuid] ? '推送中' : '推送更新' }}
             </el-button>
             <el-button
               size="small"
@@ -242,10 +242,10 @@
               <el-button
                 size="small"
                 :loading="updating[row.uuid]"
-                title="更新固件"
+                title="推送更新"
                 @click="updateFirmware(row)"
               >
-                {{ updating[row.uuid] ? '更新中' : '更新' }}
+                {{ updating[row.uuid] ? '推送中' : '推送更新' }}
               </el-button>
               <el-button
                 size="small"

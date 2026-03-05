@@ -5,6 +5,7 @@ import { v7 as uuidv7, validate as validUUID } from 'uuid';
 import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
+import type { 机器人包服务 } from '../机器人包管理/service';
 import type WebSocketService from '../websocket/service';
 import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from './types';
 
@@ -14,6 +15,7 @@ import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from 
 export class 机器人服务 {
   private pythonCommand: string;
   private websocketService?: WebSocketService;
+  private packageService?: 机器人包服务;
 
   constructor(private database: DatabaseService) {
     // Windows 上通常是 python，Linux/Mac 上通常是 python3
@@ -25,6 +27,13 @@ export class 机器人服务 {
    */
   setWebSocketService(service: WebSocketService): void {
     this.websocketService = service;
+  }
+
+  /**
+   * 设置机器人包服务（延迟注入，避免循环依赖）
+   */
+  set机器人包服务(service: 机器人包服务): void {
+    this.packageService = service;
   }
 
   /**
@@ -390,48 +399,54 @@ export class 机器人服务 {
   }
 
   /**
-   * 更新固件
+   * 推送安装包到机器人：通过 WebSocket 通道告知机器人从云端 HTTP 下载安装包
    */
-  async 更新固件(uuid: string): Promise<{ robotIp: string }> {
+  async 更新固件(uuid: string, channel: string = 'stable'): Promise<{ downloaded: string[] }> {
     const robot = this.database.getRobot(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
 
-    if (!robot.ip) {
-      throw new Error('缺少机器人IP地址');
+    if (!this.websocketService) {
+      throw new Error('WebSocket服务未初始化');
     }
 
-    const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
-
-    // 测试连接
-    logger.info(`测试连接到 ${robot.ip}...`);
-    const canConnect = await this.测试SSH连接(pythonScript, robot.ip);
-    if (!canConnect) {
-      throw new Error(`无法连接到机器人 ${robot.ip}`);
+    if (!this.packageService) {
+      throw new Error('机器人包服务未初始化');
     }
 
-    // 创建远程目录
-    logger.info('创建远程目录...');
-    const mkdirCmd = 'mkdir -p /home/firefly/sparkrobot/robot-agent && mkdir -p /home/firefly/sparkrobot/config';
-    try {
-      await this.执行SSH命令(pythonScript, robot.ip, mkdirCmd);
-    } catch {
-      throw new Error('创建远程目录失败');
+    const releaseChannel = channel as 'stable' | 'beta';
+    const pkgInfo = this.packageService.getActive(releaseChannel);
+    if (!pkgInfo) {
+      throw new Error(`没有可用的安装包（channel: ${channel}），请先在包管理页面上传安装包`);
     }
 
-    // 复制客户端代码
-    logger.info('开始复制客户端代码...');
-    const localClientPath = path.resolve(__dirname, '../../../../../robot-agent');
-    const remoteClientPath = '/home/firefly/sparkrobot';
-    const copyResult = await this.复制到机器人(pythonScript, robot.ip, localClientPath, remoteClientPath);
+    // 构建各包的下载路径和哈希（机器人收到后自行拼接HTTP基础URL）
+    const downloadPaths: { agent?: string; server?: string; common?: string } = {};
+    const hashes: { agent?: string; server?: string; common?: string } = {};
 
-    if (!copyResult.success) {
-      throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
+    if (pkgInfo.agent) {
+      downloadPaths.agent = `/api/v1/robot-packages/download/agent?channel=${channel}`;
+      hashes.agent = pkgInfo.agent.fileHash;
+    }
+    if (pkgInfo.server) {
+      downloadPaths.server = `/api/v1/robot-packages/download/server?channel=${channel}`;
+      hashes.server = pkgInfo.server.fileHash;
+    }
+    if (pkgInfo.common) {
+      downloadPaths.common = `/api/v1/robot-packages/download/common?channel=${channel}`;
+      hashes.common = pkgInfo.common.fileHash;
     }
 
-    logger.info('固件更新成功');
-    return { robotIp: robot.ip };
+    logger.info(`开始推送安装包到机器人 ${uuid}，包含: ${Object.keys(downloadPaths).join(', ')}`);
+
+    const result = await this.websocketService.请求推送安装包(uuid, downloadPaths, hashes);
+    if (!result.success) {
+      throw new Error(result.error || '推送安装包失败');
+    }
+
+    logger.info(`安装包推送成功，已下载: ${(result.downloaded || []).join(', ')}`);
+    return { downloaded: result.downloaded || [] };
   }
 
   async 写入日志标记(uuid: string, message: string): Promise<{ marker?: string }> {

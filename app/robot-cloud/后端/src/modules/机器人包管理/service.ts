@@ -261,4 +261,23 @@ export class 机器人包服务 {
     this.db.prepare(`DELETE FROM robot_package_versions WHERE id = ?`).run(id);
     logger.info(`已删除机器人包版本记录 id=${id}`);
   }
+
+  /* ------------------------------------------------------------------ */
+  /*  获取活跃版本                                                       */
+  /* ------------------------------------------------------------------ */
+
+  getActive(channel: ReleaseChannel = 'stable'): RobotPackageInfo | null {
+    const record = this.db
+      .prepare(`SELECT * FROM robot_package_versions WHERE channel = ? AND is_active = 1 ORDER BY id DESC LIMIT 1`)
+      .get(channel) as RobotPackageRecord | undefined;
+    return record ? toPackageInfo(record) : null;
+  }
+
+  getPackageFilePath(type: PackageType, channel: ReleaseChannel = 'stable'): string | null {
+    const info = this.getActive(channel);
+    if (!info) return null;
+    const fileInfo = info[type];
+    if (!fileInfo) return null;
+    return path.join(PKG_DIR, type, fileInfo.fileName);
+  }
 }

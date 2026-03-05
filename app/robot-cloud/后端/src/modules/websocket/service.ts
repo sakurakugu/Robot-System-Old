@@ -385,6 +385,7 @@ class WebSocket服务 {
         'volume_response',
         'config_response',
         'log_mark_response',
+        'package_download_response',
       ]),
       audio_upload: new Set(['audio_start', 'audio_chunk', 'audio_end', 'heartbeat']),
       audio_download: new Set(['heartbeat']),
@@ -2199,6 +2200,55 @@ class WebSocket服务 {
             resolve(msg.data);
           }
         } catch (error) {
+          // 忽略解析错误
+        }
+      };
+
+      connection.websocket.on('message', checkResponse);
+    });
+  }
+
+  /**
+   * 请求机器人通过 HTTP 下载安装包（用于API调用）
+   */
+  async 请求推送安装包(
+    robotId: string,
+    downloadPaths: { agent?: string; server?: string; common?: string },
+    hashes: { agent?: string; server?: string; common?: string },
+  ): Promise<{ success: boolean; downloaded?: string[]; error?: string }> {
+    const connection = this.robotConnections.get(robotId)?.get('business');
+    if (!connection) {
+      throw new Error('机器人未连接');
+    }
+
+    const requestId = uuidv7();
+
+    const success = this.sendToRobot(robotId, {
+      type: 'package_download',
+      robotId,
+      timestamp: Date.now(),
+      data: { requestId, downloadPaths, hashes },
+    } as any, 'business');
+
+    if (!success) {
+      throw new Error('发送推送安装包命令失败');
+    }
+
+    // 等待机器人响应（最多 5 分钟，下载大文件需要足够时间）
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('推送安装包请求超时'));
+      }, 300000);
+
+      const checkResponse = (data: Buffer) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'package_download_response' && msg.data?.requestId === requestId) {
+            clearTimeout(timeout);
+            connection.websocket.off('message', checkResponse);
+            resolve(msg.data);
+          }
+        } catch {
           // 忽略解析错误
         }
       };

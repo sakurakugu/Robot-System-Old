@@ -43,6 +43,12 @@ export function createRobotPackageRoutes(
   // 版本列表 ?channel=stable
   router.get('/versions', controller.list);
 
+  // 获取当前活跃版本信息（机器人和手机端下载前调用）
+  router.get('/active', controller.getActive);
+
+  // 下载安装包文件（:type = agent | server | common，不需要鉴权，机器人直接 HTTP 下载）
+  router.get('/download/:type', controller.download);
+
   // 回滚到指定版本
   if (guards?.manage) {
     router.post('/rollback/:id', guards.manage, controller.rollback);

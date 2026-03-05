@@ -62,7 +62,8 @@ export type ClientMessage =
   | AudioControlMessage
   | SdkModeSetMessage
   | SdkModeGetMessage
-  | SdkModeResponseMessage;
+  | SdkModeResponseMessage
+  | PackageDownloadResponseMessage;
 
 export interface SdkModeSetMessage {
   type: 'sdk_mode_set';
@@ -228,7 +229,8 @@ export type ServerMessage =
   | BatteryStatusMessage
   | StatusUpdateMessage
   | AudioControlCommandMessage
-  | AsrTranscriptMessage;
+  | AsrTranscriptMessage
+  | PackageDownloadCommandMessage;
 
 export interface AudioResponseMessage {
   type: 'audio_response';
@@ -373,3 +375,39 @@ export interface AsrTranscriptMessage {
 // 引用conversation模块的类型
 import type { TTSOptions } from '../大模型交互/types';
 import type { ActionCommand } from '../机器人交互/types';
+
+/** 云端→机器人：通知机器人通过 HTTP 下载安装包 */
+export interface PackageDownloadCommandMessage {
+  type: 'package_download';
+  robotId: string;
+  timestamp: number;
+  data: {
+    requestId: string;
+    /** 各包的相对下载路径（机器人自行拼接 HTTP 基础 URL） */
+    downloadPaths: {
+      agent?: string;
+      server?: string;
+      common?: string;
+    };
+    /** 各包的 SHA-256 哈希，用于下载后校验 */
+    hashes: {
+      agent?: string;
+      server?: string;
+      common?: string;
+    };
+  };
+}
+
+/** 机器人→云端：下载安装包操作结果 */
+export interface PackageDownloadResponseMessage {
+  type: 'package_download_response';
+  robotId: string;
+  timestamp: number;
+  data: {
+    requestId: string;
+    success: boolean;
+    /** 成功下载的包类型列表 */
+    downloaded?: string[];
+    error?: string;
+  };
+}

@@ -328,7 +328,7 @@ def terminate_pid(pid: int) -> bool:
             except ProcessLookupError:
                 return True
             time.sleep(0.1)
-        os.kill(pid, signal.SIGKILL)
+        os.kill(pid, getattr(signal, "SIGKILL", signal.SIGTERM))
         return True
     except ProcessLookupError:
         return True

@@ -104,6 +104,8 @@ export class 应用程序 {
     this.编舞服务.setWebSocketService(this.WebSocket服务);
     // 延迟注入 WebSocket 服务到机器人服务
     this.机器人服务.setWebSocketService(this.WebSocket服务);
+    // 注入机器人包服务到机器人服务（用于推送安装包）
+    this.机器人服务.set机器人包服务(this.机器人包服务);
     // 延迟注入机器人服务和对话服务到WebSocket服务
     this.WebSocket服务.set机器人服务(this.机器人服务);
     this.WebSocket服务.set对话服务(this.对话服务);

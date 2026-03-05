@@ -130,15 +130,16 @@ export class 机器人控制器 {
   };
 
   /**
-   * 更新机器人固件
+   * 更新机器人固件（推送安装包）
    */
   updateFirmware = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const result = await this.机器人服务.更新固件(uuid);
+      const channel = (req.query.channel as string) || 'stable';
+      const result = await this.机器人服务.更新固件(uuid, channel);
       res.json({
         success: true,
-        message: '客户端代码已成功更新到机器人',
+        message: `安装包已成功推送到机器人，已下载: ${result.downloaded.join(', ')}`,
         data: result,
       });
     } catch (error: any) {

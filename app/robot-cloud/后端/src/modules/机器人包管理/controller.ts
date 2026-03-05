@@ -1,7 +1,16 @@
 import type { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import type { PackageUploadItem, 机器人包服务 } from './service';
 import { semverToVersionCode } from './service';
 import type { PackageType, ReleaseChannel } from './types';
+
+/** 包类型到安装包文件名映射 */
+const PACKAGE_FILENAMES: Record<PackageType, string> = {
+  agent: 'robot-agent.tar.gz',
+  server: 'robot-server.tar.gz',
+  common: 'sparkrobot-common.tar.gz',
+};
 
 const VALID_PACKAGE_TYPES: PackageType[] = ['agent', 'server', 'common'];
 
@@ -103,6 +112,52 @@ export class 机器人包控制器 {
       const id = Number(req.params.id);
       this.service.deleteVersion(id);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  /** GET /robot-packages/active?channel=stable — 获取当前活跃版本信息 */
+  getActive = (req: Request, res: Response): void => {
+    try {
+      const channel = (req.query.channel as ReleaseChannel) || 'stable';
+      if (!['stable', 'beta'].includes(channel)) {
+        res.status(400).json({ success: false, error: 'channel 必须是 stable 或 beta' });
+        return;
+      }
+      const info = this.service.getActive(channel);
+      if (!info) {
+        res.status(404).json({ success: false, error: '没有可用的安装包' });
+        return;
+      }
+      res.json({ success: true, data: info });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  /** GET /robot-packages/download/:type?channel=stable — 下载指定类型的安装包 */
+  download = (req: Request, res: Response): void => {
+    try {
+      const type = req.params.type as PackageType;
+      if (!['agent', 'server', 'common'].includes(type)) {
+        res.status(400).json({ success: false, error: '无效的包类型，必须是 agent、server 或 common' });
+        return;
+      }
+      const channel = (req.query.channel as ReleaseChannel) || 'stable';
+      if (!['stable', 'beta'].includes(channel)) {
+        res.status(400).json({ success: false, error: 'channel 必须是 stable 或 beta' });
+        return;
+      }
+      const filePath = this.service.getPackageFilePath(type, channel);
+      if (!filePath || !fs.existsSync(filePath)) {
+        res.status(404).json({ success: false, error: '找不到安装包文件，请先上传安装包' });
+        return;
+      }
+      const fileName = PACKAGE_FILENAMES[type];
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Type', 'application/gzip');
+      res.sendFile(path.resolve(filePath));
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }

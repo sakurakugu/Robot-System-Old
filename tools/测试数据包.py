@@ -3,10 +3,13 @@ import json
 import socket
 import threading
 import time
-from colorama import init, Fore, Style
+import importlib
 
 # ── 初始化 colorama ─────────────────────────────────────────────────────────────
-init(autoreset=True)  # 自动在每次打印后重置颜色
+colorama = importlib.import_module("colorama")
+init = colorama.init
+Fore = colorama.Fore
+init(autoreset=True)
 
 DOG_IP       = "192.168.0.85"
 SEND_PORT    = 8081

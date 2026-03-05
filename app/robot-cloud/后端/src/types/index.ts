@@ -77,6 +77,8 @@ export interface RobotConnection {
     name?: string;
     model?: string;
     version?: string;
+    motion_control_version?: string;
+    robot_server_version?: string;
   };
 }
 
@@ -164,7 +166,12 @@ export interface RobotRegisterMessage extends BaseClientMessage {
     name?: string;
     model?: string;
     version?: string;
-    metadata?: any;
+    metadata?: {
+      version?: string; // robot-agent 版本
+      motion_control_version?: string;
+      robot_server_version?: string;
+      [key: string]: any;
+    };
   };
 }
 

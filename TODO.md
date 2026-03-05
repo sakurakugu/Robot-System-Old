@@ -4,6 +4,8 @@
 
    - 服务端将机器狗的包下载到手机端，让手机端更新机器狗端
    - 服务器直接远程更新机器狗端
+   - 新增robot-updata用于更新
+   - 实现脚本，分别将 robot-agent、robot-server、robot-updata 打包
 
 2. 优化大模型的各种内容
 

@@ -543,29 +543,27 @@
 
             <div class="upgrade-card">
               <div class="upgrade-header">
-                <h4>APP 客户端</h4>
+                <h4>版本信息</h4>
                 <el-tag
                   size="small"
                   type="info"
                 >
-                  当前版本 v1.0.2
+                  当前
                 </el-tag>
               </div>
-              <div class="upgrade-body">
-                <p v-if="appUpdateAvailable">
-                  发现新版本 v1.1.0 (2025-01-20)
-                </p>
-                <p v-else>
-                  当前已是最新版本
-                </p>
-                <el-button
-                  type="primary"
-                  size="small"
-                  :disabled="!appUpdateAvailable"
-                  @click="handleUpgrade('app')"
-                >
-                  {{ appUpdateAvailable ? '立即升级' : '检查更新' }}
-                </el-button>
+              <div class="version-list">
+                <div class="version-item">
+                  <span>Agent版本</span>
+                  <el-text>{{ formData.version || '-' }}</el-text>
+                </div>
+                <div class="version-item">
+                  <span>运控版本</span>
+                  <el-text>{{ formData.motion_control_version || '-' }}</el-text>
+                </div>
+                <div class="version-item">
+                  <span>Server版本</span>
+                  <el-text>{{ formData.server_version || '-' }}</el-text>
+                </div>
               </div>
             </div>
 
@@ -576,7 +574,7 @@
                   size="small"
                   type="info"
                 >
-                  当前版本 v2.3.1
+                  当前版本 {{ formData.server_version || '-' }}
                 </el-tag>
               </div>
               <div class="upgrade-body">
@@ -595,19 +593,6 @@
                   {{ firmwareUpdateAvailable ? '立即升级' : '检查更新' }}
                 </el-button>
               </div>
-            </div>
-
-            <div
-              v-if="appUpdateAvailable || firmwareUpdateAvailable"
-              class="one-click-upgrade"
-            >
-              <el-button
-                type="success"
-                style="width: 100%"
-                @click="handleUpgrade('all')"
-              >
-                一键升级所有
-              </el-button>
             </div>
           </div>
         </el-tab-pane>
@@ -641,6 +626,9 @@ const formData = reactive({
   uuid: '',
   ip: '',
   local_ip: '',
+  version: '',
+  motion_control_version: '',
+  server_version: '',
   ai_temperature: 0.7,
   ai_model: '',
   ai_voice: '',
@@ -690,9 +678,8 @@ const availableModels = [
 ]
 
 // Update Status (Mock)
-const appUpdateAvailable = ref(false)
 const firmwareUpdateAvailable = ref(false)
-const hasUpdate = computed(() => appUpdateAvailable.value || firmwareUpdateAvailable.value)
+const hasUpdate = computed(() => firmwareUpdateAvailable.value)
 const canOpenWifi = computed(() => status.connected && isValidIP(formData.ip))
 
 // Methods
@@ -708,6 +695,9 @@ const loadData = async () => {
         formData.uuid = r.uuid || ''
         formData.name = r.name || ''
         formData.model = r.model || ''
+        formData.version = r.version || ''
+        formData.motion_control_version = r.motion_control_version || ''
+        formData.server_version = r.server_version || ''
         formData.role_id = r.role_id || ''
         formData.sn = r.sn || ''
         formData.ip = r.ip || r.robot_ip || ''
@@ -832,8 +822,8 @@ const testConnection = async () => {
 }
 
 // Update Methods
-const handleUpgrade = async (type: 'app' | 'firmware' | 'all') => {
-  ElMessage.info(`暂不支持${type === 'app' ? 'APP' : type === 'firmware' ? '固件' : '系统'}升级功能`)
+const handleUpgrade = async (type: 'firmware') => {
+  ElMessage.info(`暂不支持${type === 'firmware' ? '固件' : '系统'}升级功能`)
   // TODO: 实现升级功能
 }
 
@@ -1189,7 +1179,15 @@ watch(
   font-size: 14px;
 }
 
-.one-click-upgrade {
-  margin-top: 20px;
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.version-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

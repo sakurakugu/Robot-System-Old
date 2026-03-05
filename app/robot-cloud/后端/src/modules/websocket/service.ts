@@ -1523,6 +1523,10 @@ class WebSocket服务 {
 
     try {
       const { name, model, version } = data;
+      const metadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+      const agentVersion = typeof version === 'string' && version ? version : metadata.agent_version;
+      const motionControlVersion = typeof metadata.motion_control_version === 'string' ? metadata.motion_control_version : undefined;
+      const robotServerVersion = typeof metadata.robot_server_version === 'string' ? metadata.robot_server_version : undefined;
 
       // 更新机器人信息
       const robot = this.database.getRobot(robotId);
@@ -1530,7 +1534,11 @@ class WebSocket服务 {
       this.database.updateRobot(robotId, {
         name: name || robot?.name || null,
         model: model || robot?.model || null,
+        version: agentVersion || robot?.version || null,
+        motion_control_version: motionControlVersion || robot?.motion_control_version || null,
+        server_version: robotServerVersion || robot?.server_version || null,
         status: 'online',
+        last_connected_at: new Date().toISOString(),
       });
 
       // 更新连接元数据
@@ -1539,11 +1547,20 @@ class WebSocket服务 {
         connection.metadata = {
           name: name || connection.metadata.name,
           model: model || connection.metadata.model,
-          version: version || connection.metadata.version,
+          version: agentVersion || connection.metadata.version,
+          motion_control_version: motionControlVersion || connection.metadata.motion_control_version,
+          robot_server_version: robotServerVersion || connection.metadata.robot_server_version,
         };
       }
 
-      logger.info('客户端注册成功', { robotId, name, model });
+      logger.info('客户端注册成功', {
+        robotId,
+        name,
+        model,
+        agentVersion,
+        motionControlVersion,
+        robotServerVersion,
+      });
 
       // 发送注册确认 - 仅发送到 business 通道，不要广播到其他通道
       this.sendToRobot(robotId, {

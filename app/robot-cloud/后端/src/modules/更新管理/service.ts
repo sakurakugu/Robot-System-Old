@@ -12,7 +12,7 @@ import type {
 } from './types';
 
 /** APK 存储根目录 */
-const APK_DIR = path.resolve(process.cwd(), 'data', 'apk');
+const APK_DIR = path.resolve(process.cwd(), 'data', 'apps', 'apk');
 
 export function versionCodeToDisplay(versionCode: number): string {
   const safeCode = Math.max(0, Math.floor(versionCode));

@@ -10,6 +10,8 @@ export interface RobotConnection {
     name?: string;
     model?: string;
     version?: string;
+    motion_control_version?: string;
+    robot_server_version?: string;
   };
 }
 
@@ -147,7 +149,12 @@ export interface ClientRegisterMessage {
     name?: string;
     model?: string;
     version?: string;
-    metadata?: any;
+    metadata?: {
+      version?: string; // robot-agent 版本
+      motion_control_version?: string;
+      robot_server_version?: string;
+      [key: string]: any;
+    };
   };
 }
 
@@ -366,4 +373,3 @@ export interface AsrTranscriptMessage {
 // 引用conversation模块的类型
 import type { TTSOptions } from '../大模型交互/types';
 import type { ActionCommand } from '../机器人交互/types';
-

@@ -56,6 +56,7 @@ def receiver(sock: socket.socket, stop_event: threading.Event, max_packets: int)
 
 
 def main():
+    print("\033]0;测试数据包\007")
     parser = argparse.ArgumentParser(description="机器狗数据包测试")
     parser.add_argument("--dog-ip",   default=DOG_IP,  help="机器狗 IP")
     parser.add_argument("--count",    type=int, default=5,   help="发送数据包次数（0=无限）")

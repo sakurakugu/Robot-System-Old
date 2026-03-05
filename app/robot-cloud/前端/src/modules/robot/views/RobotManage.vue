@@ -60,7 +60,12 @@
               <el-icon :size="20">
                 <Bot />
               </el-icon>
-              <span>{{ robot.name || '未命名' }}</span>
+              <el-tooltip
+                :content="robot.uuid"
+                placement="top"
+              >
+                <span>{{ robot.name || '未命名' }}</span>
+              </el-tooltip>
             </div>
             <el-tag
               :type="getStatusType(robot.status)"
@@ -77,19 +82,21 @@
           size="small"
           border
         >
-          <el-descriptions-item label="UUID">
-            <el-text
-              class="mono"
-              size="small"
-            >
-              {{ robot.uuid }}
-            </el-text>
+          <el-descriptions-item label="电量">
+            {{ formatBattery(robot.battery) }}
           </el-descriptions-item>
-          <el-descriptions-item label="型号">
-            {{ robot.model || '-' }}
+          <el-descriptions-item
+            :label="hoveredLastConnectedUuid === robot.uuid ? '最后连接时间' : '最后IP'"
+            @mouseenter="hoveredLastConnectedUuid = robot.uuid"
+            @mouseleave="hoveredLastConnectedUuid = null"
+          >
+            {{ hoveredLastConnectedUuid === robot.uuid ? formatTime(robot.last_connected) : (robot.ip || '-') }}
           </el-descriptions-item>
-          <el-descriptions-item label="最近连接">
-            {{ formatTime(robot.last_connected) }}
+          <el-descriptions-item label="分组">
+            {{ robot.group_name || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="标签">
+            {{ formatTags(robot.tags) }}
           </el-descriptions-item>
         </el-descriptions>
 
@@ -188,6 +195,21 @@
           width="150"
         />
         <el-table-column
+          prop="version"
+          label="Agent版本"
+          width="120"
+        />
+        <el-table-column
+          prop="motion_control_version"
+          label="运控版本"
+          width="120"
+        />
+        <el-table-column
+          prop="server_version"
+          label="Server版本"
+          width="120"
+        />
+        <el-table-column
           prop="uuid"
           label="UUID"
           min-width="200"
@@ -284,12 +306,18 @@ type Robot = {
   uuid: string
   name?: string | null
   model?: string | null
+  version?: string | null
+  motion_control_version?: string | null
+  server_version?: string | null
   status: 'online' | 'offline' | 'connecting' | 'error'
   last_connected?: string | null
+  ip?: string | null
   robot_ip?: string | null
   local_ip?: string | null
   local_port?: number
   group_name?: string | null
+  tags?: string[] | null
+  battery?: number | null
 }
 
 const router = useRouter()
@@ -299,6 +327,7 @@ const viewMode = ref<'card' | 'list'>('card')
 const updating = ref<Record<string, boolean>>({})
 const error = ref('')
 const loading = ref(false)
+const hoveredLastConnectedUuid = ref<string | null>(null)
 
 function statusText(status: string): string {
   const map: Record<string, string> = {
@@ -328,6 +357,16 @@ function formatTime(val?: string | null) {
   return d.toLocaleString('zh-CN')
 }
 
+function formatBattery(val?: number | null) {
+  if (typeof val !== 'number' || Number.isNaN(val)) return '-'
+  return `${Math.round(val)}%`
+}
+
+function formatTags(tags?: string[] | null) {
+  if (!Array.isArray(tags) || tags.length === 0) return '-'
+  return tags.join('、')
+}
+
 async function loadRobots() {
   loading.value = true
   error.value = ''
@@ -348,21 +387,40 @@ async function loadRobots() {
     const list: any[] = json.data.robots || []
     robots.value = list.map((r) => {
       let meta: any = {}
+      let tags: string[] = []
       try {
         meta = r.metadata ? JSON.parse(r.metadata) : {}
       } catch {
         meta = {}
       }
+      if (Array.isArray(r.tags)) {
+        tags = r.tags
+      } else if (typeof r.tags === 'string' && r.tags) {
+        try {
+          const parsed = JSON.parse(r.tags)
+          tags = Array.isArray(parsed) ? parsed : []
+        } catch {
+          tags = []
+        }
+      }
       return {
         uuid: r.uuid,
         name: r.name || '',
         model: r.model || '',
+        version: r.version || '',
+        motion_control_version: r.motion_control_version || '',
+        server_version: r.server_version || '',
         status: r.status || 'offline',
-        last_connected: r.last_connected || null,
+        last_connected: r.last_connected_at || r.last_connected || null,
+        ip: r.ip ?? null,
         robot_ip: r.robot_ip ?? meta.robot_ip ?? '',
         local_ip: r.local_ip ?? meta.local_ip ?? '',
         local_port: r.local_port ?? meta.local_port ?? 10000,
-        group_name: r.group_name ?? meta.group_name ?? ''
+        group_name: r.group_name ?? meta.group_name ?? '',
+        tags,
+        battery: typeof r.battery === 'number'
+          ? r.battery
+          : (typeof meta.battery === 'number' ? meta.battery : null)
       }
     })
   } catch (e: any) {

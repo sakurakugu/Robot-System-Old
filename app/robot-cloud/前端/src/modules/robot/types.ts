@@ -5,6 +5,8 @@ export interface Robot {
   name?: string
   model?: string
   version?: string
+  motion_control_version?: string
+  server_version?: string
   ip?: string
   robot_ip?: string
   group_name?: string | null

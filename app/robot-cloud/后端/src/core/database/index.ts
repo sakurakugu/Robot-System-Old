@@ -119,6 +119,8 @@ class 数据库服务 {
         name TEXT,
         model TEXT,
         version TEXT,
+        motion_control_version TEXT,
+        server_version TEXT,
         ip TEXT,
         group_name TEXT,
         tags TEXT,
@@ -354,12 +356,14 @@ move动作支持三种控制方式：
    */
   upsertRobot(robot: Partial<RobotRecord> & { uuid: string }): void {
     const stmt = this.数据库.prepare(`
-      INSERT INTO robots (uuid, name, model, version, ip, group_name, tags, sn, role_uuid, status, last_connected_at, registered_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO robots (uuid, name, model, version, motion_control_version, server_version, ip, group_name, tags, sn, role_uuid, status, last_connected_at, registered_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(uuid) DO UPDATE SET
         name = COALESCE(excluded.name, robots.name),
         model = COALESCE(excluded.model, robots.model),
         version = COALESCE(excluded.version, robots.version),
+        motion_control_version = COALESCE(excluded.motion_control_version, robots.motion_control_version),
+        server_version = COALESCE(excluded.server_version, robots.server_version),
         ip = COALESCE(excluded.ip, robots.ip),
         group_name = COALESCE(excluded.group_name, robots.group_name),
         tags = COALESCE(excluded.tags, robots.tags),
@@ -375,6 +379,8 @@ move动作支持三种控制方式：
       robot.name ?? null,
       robot.model ?? null,
       robot.version ?? null,
+      robot.motion_control_version ?? null,
+      robot.server_version ?? null,
       robot.ip ?? null,
       robot.group_name ?? null,
       Array.isArray(robot.tags) ? JSON.stringify(robot.tags) : robot.tags ?? null,
@@ -433,7 +439,7 @@ move动作支持三种控制方式：
     const fields: string[] = [];
     const values: any[] = [];
 
-    const allowedFields = ['name', 'model', 'version', 'ip', 'group_name', 'tags', 'sn', 'role_uuid', 'status', 'last_connected_at'];
+    const allowedFields = ['name', 'model', 'version', 'motion_control_version', 'server_version', 'ip', 'group_name', 'tags', 'sn', 'role_uuid', 'status', 'last_connected_at'];
 
     for (const field of allowedFields) {
       if ((data as any)[field] !== undefined) {

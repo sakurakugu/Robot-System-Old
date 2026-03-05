@@ -62,6 +62,7 @@ def monitor(pids: List[Tuple[str, int]]) -> int:
 
 
 def main() -> int:
+    print("\033]0;服务端\007")
     ns = parse_args()
     action = resolve_action(ns)
 

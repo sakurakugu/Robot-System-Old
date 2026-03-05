@@ -15,6 +15,8 @@ export interface RobotRecord {
   name: string | null;
   model: string | null; // 机器狗型号
   version: string | null; // robot-agent 版本（不是运控版本）
+  motion_control_version: string | null; // 运控版本
+  server_version: string | null; // robot-server 版本
   ip: string | null; // 最后一次连接 IP
   group_name: string | null; // 组别名称
   tags: string | null; // JSON 数组 string
@@ -64,4 +66,3 @@ export interface RobotResponse extends Omit<RobotRecord, 'tags'> {
   tags: string[];
   role?: RoleRecord | null;
 }
-

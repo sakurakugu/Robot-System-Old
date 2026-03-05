@@ -19,6 +19,9 @@ import { 大模型配置服务 } from './modules/大模型管理/service';
 import { 更新控制器 } from './modules/更新管理/controller';
 import { createUpdateRoutes } from './modules/更新管理/routes';
 import { 更新服务 } from './modules/更新管理/service';
+import { 机器人包控制器 } from './modules/机器人包管理/controller';
+import { createRobotPackageRoutes } from './modules/机器人包管理/routes';
+import { 机器人包服务 } from './modules/机器人包管理/service';
 import { 机器人控制器 } from './modules/机器人管理/controller';
 import { createRobotRoutes } from './modules/机器人管理/routes';
 import { 机器人服务 } from './modules/机器人管理/service';
@@ -46,6 +49,7 @@ export class 应用程序 {
   private 角色服务: 角色服务;
   private 编舞服务: ChoreoService;
   private 更新服务: 更新服务;
+  private 机器人包服务: 机器人包服务;
   private 账号服务: AccountService;
   private 知识库服务: KnowledgeService;
 
@@ -57,6 +61,7 @@ export class 应用程序 {
   private 角色控制器: 角色控制器;
   private 编舞控制器: ChoreoController;
   private 更新控制器: 更新控制器;
+  private 机器人包控制器: 机器人包控制器;
   private 账号控制器: AccountController;
   private 知识库控制器: KnowledgeController;
 
@@ -74,6 +79,7 @@ export class 应用程序 {
     this.角色服务 = new 角色服务(this.数据库);
     this.编舞服务 = new ChoreoService(this.数据库);
     this.更新服务 = new 更新服务(this.数据库);
+    this.机器人包服务 = new 机器人包服务(this.数据库);
     this.账号服务 = new AccountService(this.数据库);
     this.知识库服务 = new KnowledgeService(this.数据库);
 
@@ -85,6 +91,7 @@ export class 应用程序 {
     this.角色控制器 = new 角色控制器(this.角色服务);
     this.编舞控制器 = new ChoreoController(this.编舞服务);
     this.更新控制器 = new 更新控制器(this.更新服务);
+    this.机器人包控制器 = new 机器人包控制器(this.机器人包服务);
     this.账号控制器 = new AccountController(this.账号服务);
     this.知识库控制器 = new KnowledgeController(this.知识库服务);
 
@@ -164,6 +171,9 @@ export class 应用程序 {
     路由器.use('/roles', createRoleRoutes(this.角色控制器));
     路由器.use('/choreo', createChoreoRoutes(this.编舞控制器));
     路由器.use('/updates', createUpdateRoutes(this.更新控制器, {
+      manage: requireRole('admin', 'super_admin'),
+    }));
+    路由器.use('/robot-packages', createRobotPackageRoutes(this.机器人包控制器, {
       manage: requireRole('admin', 'super_admin'),
     }));
     路由器.use('/knowledge', createKnowledgeRoutes(this.知识库控制器));

@@ -4,13 +4,10 @@ import { API_BASE_URL, REQUEST_TIMEOUT } from '@/constants'
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 
-// 创建 axios 实例
+// 创建 axios 实例（不设 Content-Type 默认值，避免与 multipart/form-data 上传冲突）
 const request: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: REQUEST_TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 // 请求拦截器

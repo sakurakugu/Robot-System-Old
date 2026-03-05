@@ -118,6 +118,24 @@ export interface AppVersionInfo {
   uploadedAt: string
 }
 
+export interface RobotPackageFileInfo {
+  fileName: string
+  fileSize: number
+  fileHash: string
+}
+
+export interface RobotPackageInfo {
+  id: number
+  versionCode: number
+  channel: ReleaseChannel
+  changelog: string | null
+  isActive: boolean
+  uploadedAt: string
+  agent: RobotPackageFileInfo | null
+  server: RobotPackageFileInfo | null
+  common: RobotPackageFileInfo | null
+}
+
 export interface ApiResponse<T = any> {
   success: boolean
   message?: string

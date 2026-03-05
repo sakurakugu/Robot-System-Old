@@ -2,18 +2,19 @@
 
 import { http } from '@/api/request'
 import type {
-  AIConfig,
-  ApiResponse,
-  AppVersionInfo,
-  LLMConfig,
-  LLMProvider,
-  NetworkInfo,
-  ReleaseChannel,
-  SystemStatus,
-  UIConfig,
-  UpdateAIConfigDTO,
-  UpdateLLMConfigDTO,
-  UpdateUIConfigDTO,
+    AIConfig,
+    ApiResponse,
+    AppVersionInfo,
+    LLMConfig,
+    LLMProvider,
+    NetworkInfo,
+    ReleaseChannel,
+    RobotPackageInfo,
+    SystemStatus,
+    UIConfig,
+    UpdateAIConfigDTO,
+    UpdateLLMConfigDTO,
+    UpdateUIConfigDTO,
 } from './types'
 
 /**
@@ -108,9 +109,7 @@ export function uploadAppPackage(payload: {
   }
 
   return http.post<ApiResponse<AppVersionInfo>>('/api/v1/updates/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    timeout: 0, // 文件上传不限超时
   })
 }
 
@@ -135,4 +134,63 @@ export function rollbackAppVersion(id: number) {
  */
 export function deleteAppVersion(id: number) {
   return http.delete<ApiResponse>(`/api/v1/updates/versions/${id}`)
+}
+
+/**
+ * 上传机器人包（可分别或合并上传 agent / server / common）
+ */
+export function uploadRobotPackages(payload: {
+  agent?: { file: File; hash: string }
+  server?: { file: File; hash: string }
+  common?: { file: File; hash: string }
+  version: string
+  versionCode: number
+  channel: ReleaseChannel
+  changelog?: string
+}) {
+  const formData = new FormData()
+  formData.append('version', payload.version)
+  formData.append('versionCode', String(payload.versionCode))
+  formData.append('channel', payload.channel)
+  if (payload.changelog) {
+    formData.append('changelog', payload.changelog)
+  }
+  if (payload.agent) {
+    formData.append('agent', payload.agent.file)
+    formData.append('agentHash', payload.agent.hash)
+  }
+  if (payload.server) {
+    formData.append('server', payload.server.file)
+    formData.append('serverHash', payload.server.hash)
+  }
+  if (payload.common) {
+    formData.append('common', payload.common.file)
+    formData.append('commonHash', payload.common.hash)
+  }
+  return http.post<ApiResponse<RobotPackageInfo>>('/api/v1/robot-packages/upload', formData, {
+    timeout: 0, // 文件上传不限超时
+  })
+}
+
+/**
+ * 获取机器人包版本列表
+ */
+export function getRobotPackageVersions(channel?: ReleaseChannel) {
+  return http.get<ApiResponse<RobotPackageInfo[]>>('/api/v1/robot-packages/versions', {
+    params: channel ? { channel } : undefined,
+  })
+}
+
+/**
+ * 回滚机器人包到指定版本
+ */
+export function rollbackRobotPackage(id: number) {
+  return http.post<ApiResponse<RobotPackageInfo>>(`/api/v1/robot-packages/rollback/${id}`)
+}
+
+/**
+ * 删除机器人包版本
+ */
+export function deleteRobotPackage(id: number) {
+  return http.delete<ApiResponse>(`/api/v1/robot-packages/versions/${id}`)
 }

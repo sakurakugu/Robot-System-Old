@@ -1,33 +1,29 @@
 ### 主要需求
 
 1. 实现远程更新
-
    - 让手机端更新机器狗端
      -. 支持手机端分别安装这三个（安装 robot-server 时自动安装 sparkrobot-common，安装 robot-agent 时自动安装 robot-server）
      -. 发现页第一次安装与群控安装
 
 2. 优化大模型的各种内容
-
    - 比如：让 apikey 输入优化
    - 让使用的模型为真实的模型等等
 
 3. 机器狗端：
-
    - 让摇杆指令编程如果有下一个指令，上一个还没执行的话就直接吞掉（udp？）
 
-4. aaa
+4. 前端观看视频，使用手机端推送给后端，然后后端转发给前端（mediasoup）
+   1. 前端改成从手机发送 webrtc 视频流而到服务端（不是发送图片）
+   2. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\settings\screens\SettingsScreen.tsx
+   3. 然后手机端向服务器发送时，会在手机端的机器人操作的顶部显示向云端上传的图标 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\robots\screens\RobotOperationScreen.tsx 4. 点击后在右边显示弹窗正在向云端发送视频流（使用点击动作然后在右边显示的弹窗）（就是把手机的通过后端转发到前端）
 
-   1.前端改成从手机发送 webrtc 视频流而到服务端（不是发送图片）（手机先拉机器狗视频，再转推到服务端，只有在手机进入机器狗操作页面是才可以拉，m开头的那个后端转发 转发到前端）
-   2. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-
-      phone\RobotPhone\src\features\settings\screens\SettingsScreen.tsx
-   3. 然后手机端向服务器发送时，会在手机端的机器人操作的顶部显示向云端上传的图标 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\robots\screens\RobotOperationScreen.tsx
-   4. 点击后在右边显示弹窗正在向云端发送视频流（使用点击动作然后在右边显示的弹窗）（就是把手机的通过后端转发到前端）1. 删除服务器端的 gstream 的视频流（这个原本是测试用的，现在不需要了）d:\elric\Code\Repos\robot-dog\app\robot-cloud\后端\src\modules\机器人交互\video-
-      service.ts
-      可以全部重构，不要向前兼容。可以全部重构，不要向前兼容。可以全部重构，不要向前兼容。
+5. 自动启动robot-agent，如何要让其在robot-server后面启动
 
-5. 手机和前端反馈入口，还有管理员以上可以查看反馈
+6. 手机和前端反馈入口，还有管理员以上可以查看反馈
 
-6. 将配置文件导出的功能，方便测试版回滚
+7. 现在先是群控、编舞，然后是ai优化、然后是手机上传音频、然后是音频识别、等等，然后是人脸识别、物品识别
+
+8. 将配置文件导出的功能，方便测试版回滚
 
    ```
    Android

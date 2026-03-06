@@ -62,6 +62,7 @@ test/
 *.blend1
 
 /other/
+robot-packages/
 *.db
 tools/scripts/config/
 

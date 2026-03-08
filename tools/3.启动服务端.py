@@ -2,8 +2,8 @@
 import argparse
 import sys
 import time
-from typing import List, Tuple
 from scripts.start.orchestrator import start_all, stop_all, test_all
+from scripts.start.utils import 持续监控直到中断
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,21 +46,6 @@ def show_help() -> None:
     print("")
 
 
-def monitor(pids: List[Tuple[str, int]]) -> int:
-    """监控进程，等待用户中断"""
-    print("")
-    print("========================================")
-    print("  ✅ 系统启动完成，开始监控进程")
-    print("========================================")
-    print("按 Ctrl+C 停止所有服务")
-    try:
-        while True:
-            time.sleep(1.0)
-    except KeyboardInterrupt:
-        print("\n正在停止服务...")
-        return 130
-
-
 def main() -> int:
     print("\033]0;服务端\007")
     ns = parse_args()
@@ -81,8 +66,8 @@ def main() -> int:
     if action == "restart":
         stop_all()
         time.sleep(2)
-        pids = start_all()
-        rc = monitor(pids)
+        start_all()
+        rc = 持续监控直到中断("系统启动完成，开始监控进程")
         try:
             stop_all()
         except KeyboardInterrupt:
@@ -90,8 +75,8 @@ def main() -> int:
         return rc
 
     if action == "start":
-        pids = start_all()
-        rc = monitor(pids)
+        start_all()
+        rc = 持续监控直到中断("系统启动完成，开始监控进程")
         try:
             stop_all()
         except KeyboardInterrupt:

@@ -360,6 +360,21 @@ def kill_port(port: int) -> bool:
     return any_killed
 
 
+def 持续监控直到中断(完成提示: str) -> int:
+    """统一的前台监控循环，按 Ctrl+C 返回 130。"""
+    print("")
+    print("========================================")
+    print(f"  ✅ {完成提示}")
+    print("========================================")
+    print("按 Ctrl+C 停止所有服务")
+    try:
+        while True:
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print("\n正在停止服务...")
+        return 130
+
+
 def 确保端口可用(ports: dict, interactive: bool = True) -> bool:
     """确保端口可用。若为本项目进程则自动清理；否则询问确认。"""
     blocked = []

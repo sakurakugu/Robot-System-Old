@@ -41,10 +41,10 @@ def receiver(sock: socket.socket, stop_event: threading.Event, max_packets: int)
                 print(Fore.GREEN + f"[RX #{received:04d}] {addr}  type={pkt_type}")
                 pretty = json.dumps(obj, ensure_ascii=False, indent=2)
                 if len(pretty) > 600:
-                    pretty = pretty[:600] + "\n  … (truncated)"
+                    pretty = pretty[:600] + "\n  … (已截断)"
                 print(Fore.GREEN + pretty + "\n")
         except json.JSONDecodeError:
-            print(Fore.RED + f"[RX #{received:04d}] {addr}  <非 JSON，{len(data)} bytes>")
+            print(Fore.RED + f"[RX #{received:04d}] {addr}  <非 JSON，{len(data)} 字节>")
             print(Fore.RED + str(data[:120]) + "\n")
 
         if max_packets > 0 and received >= max_packets:
@@ -92,7 +92,7 @@ def main():
         while sent < total:
             sock.sendto(DATA_PACKAGE, (args.dog_ip, SEND_PORT))
             sent += 1
-            print(Fore.YELLOW + f"[TX #{sent:04d}] sent data package")
+            print(Fore.YELLOW + f"[TX #{sent:04d}] 发送数据包")
             time.sleep(args.interval)
     except KeyboardInterrupt:
         print(Fore.RED + "\n[TX] 用户中断发送")

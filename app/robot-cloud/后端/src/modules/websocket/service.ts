@@ -258,7 +258,7 @@ class WebSocket服务 {
         }
         logger.info('UI连接关闭', { robotId, channel });
       } else {
-        this.handleDisconnection(robotId, channel);
+        this.handleDisconnection(robotId, channel, ws);
       }
     });
 
@@ -1595,9 +1595,13 @@ class WebSocket服务 {
   /**
    * 处理断开连接
    */
-  private handleDisconnection(robotId: string, channel: Channel): void {
+  private handleDisconnection(robotId: string, channel: Channel, ws: WebSocket): void {
     const connections = this.robotConnections.get(robotId);
     if (connections) {
+      const current = connections.get(channel);
+      if (!current || current.websocket !== ws) {
+        return;
+      }
       connections.delete(channel);
       if (connections.size === 0) {
         this.robotConnections.delete(robotId);

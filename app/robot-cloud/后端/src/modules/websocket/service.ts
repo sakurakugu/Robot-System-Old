@@ -193,8 +193,8 @@ class WebSocket服务 {
       this.robotConnections.get(robotId)!.set(channel, connection);
     }
 
-    // 仅机器人连接才需要更新数据库状态；手机端独立会话（phoneId）不写入机器人表
-    if (!isPhoneSession) {
+    // 仅机器人连接才需要更新数据库状态；UI 会话不写入机器人在线状态
+    if (role !== 'ui' && !isPhoneSession) {
       const existing = this.database.getRobot(robotId);
       if (existing) {
         this.database.updateRobot(robotId, { status: 'online' });
@@ -206,12 +206,21 @@ class WebSocket服务 {
       }
     }
 
-    logger.info(isPhoneSession ? '手机端独立连接建立' : '机器人连接建立', {
-      [isPhoneSession ? 'phoneId' : 'robotId']: robotId,
-      channel,
-      ip: req.socket.remoteAddress,
-      role: role || 'robot',
-    });
+    if (isPhoneSession) {
+      logger.info('手机端独立连接建立', {
+        phoneId: robotId,
+        channel,
+        ip: req.socket.remoteAddress,
+        role: role || 'ui',
+      });
+    } else if (role !== 'ui') {
+      logger.info('机器人连接建立', {
+        robotId,
+        channel,
+        ip: req.socket.remoteAddress,
+        role: role || 'robot',
+      });
+    }
 
     // 仅对机器人客户端的 business 通道发送连接确认消息
     // 其他通道（control, audio_upload, audio_download）不发送消息
@@ -507,7 +516,7 @@ class WebSocket服务 {
         }
       }
 
-      if(!this.对话服务) {
+      if (!this.对话服务) {
         throw new Error('对话服务 未初始化');
       }
 

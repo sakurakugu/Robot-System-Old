@@ -698,6 +698,11 @@ const fetchControlLayout = async () => {
   }
 }
 
+const isRobotOnline = (uuid: string): boolean => {
+  const robot = robots.value.find((item) => item.uuid === uuid)
+  return robot?.status === 'online'
+}
+
 // WebSocket Message Handling
 onMessage((data) => {
   if (data.type === 'battery_status') {
@@ -750,13 +755,14 @@ watch(selectedUuid, async (val) => {
     robotId.value = val
     try {
       await wsConnect()
-      // 连接成功后查询SDK模式状态
-      wsSendMessage({
-        type: 'sdk_mode_get',
-        robotId: val,
-        timestamp: Date.now(),
-        data: {},
-      })
+      if (isRobotOnline(val)) {
+        wsSendMessage({
+          type: 'sdk_mode_get',
+          robotId: val,
+          timestamp: Date.now(),
+          data: {},
+        })
+      }
     } catch (e) {
       ElMessage.error('连接失败，请检查后端服务或网络')
     }

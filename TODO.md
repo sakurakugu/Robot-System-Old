@@ -1,4 +1,4 @@
-### 主要需求
+### 需求
 
 1. 机器狗端：
    - 让摇杆指令编程如果有下一个指令，上一个还没执行的话就直接吞掉（udp？）
@@ -12,81 +12,22 @@
 
 4. 现在先是群控、编舞，然后是ai优化、然后是手机上传音频、然后是音频识别、等等，然后是人脸识别、物品识别
 
-5. 新增默认关闭sdk功能
-
-6. 将配置文件导出的功能，方便测试版回滚
-
-   ```
-   Android
-
-    1 // 直接保存到 Download 目录，用户可在文件管理器访问
-    2 const androidPath = '/storage/emulated/0/Download/robot-data.json';
-
-   iOS
-
-    1 // 保存到文档目录，用户可通过"文件"App 访问
-    2 const iosPath = RNFS.DocumentDirectoryPath + '/robot-data.json';
-    3
-    4 // 可选：调用系统分享，让用户选择保存位置
-    5 Share.share({
-    6   url: 'file://' + path,
-    7   title: '导出数据'
-    8 });
-
-   推荐实现
-
-     1 import { Platform, Share } from 'react-native';
-     2 import RNFetchBlob from 'react-native-blob-util';
-     3
-     4 const exportData = async (data: object) => {
-     5   const json = JSON.stringify(data, null, 2);
-     6   const filename = `robot-backup-${Date.now()}.json`;
-     7
-     8   if (Platform.OS === 'android') {
-     9     // Android: 直接保存到 Download
-    10     const path = RNFetchBlob.fs.dirs.DownloadDir + '/' + filename;
-    11     await RNFetchBlob.fs.writeFile(path, json, 'utf8');
-    12     Toast.show('已保存到 下载/robot-backup.json');
-    13   } else {
-    14     // iOS: 保存后调用系统分享
-    15     const path = RNFetchBlob.fs.dirs.DocumentDir + '/' + filename;
-    16     await RNFetchBlob.fs.writeFile(path, json, 'utf8');
-    17
-    18     // 让用户选择如何处理（保存到文件/分享等）
-    19     await Share.share({
-    20       url: 'file://' + path,
-    21       title: '机器人数据备份'
-    22     });
-    23   }
-    24 };
-
-   用户体验
-
-    - Android: 保存后通知用户去「文件管理器 → 下载」查看
-    - iOS: 弹出系统分享菜单，用户可选择「存储到文件」或分享给其他人
-   ```
-
-### 次要需求
-
-生成 文件名.h.py 或文件名.h.js 这样的文件，里面包含了这个文件的接口定义（函数名、参数、返回值等），方便大模型调用，并且在开头注释这个文件的功能，还有不要用.pyi 或者.d.ts 这样的文件，我要的是方便查找的文档而不是可以被编译器等工具使用的类型定义文件
-
-1. 改一下动作的提示词
-2. 下面的 bug
-3. 走路速度等调整
-4. 知识库
-5. 搞定群控
-6. https://grpc.org.cn/docs/what-is-grpc/introduction/
-   让机器人端通过 grpc 连接到后端的 python 服务，然后把结果返回给 nodejs 服务
-7. 让大模型调用工具而不是通过提示词来行动
-   https://bailian.console.aliyun.com/cn-beijing/?spm=5176.29597918.J_SEsSjsNv72yRuRFS2VknO.2.55ed7b08Zvf6Yi&tab=doc#/doc/?type=model&url=2862208
-8. 到时候支持将 robot-server 的账号密码发送到服务端（cloud）进行保存，然后手机端如果尝试密码错误后，从服务器获取最新的密码，防止改了密码后，手机端登录不了
-9. 关闭 sdk 模式后，可以尝试让手机端通过智元自带的来控制移动
+5. 改一下动作的提示词
+6. 下面的 bug
+7. 走路速度等调整
+8. 知识库
+9. 搞定群控
+10. https://grpc.org.cn/docs/what-is-grpc/introduction/
+    让机器人端通过 grpc 连接到后端的 python 服务，然后把结果返回给 nodejs 服务
+11. 让大模型调用工具而不是通过提示词来行动
+    https://bailian.console.aliyun.com/cn-beijing/?spm=5176.29597918.J_SEsSjsNv72yRuRFS2VknO.2.55ed7b08Zvf6Yi&tab=doc#/doc/?type=model&url=2862208
+12. 到时候支持将 robot-server 的账号密码发送到服务端（cloud）进行保存，然后手机端如果尝试密码错误后，从服务器获取最新的密码，防止改了密码后，手机端登录不了
+13. 关闭 sdk 模式后，可以尝试让手机端通过智元自带的来控制移动
+14. 实现 `last_action_before_disable` 功能
+    - 当前 `application.py` 中定义了 `last_action_before_disable` 变量但未实际使用
+    - 设计目的是记录关闭 SDK 模式时机器狗的最后动作状态
+    - 需要在关闭 SDK 模式前记录当前动作，重新开启时恢复该状态
 
 ### 其他需求
 
 还有文件内部的 TODO
-
-### 待整理到 docs 中的内容
-
-1. 启动手机端的注意事项：
-   - 要设置 ANDROID_HOME 环境变量，指向 android sdk 的安装目录,类似`C:\Users\<用户名>\AppData\Local\Android\Sdk`，java 要 java17（以上的没试过）

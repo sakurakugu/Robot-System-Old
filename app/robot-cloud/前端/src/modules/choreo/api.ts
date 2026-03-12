@@ -9,7 +9,7 @@ import type {
     ChoreoRobot,
     CreateProjectDto,
     CustomAction,
-    ExecuteActionsDto,
+    ExecuteChoreoDto,
     ExecutionStatus,
     SaveTimelineDto,
     TimelineData,
@@ -143,11 +143,21 @@ export const choreoApi = {
     return http.delete(`${BASE_URL}/projects/${projectUuid}/audio/${filename}`)
   },
 
-  // ==================== 动作执行 ====================
+  // ==================== 编舞执行 ====================
 
-  /** 执行动作序列 */
-  executeActions(projectUuid: string, data: ExecuteActionsDto): Promise<{ success: boolean; executionId: string; message: string }> {
-    return http.post(`${BASE_URL}/projects/${projectUuid}/execute`, data)
+  /** 执行编舞（后端自动编译时间轴） */
+  executeChoreo(projectUuid: string, data?: ExecuteChoreoDto): Promise<{ success: boolean; data: ExecutionStatus; message: string }> {
+    return http.post(`${BASE_URL}/projects/${projectUuid}/execute`, data || {})
+  },
+
+  /** 暂停执行 */
+  pauseExecution(executionId: string): Promise<{ success: boolean; message: string }> {
+    return http.post(`${BASE_URL}/executions/${executionId}/pause`)
+  },
+
+  /** 恢复执行 */
+  resumeExecution(executionId: string): Promise<{ success: boolean; message: string }> {
+    return http.post(`${BASE_URL}/executions/${executionId}/resume`)
   },
 
   /** 停止执行 */

@@ -81,7 +81,36 @@
           <el-icon><DocumentChecked /></el-icon>
           保存
         </el-button>
+        <template v-if="executing">
+          <el-button
+            v-if="executionStatus?.status === 'running'"
+            size="small"
+            type="warning"
+            @click="pauseExecution"
+          >
+            暂停
+          </el-button>
+          <el-button
+            v-if="executionStatus?.status === 'paused'"
+            size="small"
+            type="success"
+            @click="resumeExecution"
+          >
+            恢复
+          </el-button>
+          <el-button
+            size="small"
+            type="danger"
+            @click="stopExecution"
+          >
+            停止
+          </el-button>
+          <span class="execution-progress">
+            {{ executionStatus?.progress ?? 0 }}%
+          </span>
+        </template>
         <el-button
+          v-else
           size="small"
           type="primary"
           :disabled="!canExecute"
@@ -97,24 +126,24 @@
       <!-- 左侧活动栏 -->
       <div class="activity-bar">
         <div class="activity-icons">
-          <div 
-            class="activity-icon" 
+          <div
+            class="activity-icon"
             :class="{ active: activeView === 'robots' }"
             title="机器人列表"
             @click="toggleView('robots')"
           >
             <el-icon><Setting /></el-icon>
           </div>
-          <div 
-            class="activity-icon" 
+          <div
+            class="activity-icon"
             :class="{ active: activeView === 'actions' }"
             title="动作列表"
             @click="toggleView('actions')"
           >
             <el-icon><VideoPlay /></el-icon>
           </div>
-          <div 
-            class="activity-icon" 
+          <div
+            class="activity-icon"
             :class="{ active: activeView === 'history' }"
             title="历史记录"
             @click="toggleView('history')"
@@ -221,9 +250,9 @@
 
 
       <!-- 左侧面板拖拽条 -->
-      <div 
-        v-show="showLeftPanel" 
-        class="vertical-resizer" 
+      <div
+        v-show="showLeftPanel"
+        class="vertical-resizer"
         @mousedown="startResizeLeft"
       />
 
@@ -246,9 +275,9 @@
         </div>
 
         <!-- 底部面板拖拽条 -->
-        <div 
-          v-show="showBottomPanel" 
-          class="horizontal-resizer" 
+        <div
+          v-show="showBottomPanel"
+          class="horizontal-resizer"
           @mousedown="startResizeBottom"
         />
 
@@ -283,9 +312,9 @@
             ref="logsContainerRef"
             class="logs-content"
           >
-            <div 
-              v-for="(log, index) in logs" 
-              :key="index" 
+            <div
+              v-for="(log, index) in logs"
+              :key="index"
               class="log-item"
               :class="log.type"
             >
@@ -303,9 +332,9 @@
       </div>
 
       <!-- 右侧面板拖拽条 -->
-      <div 
-        v-show="showRightPanel" 
-        class="vertical-resizer" 
+      <div
+        v-show="showRightPanel"
+        class="vertical-resizer"
         @mousedown="startResizeRight"
       />
 
@@ -430,6 +459,7 @@
 </template>
 
 <script setup lang="ts">
+import { useWebSocket } from '@/composables/useWebSocket'
 import { getRobotList } from '@/modules/robot/api'
 import { ArrowDown, ArrowLeft, Clock, Close, Connection, Delete, Document, DocumentChecked, Expand, Fold, Plus, Setting, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -440,12 +470,13 @@ import { choreoApi } from '../api'
 import RobotPreview from '../components/RobotPreview.vue'
 import { HistoryPanel, TimelineEditor } from '../components/timeline'
 import type {
-    ActionCommand,
-    ChoreoProject,
-    ChoreoRobot,
-    HistoryRecord,
-    Robot,
-    TimelineConfig,
+  ChoreoProject,
+  ChoreoRobot,
+  ChoreoWSMessage,
+  ExecutionStatus,
+  HistoryRecord,
+  Robot,
+  TimelineConfig,
 } from '../types'
 import ActionList from './ActionList.vue'
 
@@ -470,7 +501,7 @@ const isPlaying = ref(false)
 
 // 面板状态
 const showLeftPanel = ref(true)
-const showRightPanel = ref(true)
+const showRightPanel = ref(false)
 const showBottomPanel = ref(true)
 const leftPanelWidth = ref(280)
 const rightPanelWidth = ref(360)
@@ -526,7 +557,14 @@ const robotsForTimeline = computed<Robot[]>(() => {
 })
 
 const canExecute = computed(() => {
-  return projectRobots.value.length > 0 && tracks.value.some((t) => (t.blocks?.length || 0) > 0)
+  if (projectRobots.value.length === 0) return false
+  // 必须有至少一个动作轨道：已绑定机器人、已有 block、且 block 已选择动作
+  return tracks.value.some(
+    (t) =>
+      t.type === 'action' &&
+      t.robotId &&
+      t.blocks?.some((b: { actionType?: string }) => !!b.actionType)
+  )
 })
 
 const getPanelTitle = computed(() => {
@@ -707,40 +745,115 @@ const saveTimeline = async () => {
   }
 }
 
+// ==================== 编舞执行 ====================
+
+const executionStatus = ref<ExecutionStatus | null>(null)
+const executing = computed(() => executionStatus.value?.status === 'running' || executionStatus.value?.status === 'paused')
+
 // 执行时间轴
 const executeTimeline = async () => {
   if (!canExecute.value) return
 
-  // 收集所有动作
-  const actions: ActionCommand[] = []
-  for (const track of tracks.value) {
-    if (track.blocks) {
-      for (const block of track.blocks) {
-        if (block.actionType) {
-          actions.push({
-            action: block.actionType,
-            parameters: block.actionParams,
-          })
-        }
-      }
-    }
+  // 预检查：确保时间轴已保存
+  if (timelineEditorRef.value) {
+    await saveTimeline()
   }
-
-  // 获取所有关联的机器人 ID
-  const robotIds = projectRobots.value.map((r) => r.robot_id)
 
   try {
-    const res = await choreoApi.executeActions(projectUuid, {
-      robotIds,
-      actions,
-    })
+    const res = await choreoApi.executeChoreo(projectUuid)
     if (res.success) {
+      executionStatus.value = res.data
+      addLog('编舞开始执行', 'success')
       ElMessage.success('开始执行')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('执行失败:', error)
-    ElMessage.error('执行失败')
+    ElMessage.error(error.response?.data?.error || '执行失败')
   }
+}
+
+// 暂停执行
+const pauseExecution = async () => {
+  if (!executionStatus.value) return
+  try {
+    await choreoApi.pauseExecution(executionStatus.value.executionId)
+    addLog('编舞已暂停', 'warning')
+  } catch (error) {
+    console.error('暂停失败:', error)
+  }
+}
+
+// 恢复执行
+const resumeExecution = async () => {
+  if (!executionStatus.value) return
+  try {
+    await choreoApi.resumeExecution(executionStatus.value.executionId)
+    addLog('编舞已恢复', 'info')
+  } catch (error) {
+    console.error('恢复失败:', error)
+  }
+}
+
+// 停止执行
+const stopExecution = async () => {
+  if (!executionStatus.value) return
+  try {
+    await choreoApi.stopExecution(executionStatus.value.executionId)
+    executionStatus.value = null
+    addLog('编舞已停止', 'warning')
+  } catch (error) {
+    console.error('停止失败:', error)
+  }
+}
+
+// 处理 WebSocket 编舞消息
+const handleChoreoMessage = (message: ChoreoWSMessage) => {
+  switch (message.type) {
+    case 'choreo_start':
+      addLog(`编舞开始，总时长 ${(message.data.totalDuration / 1000).toFixed(1)}s，机器人 ${message.data.robotIds.length} 台`, 'success')
+      break
+    case 'choreo_progress':
+      if (executionStatus.value) {
+        executionStatus.value.currentTime = message.data.currentTime
+        executionStatus.value.progress = message.data.progress
+        // 驱动时间轴竖线（currentTime 单位：秒）
+        timelineEditorRef.value?.setCurrentTime(message.data.currentTime / 1000)
+      }
+      break
+    case 'choreo_action':
+      addLog(`[${message.data.robotId}] 执行动作: ${message.data.action}`, 'info')
+      break
+    case 'choreo_stop':
+      executionStatus.value = null
+      addLog(`编舞已停止: ${message.data.message || message.data.reason}`, 'warning')
+      break
+    case 'choreo_complete':
+      executionStatus.value = null
+      addLog(`编舞执行完成，总时长 ${(message.data.totalDuration / 1000).toFixed(1)}s`, 'success')
+      ElMessage.success('编舞执行完成')
+      break
+    case 'choreo_error':
+      executionStatus.value = null
+      addLog(`编舞执行错误: ${message.data.message}`, 'error')
+      ElMessage.error(`执行错误: ${message.data.message}`)
+      break
+  }
+}
+
+// WebSocket 消息监听
+const { onMessage, connect: wsConnect, disconnect: wsDisconnect } = useWebSocket()
+
+const setupWSListener = () => {
+  onMessage((message: any) => {
+    if (typeof message.type === 'string' && message.type.startsWith('choreo_')) {
+      handleChoreoMessage(message as ChoreoWSMessage)
+    }
+  })
+  wsConnect().catch((e) => console.warn('编舞 WS 连接失败:', e))
+}
+
+const cleanupWSListener = () => {
+  wsDisconnect()
 }
 
 // 拖拽处理函数
@@ -799,7 +912,7 @@ const addLog = (message: string, type: LogItem['type'] = 'info') => {
   const now = new Date()
   const time = now.toLocaleTimeString('zh-CN', { hour12: false })
   logs.value.push({ time, message, type })
-  
+
   // 自动滚动到底部
   setTimeout(() => {
     if (logsContainerRef.value) {
@@ -860,11 +973,12 @@ const loadData = async () => {
 
 onMounted(() => {
   loadData()
+  setupWSListener()
   addLog('编舞编辑器已加载', 'info')
 })
 
 onUnmounted(() => {
-  // 清理拖拽事件监听器
+  cleanupWSListener()
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
 })
@@ -872,7 +986,7 @@ onUnmounted(() => {
 
 <style scoped>
 .choreo-editor-container {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--el-bg-color-page);
@@ -1214,5 +1328,12 @@ onUnmounted(() => {
 
 .status-item .el-icon {
   font-size: 14px;
+}
+
+.execution-progress {
+  font-size: 12px;
+  color: var(--el-color-primary);
+  font-weight: bold;
+  margin-left: 4px;
 }
 </style>

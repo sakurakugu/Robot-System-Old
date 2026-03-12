@@ -261,6 +261,7 @@
         >
           <div
             class="playhead"
+            :class="{ 'no-transition': isDraggingPlayhead }"
             :style="{ left: (timeToPixel(config.currentTime) - scrollLeft + 200) + 'px' }"
             @mousedown="startDragPlayhead"
           />
@@ -360,32 +361,32 @@
 
 <script setup lang="ts">
 import {
-    Check,
-    CircleClose,
-    Delete,
-    Hide,
-    Lock,
-    Minus,
-    Plus,
-    Unlock,
-    VideoPause as VideoPauseIcon,
-    VideoPlay as VideoPlayIcon,
-    View,
-    Warning,
-    ZoomIn,
-    ZoomOut,
+  Check,
+  CircleClose,
+  Delete,
+  Hide,
+  Lock,
+  Minus,
+  Plus,
+  Unlock,
+  VideoPause as VideoPauseIcon,
+  VideoPlay as VideoPlayIcon,
+  View,
+  Warning,
+  ZoomIn,
+  ZoomOut,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Film } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
-    HistoryActionType,
-    TrackType,
-    type ActionBlock,
-    type HistoryRecord,
-    type Robot,
-    type TimelineConfig,
-    type Track,
+  HistoryActionType,
+  TrackType,
+  type ActionBlock,
+  type HistoryRecord,
+  type Robot,
+  type TimelineConfig,
+  type Track,
 } from '../../types'
 import ActionSelectorDialog from './ActionSelectorDialog.vue'
 import ActionTrack from './ActionTrack.vue'
@@ -743,16 +744,16 @@ const zoomOut = () => {
 }
 
 // 拖拽播放头
-let isDraggingPlayhead = false
+const isDraggingPlayhead = ref(false)
 const startDragPlayhead = (e: MouseEvent) => {
-  isDraggingPlayhead = true
+  isDraggingPlayhead.value = true
   updatePlayheadPosition(e)
   document.addEventListener('mousemove', updatePlayheadPosition)
   document.addEventListener('mouseup', stopDragPlayhead)
 }
 
 const updatePlayheadPosition = (e: MouseEvent) => {
-  if (!isDraggingPlayhead || !playheadLayer.value) return
+  if (!isDraggingPlayhead.value || !playheadLayer.value) return
   const rect = playheadLayer.value.getBoundingClientRect()
   const x = e.clientX - rect.left - 200 + scrollLeft.value
   config.value.currentTime = pixelToTime(x)
@@ -760,7 +761,7 @@ const updatePlayheadPosition = (e: MouseEvent) => {
 }
 
 const stopDragPlayhead = () => {
-  isDraggingPlayhead = false
+  isDraggingPlayhead.value = false
   document.removeEventListener('mousemove', updatePlayheadPosition)
   document.removeEventListener('mouseup', stopDragPlayhead)
 }
@@ -1241,6 +1242,9 @@ defineExpose({
   validate,
   loadTimelineData,
   getTimelineData,
+  setCurrentTime: (time: number) => {
+    config.value.currentTime = time
+  },
 })
 </script>
 
@@ -1386,6 +1390,11 @@ defineExpose({
   cursor: ew-resize;
   z-index: 100;
   height: 100vh;
+  transition: left 0.5s linear;
+}
+
+.playhead.no-transition {
+  transition: none;
 }
 
 .playhead::before {

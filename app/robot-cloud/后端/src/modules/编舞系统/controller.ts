@@ -7,13 +7,12 @@ import fs from 'fs';
 import { logger } from '../../core/logger';
 import type { ChoreoService } from './service';
 import type {
-  AddProjectRobotDirectDto,
-  AddRobotToProjectDto,
-  CreateProjectDto,
-  ExecuteActionsDto,
-  SaveTimelineDto,
-  UpdateProjectDto,
-  UpdateProjectRobotDto,
+    AddProjectRobotDirectDto,
+    AddRobotToProjectDto,
+    CreateProjectDto,
+    SaveTimelineDto,
+    UpdateProjectDto,
+    UpdateProjectRobotDto,
 } from './types';
 
 // 辅助函数：安全获取路由参数
@@ -319,30 +318,15 @@ export class 编舞控制器 {
   // ==================== 动作执行 ====================
 
   /**
-   * 执行动作序列
+   * 执行编舞（编译时间轴 + 启动调度器）
    */
-  executeActions = async (req: Request, res: Response): Promise<void> => {
+  executeChoreo = async (req: Request, res: Response): Promise<void> => {
     try {
-      const dto: ExecuteActionsDto = req.body;
-      if (!dto.robotIds || dto.robotIds.length === 0) {
-        res.status(400).json({ success: false, error: '请选择至少一个机器人' });
-        return;
-      }
-      if (!dto.actions || dto.actions.length === 0) {
-        res.status(400).json({ success: false, error: '动作序列不能为空' });
-        return;
-      }
-
-      const executionId = await this.service.executeActions(
-        getParam(req.params.uuid),
-        dto.robotIds,
-        dto.actions
-      );
-
+      const status = this.service.executeChoreo(getParam(req.params.uuid));
       res.json({
         success: true,
-        executionId,
-        message: '动作序列已开始执行',
+        data: status,
+        message: '编舞已开始执行',
       });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -350,6 +334,36 @@ export class 编舞控制器 {
       } else {
         res.status(500).json({ success: false, error: error.message });
       }
+    }
+  };
+
+  /**
+   * 暂停执行
+   */
+  pauseExecution = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paused = this.service.pauseExecution(getParam(req.params.executionId));
+      res.json({
+        success: paused,
+        message: paused ? '执行已暂停' : '未找到执行任务或不可暂停',
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 恢复执行
+   */
+  resumeExecution = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const resumed = this.service.resumeExecution(getParam(req.params.executionId));
+      res.json({
+        success: resumed,
+        message: resumed ? '执行已恢复' : '未找到执行任务或不可恢复',
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
     }
   };
 
@@ -704,57 +718,6 @@ export class 编舞控制器 {
     }
   };
 
-  // ==================== Python 脚本封装与运行 ====================
-
-  /**
-   * 封装项目为 Python 脚本
-   */
-  buildProject = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const result = this.service.buildProject(getParam(req.params.uuid));
-      res.json({ success: true, message: '封装成功', data: result });
-    } catch (error: any) {
-      if (error.message === '项目不存在') {
-        res.status(404).json({ success: false, error: error.message });
-      } else {
-        res.status(500).json({ success: false, error: error.message });
-      }
-    }
-  };
-
-  /**
-   * 运行项目的 Python 脚本
-   */
-  runProject = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const result = this.service.runProject(getParam(req.params.uuid));
-      res.json({ success: true, data: result });
-    } catch (error: any) {
-      if (error.message === '项目不存在') {
-        res.status(404).json({ success: false, error: error.message });
-      } else if (error.message === '未找到 Python 文件，请先封装') {
-        res.status(400).json({ success: false, error: error.message });
-      } else {
-        res.status(500).json({ success: false, error: error.message });
-      }
-    }
-  };
-
-  /**
-   * 封装并运行项目
-   */
-  buildAndRunProject = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const result = this.service.buildAndRunProject(getParam(req.params.uuid));
-      res.json({ success: true, message: '封装并运行成功', data: result });
-    } catch (error: any) {
-      if (error.message === '项目不存在') {
-        res.status(404).json({ success: false, error: error.message });
-      } else {
-        res.status(500).json({ success: false, error: error.message });
-      }
-    }
-  };
 }
 
 export default 编舞控制器;

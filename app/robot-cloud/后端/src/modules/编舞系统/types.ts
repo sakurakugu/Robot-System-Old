@@ -2,6 +2,96 @@
  * 编舞系统类型定义
  */
 
+// ==================== 调度与执行 ====================
+
+// 编排后的单条动作（编译时间轴后生成）
+export interface ScheduledAction {
+  robotId: string;              // 目标机器人 ID
+  action: string;               // 动作名称
+  parameters?: Record<string, any>;
+  executeAt: number;            // 相对执行时间（毫秒）
+  duration: number;             // 动作持续时间（毫秒）
+}
+
+// 编译后的执行计划
+export interface ExecutionPlan {
+  scheduleId: string;
+  projectUuid: string;
+  totalDuration: number;        // 总时长（毫秒）
+  actions: ScheduledAction[];   // 按 executeAt 排序
+  robotIds: string[];           // 涉及的机器人 ID 列表
+}
+
+// 编舞 WebSocket 消息（服务端 → UI）
+export type ChoreoWSMessage =
+  | ChoreoStartMessage
+  | ChoreoProgressMessage
+  | ChoreoActionMessage
+  | ChoreoStopMessage
+  | ChoreoCompleteMessage
+  | ChoreoErrorMessage;
+
+export interface ChoreoStartMessage {
+  type: 'choreo_start';
+  timestamp: number;
+  data: {
+    scheduleId: string;
+    totalDuration: number;
+    robotIds: string[];
+  };
+}
+
+export interface ChoreoProgressMessage {
+  type: 'choreo_progress';
+  timestamp: number;
+  data: {
+    scheduleId: string;
+    currentTime: number;        // 当前播放时间（毫秒）
+    progress: number;           // 0-100
+  };
+}
+
+export interface ChoreoActionMessage {
+  type: 'choreo_action';
+  timestamp: number;
+  data: {
+    scheduleId: string;
+    robotId: string;
+    action: string;
+    parameters?: Record<string, any>;
+  };
+}
+
+export interface ChoreoStopMessage {
+  type: 'choreo_stop';
+  timestamp: number;
+  data: {
+    scheduleId: string;
+    reason: 'manual' | 'error';
+    message?: string;
+  };
+}
+
+export interface ChoreoCompleteMessage {
+  type: 'choreo_complete';
+  timestamp: number;
+  data: {
+    scheduleId: string;
+    totalDuration: number;
+  };
+}
+
+export interface ChoreoErrorMessage {
+  type: 'choreo_error';
+  timestamp: number;
+  data: {
+    scheduleId: string;
+    message: string;
+  };
+}
+
+// ==================== 项目与数据 ====================
+
 // 编舞项目
 export interface ChoreoProject {
   uuid: string;
@@ -34,23 +124,20 @@ export interface TimelineTrack {
   muted?: boolean;
   locked?: boolean;
   color?: string;
-  clips: TimelineClip[];
+  blocks?: ActionBlock[];     // 动作块（仅 action 类型）
+  audioUrl?: string;          // 音频文件 URL（仅 audio 类型）
 }
 
-// 时间轴片段
-export interface TimelineClip {
+// 动作块
+export interface ActionBlock {
   id: string;
-  trackId: string;
+  name: string;
   startTime: number;          // 开始时间（秒）
   duration: number;           // 持续时间（秒）
-  action?: ActionCommand;     // 动作指令
-  audioFile?: string;         // 音频文件路径
-}
-
-// 动作指令
-export interface ActionCommand {
-  action: string;
-  parameters?: Record<string, any>;
+  actionType?: string;        // 动作类型（Python API 方法名）
+  actionParams?: Record<string, any>;  // 动作参数
+  robotId?: string;           // 块级机器人绑定（覆盖轨道级）
+  color?: string;
 }
 
 // 时间轴配置
@@ -91,8 +178,9 @@ export interface ExecutionOptions {
 // 执行状态
 export interface ExecutionStatus {
   executionId: string;
+  scheduleId: string;
   status: 'running' | 'paused' | 'stopped' | 'completed' | 'error';
-  currentTime: number;
+  currentTime: number;        // 当前播放时间（毫秒）
   progress: number;           // 0-100
   message?: string;
   startedAt: string;
@@ -122,12 +210,12 @@ export interface SaveTimelineDto {
   config: TimelineConfig;
 }
 
-export interface ExecuteActionsDto {
-  robotIds: string[];
-  actions: ActionCommand[];
+// 执行编舞请求（前端 → 后端，只需指定项目，后端自行编译时间轴）
+export interface ExecuteChoreoDto {
+  loop?: boolean;             // 是否循环执行
 }
 
-// 项目机器人配置（用于 Python 脚本生成）
+// 项目机器人配置
 export interface ProjectRobotConfig {
   uuid: string;
   name: string;
@@ -136,17 +224,6 @@ export interface ProjectRobotConfig {
   local_port: number;
   group_name?: string;
   status?: 'online' | 'offline';
-}
-
-// 封装结果
-export interface BuildResult {
-  pythonFile: string;
-  buildPath: string;
-}
-
-// 运行结果
-export interface RunResult {
-  executionId: string;
 }
 
 // 连接测试结果

@@ -147,6 +147,7 @@ export interface ActionCommand {
 
 // 时间轴数据
 export interface TimelineData {
+  version?: number
   tracks: TimelineTrack[]
   config: TimelineConfig
   updated_at?: string
@@ -166,6 +167,7 @@ export interface CustomAction {
 // 执行状态
 export interface ExecutionStatus {
   executionId: string
+  scheduleId: string
   status: 'running' | 'paused' | 'stopped' | 'completed' | 'error'
   currentTime: number
   progress: number
@@ -198,9 +200,78 @@ export interface SaveTimelineDto {
   config: TimelineConfig
 }
 
-export interface ExecuteActionsDto {
-  robotIds: string[]
-  actions: ActionCommand[]
+// 执行编舞请求（后端自行编译时间轴）
+export interface ExecuteChoreoDto {
+  loop?: boolean
+}
+
+// ==================== 编舞 WebSocket 消息 ====================
+
+export type ChoreoWSMessage =
+  | ChoreoStartMessage
+  | ChoreoProgressMessage
+  | ChoreoActionMessage
+  | ChoreoStopMessage
+  | ChoreoCompleteMessage
+  | ChoreoErrorMessage
+
+export interface ChoreoStartMessage {
+  type: 'choreo_start'
+  timestamp: number
+  data: {
+    scheduleId: string
+    totalDuration: number
+    robotIds: string[]
+  }
+}
+
+export interface ChoreoProgressMessage {
+  type: 'choreo_progress'
+  timestamp: number
+  data: {
+    scheduleId: string
+    currentTime: number
+    progress: number
+  }
+}
+
+export interface ChoreoActionMessage {
+  type: 'choreo_action'
+  timestamp: number
+  data: {
+    scheduleId: string
+    robotId: string
+    action: string
+    parameters?: Record<string, any>
+  }
+}
+
+export interface ChoreoStopMessage {
+  type: 'choreo_stop'
+  timestamp: number
+  data: {
+    scheduleId: string
+    reason: 'manual' | 'error'
+    message?: string
+  }
+}
+
+export interface ChoreoCompleteMessage {
+  type: 'choreo_complete'
+  timestamp: number
+  data: {
+    scheduleId: string
+    totalDuration: number
+  }
+}
+
+export interface ChoreoErrorMessage {
+  type: 'choreo_error'
+  timestamp: number
+  data: {
+    scheduleId: string
+    message: string
+  }
 }
 
 // ==================== 动作定义 ====================

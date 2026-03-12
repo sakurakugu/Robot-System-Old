@@ -230,7 +230,8 @@ export type ServerMessage =
   | StatusUpdateMessage
   | AudioControlCommandMessage
   | AsrTranscriptMessage
-  | PackageDownloadCommandMessage;
+  | PackageDownloadCommandMessage
+  | ChoreoWSMessage;
 
 export interface AudioResponseMessage {
   type: 'audio_response';
@@ -372,9 +373,10 @@ export interface AsrTranscriptMessage {
   };
 }
 
-// 引用conversation模块的类型
+// 引用其他模块的类型
 import type { TTSOptions } from '../大模型交互/types';
 import type { ActionCommand } from '../机器人交互/types';
+import type { ChoreoWSMessage } from '../编舞系统/types';
 
 /** 云端→机器人：通知机器人通过 HTTP 下载安装包 */
 export interface PackageDownloadCommandMessage {

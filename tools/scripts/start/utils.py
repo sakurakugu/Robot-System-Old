@@ -89,7 +89,7 @@ def _log_label(log_path: Path) -> str:
 def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Popen, int]:
     """启动进程并 tee 输出到日志文件"""
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_file = open(log_path, "a", buffering=1, encoding="utf-8")
+    log_file = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
     列表 = 根据平台调整命令(list(cmd))
     env = os.environ.copy()
     if sys.stdout.isatty():
@@ -102,6 +102,7 @@ def spawn(cmd: Iterable[str], cwd: Path, log_path: Path) -> Tuple[subprocess.Pop
         text=True,
         encoding="utf-8",
         bufsize=1,
+        errors="replace",
         env=env,
     )
     if proc.stdout is not None:

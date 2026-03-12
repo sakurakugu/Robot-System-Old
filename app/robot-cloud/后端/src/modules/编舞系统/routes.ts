@@ -159,10 +159,16 @@ export function createChoreoRoutes(controller: ChoreoController): Router {
   // 删除音频文件
   router.delete('/projects/:uuid/audio/:filename', controller.deleteAudioFile);
 
-  // ==================== 动作执行 ====================
+  // ==================== 编舞执行 ====================
 
-  // 执行动作序列
-  router.post('/projects/:uuid/execute', controller.executeActions);
+  // 执行编舞（编译时间轴 + 启动调度）
+  router.post('/projects/:uuid/execute', controller.executeChoreo);
+
+  // 暂停执行
+  router.post('/executions/:executionId/pause', controller.pauseExecution);
+
+  // 恢复执行
+  router.post('/executions/:executionId/resume', controller.resumeExecution);
 
   // 停止执行
   router.post('/executions/:executionId/stop', controller.stopExecution);
@@ -172,17 +178,6 @@ export function createChoreoRoutes(controller: ChoreoController): Router {
 
   // 获取正在运行的执行列表
   router.get('/executions', controller.getRunningExecutions);
-
-  // ==================== Python 脚本封装与运行 ====================
-
-  // 封装项目为 Python 脚本
-  router.post('/projects/:uuid/build', controller.buildProject);
-
-  // 运行项目的 Python 脚本
-  router.post('/projects/:uuid/run', controller.runProject);
-
-  // 封装并运行
-  router.post('/projects/:uuid/build-and-run', controller.buildAndRunProject);
 
   // ==================== 文件管理 ====================
 

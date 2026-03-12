@@ -14,20 +14,21 @@ import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { PythonExecutor } from '../../core/services/python-executor';
 import type WebSocketService from '../websocket/service';
+import { ChoreoScheduler } from './scheduler';
 import type {
-  ActionCommand,
   AddProjectRobotDirectDto,
   AddRobotToProjectDto,
-  BuildResult,
   ChoreoProject,
   ChoreoRobot,
+  ChoreoWSMessage,
   ConnectionTestResult,
   CreateProjectDto,
   CustomAction,
+  ExecutionPlan,
   ExecutionStatus,
   ProjectRobotConfig,
-  RunResult,
   SaveTimelineDto,
+  ScheduledAction,
   TimelineConfig,
   TimelineData,
   TimelineTrack,
@@ -57,6 +58,7 @@ const PROJECTS_DIR = process.env.CHOREO_PROJECTS_DIR || getProjectsDir();
 export class 编舞服务 {
   private projects: Map<string, ChoreoProject> = new Map();
   private executions: Map<string, ExecutionStatus> = new Map();
+  private schedulers: Map<string, ChoreoScheduler> = new Map();
   private pythonExecutor: PythonExecutor;
 
   constructor(
@@ -66,26 +68,10 @@ export class 编舞服务 {
     this.ensureDirectories();
     this.loadProjectIndex();
 
-    // 初始化 Python 执行器
+    // PythonExecutor 保留给 SSH 连接测试和运控重启用
     this.pythonExecutor = new PythonExecutor(
       path.join(__dirname, '../../../../../dance-choreo/robot-control')
     );
-
-    // 监听 Python 执行器事件
-    this.pythonExecutor.on('output', ({ executionId, data }) => {
-      logger.info(`[${executionId}] ${data}`);
-      // TODO: 扩展 WebSocket 服务支持编舞相关消息类型后启用广播
-    });
-
-    this.pythonExecutor.on('error', ({ executionId, error }) => {
-      logger.error(`[${executionId}] ${error}`);
-      // TODO: 扩展 WebSocket 服务支持编舞相关消息类型后启用广播
-    });
-
-    this.pythonExecutor.on('complete', ({ executionId, code }) => {
-      logger.info(`[${executionId}] 执行完成，退出码: ${code}`);
-      // TODO: 扩展 WebSocket 服务支持编舞相关消息类型后启用广播
-    });
   }
 
   /**
@@ -511,174 +497,203 @@ export class 编舞服务 {
     return safeFilename;
   }
 
-  // ==================== 动作执行 ====================
+  // ==================== 时间轴编译与执行 ====================
 
   /**
-   * 执行动作序列
-   * 通过 WebSocket 向 robot-agent 发送动作指令
+   * 编译时间轴为执行计划
+   * 遍历所有轨道的 clips，按 executeAt 排序，生成 ScheduledAction 列表
    */
-  async executeActions(
-    projectUuid: string,
-    robotIds: string[],
-    actions: ActionCommand[]
-  ): Promise<string> {
-    if (!this.wsService) {
-      throw new Error('WebSocket 服务未初始化');
-    }
-
+  compileTimeline(projectUuid: string): ExecutionPlan {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
-    const executionId = uuidv7();
-    const now = new Date().toISOString();
+    const timelineData = this.getTimeline(projectUuid);
+    const { tracks, config } = timelineData;
 
-    // 初始化执行状态
-    const status: ExecutionStatus = {
-      executionId,
-      status: 'running',
-      currentTime: 0,
-      progress: 0,
-      startedAt: now,
-    };
-    this.executions.set(executionId, status);
+    const scheduleId = uuidv7();
+    const actions: ScheduledAction[] = [];
+    const robotIdSet = new Set<string>();
 
-    // 异步执行动作
-    this.runActionsAsync(executionId, robotIds, actions).catch((error) => {
-      const status = this.executions.get(executionId);
-      if (status) {
-        status.status = 'error';
-        status.error = error.message;
+    for (const track of tracks) {
+      if (track.type !== 'action') continue;
+
+      const blocks = track.blocks ?? [];
+
+      for (const block of blocks) {
+        // 块级 robotId 优先，其次取轨道级 robotId
+        const robotId = block.robotId || track.robotId;
+        if (!robotId) continue;
+
+        const actionName = block.actionType;
+        if (!actionName) continue;
+
+        const parameters = block.actionParams;
+
+        robotIdSet.add(robotId);
+
+        actions.push({
+          robotId,
+          action: actionName,
+          parameters,
+          executeAt: Math.round(block.startTime * 1000),
+          duration: Math.round(block.duration * 1000),
+        });
       }
-    });
-
-    logger.info(`开始执行动作序列`, {
-      executionId,
-      robotCount: robotIds.length,
-      actionCount: actions.length,
-    });
-
-    return executionId;
-  }
-
-  /**
-   * 异步执行动作序列
-   */
-  private async runActionsAsync(
-    executionId: string,
-    robotIds: string[],
-    actions: ActionCommand[]
-  ): Promise<void> {
-    const status = this.executions.get(executionId);
-    if (!status) return;
-
-    try {
-      // 舞蹈开始前，禁止所有机器人收音
-      for (const robotId of robotIds) {
-        await this.setAudioRecording(robotId, false);
-      }
-
-      for (let i = 0; i < actions.length; i++) {
-        // 检查是否被停止
-        if (status.status === 'stopped') {
-          break;
-        }
-
-        const action = actions[i];
-        status.progress = Math.round(((i + 1) / actions.length) * 100);
-        status.message = `执行: ${action.action}`;
-
-        // 向每个机器人发送动作指令
-        for (const robotId of robotIds) {
-          await this.sendActionToRobot(robotId, action);
-        }
-
-        // 广播进度
-        this.broadcastExecutionProgress(executionId, status);
-
-        // 如果动作有持续时间，等待
-        // TODO: 根据动作的 duration 参数等待
-      }
-
-      status.status = 'completed';
-      status.progress = 100;
-      this.broadcastExecutionProgress(executionId, status);
-    } catch (error: any) {
-      status.status = 'error';
-      status.error = error.message;
-      this.broadcastExecutionProgress(executionId, status);
-      throw error;
     }
-  }
 
-  /**
-   * 设置机器人的收音状态
-   */
-  private async setAudioRecording(robotId: string, enabled: boolean): Promise<void> {
-    if (!this.wsService) return;
+    // 按执行时间排序
+    actions.sort((a, b) => a.executeAt - b.executeAt);
 
-    const message = {
-      type: 'audio_control',
-      robotId,
-      timestamp: Date.now(),
-      data: {
-        enabled,
-        source: 'choreo',
-      },
+    // 检测同一机器人同一时刻的冲突动作
+    for (let i = 0; i < actions.length - 1; i++) {
+      const curr = actions[i];
+      const next = actions[i + 1];
+      if (curr.robotId === next.robotId && curr.executeAt === next.executeAt) {
+        logger.warn('检测到同一机器人同一时刻的冲突动作', {
+          robotId: curr.robotId,
+          time: curr.executeAt,
+          action1: curr.action,
+          action2: next.action,
+        });
+      }
+    }
+
+    const totalDuration = Math.round(config.duration * 1000);
+
+    logger.info('时间轴编译完成', {
+      scheduleId,
+      actionCount: actions.length,
+      robotCount: robotIdSet.size,
+      totalDuration,
+    });
+
+    return {
+      scheduleId,
+      projectUuid,
+      totalDuration,
+      actions,
+      robotIds: Array.from(robotIdSet),
     };
-
-    this.wsService.sendToRobot(robotId, message, 'business');
   }
 
   /**
-   * 向机器人发送动作指令
+   * 执行编舞（编译时间轴 + 启动调度器）
    */
-  private async sendActionToRobot(robotId: string, action: ActionCommand): Promise<void> {
+  executeChoreo(projectUuid: string): ExecutionStatus {
     if (!this.wsService) {
       throw new Error('WebSocket 服务未初始化');
     }
 
-    // 通过 WebSocket 发送动作指令到 robot-agent
-    const message = {
-      type: 'action_command',
-      robotId,
-      timestamp: Date.now(),
-      data: {
-        action: action.action,
-        parameters: action.parameters || {},
-      },
+    // 编译时间轴
+    const plan = this.compileTimeline(projectUuid);
+
+    if (plan.actions.length === 0) {
+      throw new Error('时间轴中没有可执行的动作（请确保动作块已绑定机器人且已选择动作类型）');
+    }
+
+    if (plan.robotIds.length === 0) {
+      throw new Error('没有绑定机器人的轨道，无法执行');
+    }
+
+    // 创建调度器
+    const scheduler = new ChoreoScheduler(this.wsService);
+    const executionId = plan.scheduleId;
+
+    // 初始化执行状态
+    const status: ExecutionStatus = {
+      executionId,
+      scheduleId: plan.scheduleId,
+      status: 'running',
+      currentTime: 0,
+      progress: 0,
+      startedAt: new Date().toISOString(),
+    };
+    this.executions.set(executionId, status);
+    this.schedulers.set(executionId, scheduler);
+
+    // 广播回调：发送给所有 UI 客户端并更新执行状态
+    const onBroadcast = (message: ChoreoWSMessage) => {
+      // broadcast 只做 JSON.stringify，类型断言安全
+      this.wsService!.broadcast(message as unknown as import('../../types').ServerMessage, 'business');
+
+      // 同步更新执行状态
+      if (message.type === 'choreo_progress') {
+        status.currentTime = message.data.currentTime;
+        status.progress = message.data.progress;
+      } else if (message.type === 'choreo_complete') {
+        status.status = 'completed';
+        status.progress = 100;
+        status.currentTime = message.data.totalDuration;
+        this.schedulers.delete(executionId);
+      } else if (message.type === 'choreo_stop') {
+        status.status = 'stopped';
+        status.message = message.data.message;
+        this.schedulers.delete(executionId);
+      }
     };
 
-    // 使用 WebSocket 服务发送消息
-    this.wsService.sendToRobot(robotId, message, 'business');
+    // 启动调度
+    scheduler.start(plan, onBroadcast);
+
+    logger.info('编舞执行已启动', {
+      executionId,
+      projectUuid,
+      actionCount: plan.actions.length,
+      robotCount: plan.robotIds.length,
+    });
+
+    return status;
   }
 
   /**
-   * 广播执行进度
+   * 暂停执行
    */
-  private broadcastExecutionProgress(executionId: string, status: ExecutionStatus): void {
-    // 编舞系统的执行进度广播暂时使用日志记录
-    // TODO: 需要扩展 WebSocket 服务支持编舞相关消息类型
-    logger.info('执行进度', {
-      executionId,
-      status: status.status,
-      progress: status.progress,
-      message: status.message,
-    });
+  pauseExecution(executionId: string): boolean {
+    const scheduler = this.schedulers.get(executionId);
+    const status = this.executions.get(executionId);
+    if (!scheduler || !status) return false;
+
+    const result = scheduler.pause();
+    if (result) {
+      status.status = 'paused';
+      status.currentTime = scheduler.getCurrentTime();
+    }
+    return result;
+  }
+
+  /**
+   * 恢复执行
+   */
+  resumeExecution(executionId: string): boolean {
+    const scheduler = this.schedulers.get(executionId);
+    const status = this.executions.get(executionId);
+    if (!scheduler || !status) return false;
+
+    const result = scheduler.resume();
+    if (result) {
+      status.status = 'running';
+    }
+    return result;
   }
 
   /**
    * 停止执行
    */
   stopExecution(executionId: string): boolean {
+    const scheduler = this.schedulers.get(executionId);
     const status = this.executions.get(executionId);
-    if (!status || status.status !== 'running') {
+    if (!status || (status.status !== 'running' && status.status !== 'paused')) {
       return false;
     }
 
+    if (scheduler) {
+      scheduler.stop('manual');
+      this.schedulers.delete(executionId);
+    }
+
     status.status = 'stopped';
-    this.broadcastExecutionProgress(executionId, status);
     return true;
   }
 
@@ -686,7 +701,14 @@ export class 编舞服务 {
    * 获取执行状态
    */
   getExecutionStatus(executionId: string): ExecutionStatus | undefined {
-    return this.executions.get(executionId);
+    const status = this.executions.get(executionId);
+    // 如果调度器还在运行，同步最新时间
+    const scheduler = this.schedulers.get(executionId);
+    if (status && scheduler) {
+      status.currentTime = scheduler.getCurrentTime();
+      status.progress = scheduler.getProgress();
+    }
+    return status;
   }
 
   /**
@@ -694,7 +716,7 @@ export class 编舞服务 {
    */
   getRunningExecutions(): ExecutionStatus[] {
     return Array.from(this.executions.values()).filter(
-      (s) => s.status === 'running'
+      (s) => s.status === 'running' || s.status === 'paused'
     );
   }
 
@@ -998,7 +1020,7 @@ export class 编舞服务 {
   /**
    * 导入项目
    */
-  async importProject(filePath: string, originalName: string): Promise<ChoreoProject> {
+  async importProject(filePath: string, _originalName: string): Promise<ChoreoProject> {
     const tempExtractDir = path.join(os.tmpdir(), 'robot-dog-extracts', `extract_${Date.now()}`);
 
     try {
@@ -1098,7 +1120,6 @@ export class 编舞服务 {
 
     const robots = this.getProjectRobotsConfig(projectUuid);
 
-    const now = new Date().toISOString();
     const robot: ProjectRobotConfig = {
       uuid: uuidv7(),
       name: dto.name,
@@ -1324,258 +1345,6 @@ export class 编舞服务 {
     });
   }
 
-  // ==================== Python 脚本封装与运行 ====================
-
-  /**
-   * 封装项目为 Python 脚本
-   */
-  buildProject(projectUuid: string): BuildResult {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
-
-    // 读取时间轴数据
-    const timelineData = this.getTimeline(projectUuid);
-
-    // 获取项目机器人配置
-    const robots = this.getProjectRobotsConfig(projectUuid);
-
-    // 创建 build 目录
-    const buildDir = path.join(project.folder_path, 'build');
-    if (!fs.existsSync(buildDir)) {
-      fs.mkdirSync(buildDir, { recursive: true });
-    }
-
-    // 复制 lib 库到 build 目录
-    const libSourcePath = path.join(__dirname, '../../../../../dance-choreo/robot-control/lib');
-    const libTargetPath = path.join(buildDir, 'lib');
-
-    if (fs.existsSync(libSourcePath)) {
-      if (fs.existsSync(libTargetPath)) {
-        fs.rmSync(libTargetPath, { recursive: true, force: true });
-      }
-      this.copyDirectory(libSourcePath, libTargetPath);
-    }
-
-    // 生成 Python 代码
-    const pythonCode = this.generatePythonFromTimeline(timelineData, project.name, robots);
-
-    // 写入 Python 文件
-    const pythonFileName = `${this.sanitizeFilename(project.name)}.py`;
-    const pythonFilePath = path.join(buildDir, pythonFileName);
-    fs.writeFileSync(pythonFilePath, pythonCode, 'utf-8');
-
-    logger.info(`封装项目成功: ${project.name}`, { uuid: projectUuid, pythonFile: pythonFileName });
-
-    return {
-      pythonFile: pythonFileName,
-      buildPath: buildDir,
-    };
-  }
-
-  /**
-   * 运行项目的 Python 脚本
-   */
-  runProject(projectUuid: string): RunResult {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
-
-    const buildDir = path.join(project.folder_path, 'build');
-    const pythonFileName = `${this.sanitizeFilename(project.name)}.py`;
-    const pythonFilePath = path.join(buildDir, pythonFileName);
-
-    if (!fs.existsSync(pythonFilePath)) {
-      throw new Error('未找到 Python 文件，请先封装');
-    }
-
-    const result = this.pythonExecutor.execute(pythonFilePath, buildDir);
-
-    logger.info(`运行项目: ${project.name}`, { uuid: projectUuid, executionId: result.executionId });
-
-    return result;
-  }
-
-  /**
-   * 封装并运行项目
-   */
-  buildAndRunProject(projectUuid: string): RunResult {
-    this.buildProject(projectUuid);
-    return this.runProject(projectUuid);
-  }
-
-  /**
-   * 复制目录
-   */
-  private copyDirectory(source: string, target: string): void {
-    if (!fs.existsSync(target)) {
-      fs.mkdirSync(target, { recursive: true });
-    }
-
-    const files = fs.readdirSync(source);
-    for (const file of files) {
-      const sourcePath = path.join(source, file);
-      const targetPath = path.join(target, file);
-
-      if (fs.statSync(sourcePath).isDirectory()) {
-        this.copyDirectory(sourcePath, targetPath);
-      } else {
-        fs.copyFileSync(sourcePath, targetPath);
-      }
-    }
-  }
-
-  /**
-   * 清理文件名
-   */
-  private sanitizeFilename(name: string): string {
-    return name.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_');
-  }
-
-  /**
-   * 从时间轴生成 Python 代码
-   */
-  private generatePythonFromTimeline(
-    timelineData: TimelineData,
-    projectName: string,
-    robots: ProjectRobotConfig[]
-  ): string {
-    const { tracks } = timelineData;
-
-    logger.info('开始生成 Python 代码', {
-      tracksCount: tracks?.length || 0,
-      robotsCount: robots.length,
-    });
-
-    // 构建机器人映射
-    const robotsMap = new Map<string, ProjectRobotConfig>();
-    robots.forEach(robot => {
-      robotsMap.set(robot.uuid, robot);
-    });
-
-    // 提取动作
-    const actions: Array<{ time: number; robot: string; action: string; params: any }> = [];
-
-    tracks.forEach((track, index) => {
-      if (track.type === 'action' && track.robotId) {
-        if (!robotsMap.has(track.robotId)) {
-          logger.warn(`轨道 ${index} 绑定的机器狗 ${track.robotId} 不存在，跳过处理`);
-          return;
-        }
-
-        // 处理 clips
-        if (track.clips && Array.isArray(track.clips)) {
-          track.clips.forEach((clip) => {
-            if (clip.action) {
-              actions.push({
-                time: clip.startTime || 0,
-                robot: track.robotId!,
-                action: clip.action.action,
-                params: clip.action.parameters || {},
-              });
-            }
-          });
-        }
-      }
-    });
-
-    // 按时间排序
-    actions.sort((a, b) => a.time - b.time);
-
-    // 生成 Python 代码
-    let code = `#!/usr/bin/env python3\n`;
-    code += `# -*- coding: utf-8 -*-\n`;
-    code += `# ${projectName}\n`;
-    code += `# 自动生成于 ${new Date().toISOString()}\n\n`;
-    code += `from lib.api import CrazyRobotDog\n`;
-    code += `import time\n\n`;
-
-    // 创建机器人变量映射
-    const robotVarMap = new Map<string, string>();
-
-    // 生成机器人配置
-    if (robotsMap.size > 0) {
-      code += `# 机器人配置\n`;
-      code += `DOGS_CONFIG = {\n`;
-      robotsMap.forEach((config) => {
-        code += `    "${config.name}": ("${config.robot_ip}", ${config.local_port}),\n`;
-      });
-      code += `}\n\n`;
-
-      // 使用第一个机器人的 local_ip
-      const firstRobot = Array.from(robotsMap.values())[0];
-      code += `LOCAL_IP = "${firstRobot.local_ip}"\n\n`;
-
-      // 创建机器人实例
-      code += `# 创建机器人实例\n`;
-      let robotIndex = 1;
-      robotsMap.forEach((config, uuid) => {
-        const varName = `dog${robotIndex}`;
-        robotVarMap.set(uuid, varName);
-        code += `${varName} = CrazyRobotDog(\n`;
-        code += `    name="${config.name}",\n`;
-        code += `    robot_ip=DOGS_CONFIG["${config.name}"][0],\n`;
-        code += `    local_ip=LOCAL_IP,\n`;
-        code += `    local_port=DOGS_CONFIG["${config.name}"][1],\n`;
-        code += `)\n\n`;
-        robotIndex++;
-      });
-    } else {
-      // 默认配置
-      code += `# 默认机器人配置\n`;
-      code += `DOGS_CONFIG = {\n`;
-      code += `    "131": ("192.168.1.110", 10131),\n`;
-      code += `}\n\n`;
-      code += `LOCAL_IP = "192.168.1.105"\n\n`;
-      code += `dog1 = CrazyRobotDog(\n`;
-      code += `    name="131",\n`;
-      code += `    robot_ip=DOGS_CONFIG["131"][0],\n`;
-      code += `    local_ip=LOCAL_IP,\n`;
-      code += `    local_port=DOGS_CONFIG["131"][1],\n`;
-      code += `)\n\n`;
-    }
-
-    // 生成动作序列
-    code += `# 动作序列\n`;
-    if (actions.length > 0) {
-      let lastTime = 0;
-      actions.forEach((action) => {
-        // 添加延迟
-        if (action.time > lastTime) {
-          const delay = action.time - lastTime;
-          code += `time.sleep(${delay.toFixed(2)})\n`;
-        }
-
-        // 添加动作
-        const robotVar = robotVarMap.get(action.robot) || 'dog1';
-        const params: string[] = [];
-
-        if (action.params.duration !== undefined) {
-          params.push(String(action.params.duration));
-        }
-        if (action.params.angle !== undefined) {
-          params.push(`angle=${action.params.angle}`);
-        }
-        if (action.params.direction) {
-          params.push(`direction='${action.params.direction}'`);
-        }
-
-        const paramsStr = params.join(', ');
-        code += `${robotVar}.${action.action}(${paramsStr})\n`;
-
-        lastTime = action.time;
-      });
-    } else {
-      code += `# 没有动作数据，添加默认动作\n`;
-      code += `dog1.stand_up(0)\n`;
-      code += `time.sleep(1)\n`;
-      code += `dog1.attitude_rest()\n`;
-    }
-
-    return code;
-  }
 }
 
 export default 编舞服务;

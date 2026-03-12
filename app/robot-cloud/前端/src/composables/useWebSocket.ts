@@ -179,7 +179,7 @@ export function useWebSocket() {
 
   const sendMessage = (message: any) => {
     const type = message?.type
-    if (type === 'audio_chunk') {
+    if (type === 'audio_chunk' || type === 'audio_start' || type === 'audio_end') {
       if (!wsAudioUpload.value) { console.error('音频上传通道未连接'); return }
       wsAudioUpload.value.send(JSON.stringify(message))
       return
@@ -190,6 +190,7 @@ export function useWebSocket() {
   return {
     // 状态
     isConnected,
+    isAudioUploadConnected,
     isAudioDownloadConnected,
     robotId,
     // 方法

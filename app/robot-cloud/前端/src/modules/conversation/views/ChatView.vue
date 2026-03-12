@@ -19,7 +19,7 @@
             </el-icon>
           </template>
         </el-empty>
-        
+
         <div
           v-for="msg in messages"
           :key="msg.id"
@@ -135,6 +135,7 @@
           @keydown.shift.enter.prevent="() => sendMessage('robot')"
         />
         <div class="button-group">
+          <VoiceRecordButton size="default" />
           <el-button
             type="success"
             :disabled="!isConnected || !inputText.trim()"
@@ -158,17 +159,18 @@
 </template>
 
 <script setup lang="ts">
+import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import {
-  ChatDotSquare,
-  Clock,
-  Lightning,
-  Loading,
-  Microphone,
-  Promotion,
-  Select,
-  User,
-  WarningFilled
+    ChatDotSquare,
+    Clock,
+    Lightning,
+    Loading,
+    Microphone,
+    Promotion,
+    Select,
+    User,
+    WarningFilled
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
@@ -258,13 +260,13 @@ const connectToRobot = async (uuid?: string) => {
 const parseActionFormat = (text: string): { action: string; parameters: Record<string, any> } | null => {
   const actionRegex = /^\{\{action=([a-zA-Z_][a-zA-Z0-9_]*)((?:,[a-zA-Z_][a-zA-Z0-9_]*=[^,}]+)*)\}\}$/
   const match = text.match(actionRegex)
-  
+
   if (!match) return null
-  
+
   const action = match[1]
   const paramsStr = match[2]
   const parameters: Record<string, any> = {}
-  
+
   // 解析参数
   if (paramsStr) {
     const paramPairs = paramsStr.slice(1).split(',')
@@ -276,7 +278,7 @@ const parseActionFormat = (text: string): { action: string; parameters: Record<s
       }
     }
   }
-  
+
   return { action, parameters }
 }
 
@@ -296,14 +298,14 @@ const sendMessage = (target: 'ai' | 'robot') => {
 
   // 检查是否是动作格式 {{action=xxx}}
   const actionMatch = parseActionFormat(text)
-  
+
   if (actionMatch) {
     // 直接发送动作（不生成音频）
     userMessage.sentToRobot = false
     userMessage.sendingToRobot = true
     userMessage.actions = [actionMatch.action]
     messages.value.push(userMessage)
-    
+
     if (isConnected.value) {
       // 发送动作消息到后端（不发送TTS）
       wsSendMessage({
@@ -315,12 +317,12 @@ const sendMessage = (target: 'ai' | 'robot') => {
           parameters: actionMatch.parameters,
         },
       })
-      
+
       userMessage.sendingToRobot = false
       userMessage.sentToRobot = true
       ElMessage.success(`已发送动作: ${actionMatch.action}`)
     }
-    
+
     inputText.value = ''
     scrollToBottom()
     return // 动作格式不继续处理
@@ -338,7 +340,7 @@ const sendMessage = (target: 'ai' | 'robot') => {
         volume: ttsVolume.value,
       })
     }
-    
+
     sendToRobot(text).then(success => {
       userMessage.sendingToRobot = false
       userMessage.sentToRobot = success
@@ -436,7 +438,7 @@ onMessage((data) => {
     scrollToBottom()
 
     aiMessage.sendingToRobot = false
-    
+
     if (!data.data?.noTTS && !data.data?.ttsDone) {
       const m = messages.value.find(mm => mm.id === aiMessage.id)
       if (m && !m.audioUrl) {

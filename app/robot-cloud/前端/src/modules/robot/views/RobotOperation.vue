@@ -112,6 +112,19 @@
         >
           急停
         </el-button>
+
+        <el-divider direction="vertical" />
+
+        <!-- 机器狗麦克风开关 -->
+        <el-tooltip :content="micEnabled ? '关闭机器狗麦克风' : '开启机器狗麦克风'">
+          <el-button
+            size="small"
+            :icon="micEnabled ? Mic : MicOff"
+            :type="micEnabled ? '' : 'danger'"
+            circle
+            @click="toggleMic"
+          />
+        </el-tooltip>
       </div>
 
       <div class="right-info">
@@ -180,16 +193,11 @@
         </div>
 
         <div
-          class="floating-item"
-          :style="getControlStyle('micToggle')"
-          @pointerdown="startDrag('micToggle', $event)"
+          class="floating-item mic-toggle-btn"
+          :style="getControlStyle('voiceRecord')"
+          @pointerdown="startDrag('voiceRecord', $event)"
         >
-          <el-button
-            class="mic-toggle-btn"
-            circle
-            :icon="micEnabled ? Mic : MicOff"
-            @click="toggleMic"
-          />
+          <VoiceRecordButton size="large" />
         </div>
 
         <div
@@ -268,6 +276,7 @@
 
 <script setup lang="ts">
 import JoystickPad from '@/components/JoystickPad.vue'
+import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import ChatView from '@/modules/conversation/views/ChatView.vue'
 import ActionButton from '@/modules/robot/components/ActionButton.vue'
@@ -334,7 +343,7 @@ type ControlLayout = Record<string, { x: number; y: number }>
 
 const defaultControlLayout: ControlLayout = {
   chatToggle: { x: 92, y: 12 },
-  micToggle: { x: 92, y: 24 },
+  voiceRecord: { x: 92, y: 24 },
   leftJoystick: { x: 15, y: 80 },
   rightJoystick: { x: 85, y: 80 },
   action_stand_up: { x: 34, y: 78 },
@@ -928,13 +937,13 @@ html, body, #app {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.mic-toggle-btn {
-  width: 52px;
-  height: 52px;
-  font-size: 22px;
-  background: rgba(0, 0, 0, 0.55);
+.mic-toggle-btn :deep(.voice-record-btn) {
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  background: rgba(0, 0, 0, 0.6);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .joystick-pad {

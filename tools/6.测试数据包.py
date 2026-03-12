@@ -13,10 +13,11 @@ init = colorama.init
 Fore = colorama.Fore
 init(autoreset=True)
 
-DOG_IP       = "192.168.0.85"
+DOG_IP       = "192.168.5.111"
 SEND_PORT    = 8081
 LISTEN_PORT  = 8080
-DATA_PACKAGE = json.dumps({"type": "heartbeat", "heartbeat": 1}).encode()
+# DATA_PACKAGE = json.dumps({"type": "heartbeat", "heartbeat": 1}).encode()
+DATA_PACKAGE = json.dumps({"type": "cmd", "cmd": 4}).encode()
 
 
 def _read_pcap_packets(pcap_path: Path):
@@ -174,7 +175,7 @@ def main():
     parser.add_argument("--pcap", type=str, help="pcap 文件路径，传入后导出 JSONL")
     parser.add_argument("--out", type=str, help="导出 JSONL 文件路径")
     parser.add_argument("--dog-ip",   default=DOG_IP,  help="机器狗 IP")
-    parser.add_argument("--count",    type=int, default=5,   help="发送数据包次数（0=无限）")
+    parser.add_argument("--count",    type=int, default=1,   help="发送数据包次数（0=无限）")
     parser.add_argument("--interval", type=float, default=0.2, help="发送间隔(秒)")
     parser.add_argument("--rx-max",   type=int, default=0,
                         help="最多接收多少包后停止（0=跟随发送完成后再等 3 秒）")

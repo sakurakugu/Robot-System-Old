@@ -341,7 +341,7 @@ const defaultControlLayout: ControlLayout = {
   action_sit_down: { x: 44, y: 78 },
   action_front_jump: { x: 54, y: 78 },
   action_jump: { x: 64, y: 78 },
-  action_backflip: { x: 36, y: 88 },
+  action_back_flip: { x: 36, y: 88 },
   action_two_leg_stand: { x: 50, y: 88 },
   action_shake_hand: { x: 64, y: 88 },
 }
@@ -354,7 +354,7 @@ const actionButtons = [
   { id: 'action_sit_down', action: 'sit_down', label: '趴下', title: '趴下' },
   { id: 'action_front_jump', action: 'front_jump', label: '向前跳', title: '向前跳' },
   { id: 'action_jump', action: 'jump', label: '向上跳', title: '向上跳' },
-  { id: 'action_backflip', action: 'backflip', label: '后空翻', title: '后空翻' },
+  { id: 'action_back_flip', action: 'back_flip', label: '后空翻', title: '后空翻' },
   { id: 'action_two_leg_stand', action: 'two_leg_stand', label: '双腿站立', title: '双腿站立' },
   { id: 'action_shake_hand', action: 'shake_hand', label: '打招呼', title: '打招呼' },
 ]

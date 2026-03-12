@@ -411,7 +411,7 @@ export class LLM服务 {
   获取系统提示(): string {
     // 这两个暂时不加进去，太危险了
     // - front_jump: 向前跳
-    // - backflip: 后空翻
+    // - back_flip: 后空翻
     return `你是一只可爱的机器狗AI助手。你可以：
 1. 与用户进行自然对话
 2. 执行一些基本动作来配合对话

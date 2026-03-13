@@ -7,6 +7,7 @@ import { logger } from '../../core/logger';
 export interface StreamingASROptions {
   model?: string;
   sampleRate?: number;
+  channels?: number;
   format?: 'pcm' | 'opus';
 }
 
@@ -20,6 +21,7 @@ export class AliyunStreamingASR {
   private closed = false;
   private taskStarted = false;
   private finalText = '';
+  private latestText = '';
   private audioQueue: Buffer[] = [];
   private isProcessingQueue = false;
   private options: Required<StreamingASROptions>;
@@ -29,11 +31,52 @@ export class AliyunStreamingASR {
   private startTimeout?: NodeJS.Timeout;
   private finishTimeout?: NodeJS.Timeout;
 
+  /**
+   * 兼容不同返回结构提取文本
+   */
+  private extractTextFromMessage(msg: any): { text: string; sentenceEnd: boolean } {
+    const output = msg?.payload?.output;
+    const sentence = output?.sentence;
+
+    if (sentence && typeof sentence.text === 'string' && sentence.text.trim()) {
+      return { text: sentence.text.trim(), sentenceEnd: Boolean(sentence.sentence_end) };
+    }
+
+    if (typeof output?.text === 'string' && output.text.trim()) {
+      return { text: output.text.trim(), sentenceEnd: Boolean(output?.sentence_end) };
+    }
+
+    if (Array.isArray(output?.sentences) && output.sentences.length > 0) {
+      const last = output.sentences[output.sentences.length - 1];
+      const text = typeof last?.text === 'string' ? last.text.trim() : '';
+      if (text) {
+        return { text, sentenceEnd: Boolean(last?.sentence_end) };
+      }
+    }
+
+    if (typeof msg?.payload?.result === 'string' && msg.payload.result.trim()) {
+      return { text: msg.payload.result.trim(), sentenceEnd: true };
+    }
+
+    return { text: '', sentenceEnd: false };
+  }
+
+  private mergeFinalText(text: string): void {
+    if (!text) return;
+    if (!this.finalText) {
+      this.finalText = text;
+      return;
+    }
+    if (this.finalText.includes(text)) return;
+    this.finalText = `${this.finalText}${text}`;
+  }
+
   constructor(options?: StreamingASROptions) {
     this.taskId = crypto.randomUUID();
     this.options = {
       model: options?.model || 配置.asr.aliyun?.model || 'fun-asr-realtime',
       sampleRate: options?.sampleRate || 16000,
+      channels: options?.channels || 1,
       format: options?.format || 'pcm',
     };
   }
@@ -220,19 +263,23 @@ export class AliyunStreamingASR {
           break;
 
         case 'result-generated':
-          // 提取识别结果
-          if (msg.payload?.output?.sentence?.text) {
-            const text = msg.payload.output.sentence.text;
-            logger.info('[流式ASR] 识别结果', { text });
-            // 如果是句子结束，更新最终文本
-            if (msg.payload.output.sentence.sentence_end) {
-              this.finalText = text;
-              logger.info('[流式ASR] 句子结束，更新最终文本', { finalText: this.finalText });
+          {
+            const { text, sentenceEnd } = this.extractTextFromMessage(msg);
+            if (text) {
+              this.latestText = text;
+              logger.info('[流式ASR] 识别结果', { text, sentenceEnd });
+              if (sentenceEnd) {
+                this.mergeFinalText(text);
+                logger.info('[流式ASR] 句子结束，更新最终文本', { finalText: this.finalText });
+              }
             }
           }
           break;
 
         case 'task-finished':
+          if (!this.finalText && this.latestText) {
+            this.finalText = this.latestText;
+          }
           logger.info('[流式ASR] 任务完成，最终文本', { finalText: this.finalText });
           this.cleanup();
           this.settleSuccess(this.finalText.trim());
@@ -273,8 +320,10 @@ export class AliyunStreamingASR {
         this.ws.send(chunk);
         // logger.log('[流式ASR] 发送音频块，大小:', chunk.length, '剩余队列:', this.audioQueue.length);
 
-        // 控制发送速率（每 100ms 约 3200 字节，因此延迟约 20ms）
-        await new Promise(resolve => setTimeout(resolve, 20));
+        // 按真实音频时长限速，避免发送过快导致识别质量下降
+        const bytesPerSecond = this.options.sampleRate * this.options.channels * 2;
+        const durationMs = Math.max(10, Math.round((chunk.length / bytesPerSecond) * 1000));
+        await new Promise(resolve => setTimeout(resolve, durationMs));
       } catch (err) {
         logger.error('[流式ASR] 发送音频块失败', err as Error);
         this.cleanup();

@@ -12,18 +12,23 @@ import { ElMessage } from 'element-plus'
 import { ref } from 'vue'
 
 const SAMPLE_RATE = 16000
-const FRAME_DURATION_MS = 100 // 每 100ms 发送一帧
+const FRAME_DURATION_MS = 20
+// 与手机端保持一致：每次上送约 3200 字节 PCM 数据
+const TARGET_CHUNK_BYTES = 3200
 
 type SendAudioMessage = (message: any) => void
 
-/** PCM Float32 → Int16 数组 → base64 */
-function float32ToBase64PCM(float32: Float32Array): string {
+/** PCM Float32 -> Int16 little-endian 字节流 */
+function float32ToPCMBytes(float32: Float32Array): Uint8Array {
   const int16 = new Int16Array(float32.length)
   for (let i = 0; i < float32.length; i++) {
     const s = Math.max(-1, Math.min(1, float32[i]))
     int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
   }
-  const bytes = new Uint8Array(int16.buffer)
+  return new Uint8Array(int16.buffer)
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = ''
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i])
@@ -34,12 +39,28 @@ function float32ToBase64PCM(float32: Float32Array): string {
 /** 下采样：从原始采样率降到目标采样率 */
 function downsample(buffer: Float32Array, fromRate: number, toRate: number): Float32Array {
   if (fromRate === toRate) return buffer
+  if (fromRate < toRate) {
+    // 仅支持降采样，避免上采样引入伪信号
+    return buffer
+  }
   const ratio = fromRate / toRate
   const newLength = Math.round(buffer.length / ratio)
   const result = new Float32Array(newLength)
-  for (let i = 0; i < newLength; i++) {
-    const idx = Math.round(i * ratio)
-    result[i] = buffer[Math.min(idx, buffer.length - 1)]
+  let offsetResult = 0
+  let offsetBuffer = 0
+
+  // 使用区间平均法，保留语音主频信息，降低混叠失真
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio)
+    let accum = 0
+    let count = 0
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i]
+      count++
+    }
+    result[offsetResult] = count > 0 ? (accum / count) : 0
+    offsetResult++
+    offsetBuffer = nextOffsetBuffer
   }
   return result
 }
@@ -61,6 +82,8 @@ export function useAudioRecorder(
   let sourceNode: MediaStreamAudioSourceNode | null = null
   let sessionId = ''
   let seq = 0
+  let pcmQueue: Uint8Array[] = []
+  let pcmQueueSize = 0
 
   const startRecording = async () => {
     if (isRecording.value) return
@@ -74,9 +97,10 @@ export function useAudioRecorder(
       mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: SAMPLE_RATE,
-          echoCancellation: true,
-          noiseSuppression: true,
+          // 浏览器内置增强会显著影响 ASR，统一关闭
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
         },
       })
     } catch (e: any) {
@@ -91,7 +115,8 @@ export function useAudioRecorder(
     }
 
     try {
-      audioContext = new AudioContext({ sampleRate: SAMPLE_RATE })
+      // 使用硬件采样率采集，再统一降采样到 16k
+      audioContext = new AudioContext()
       sourceNode = audioContext.createMediaStreamSource(mediaStream)
 
       // 使用 ScriptProcessorNode 采集 PCM 数据（bufferSize = 采样率 * 帧时长）
@@ -120,14 +145,31 @@ export function useAudioRecorder(
         const inputData = event.inputBuffer.getChannelData(0)
         // 下采样到目标采样率（AudioContext 可能使用硬件原始采样率）
         const resampled = downsample(inputData, audioContext!.sampleRate, SAMPLE_RATE)
-        const base64 = float32ToBase64PCM(resampled)
-        sendMessage({
-          type: 'audio_chunk',
-          robotId: robotId(),
-          timestamp: Date.now(),
-          // TODO: 后续替换 format 为 opus
-          data: { format: 'pcm', sampleRate: SAMPLE_RATE, channels: 1, sessionId, seq: seq++, frameDurationMs: FRAME_DURATION_MS, buffer: base64 },
-        })
+        const bytes = float32ToPCMBytes(resampled)
+        pcmQueue.push(bytes)
+        pcmQueueSize += bytes.length
+
+        while (pcmQueueSize >= TARGET_CHUNK_BYTES) {
+          const merged = new Uint8Array(pcmQueueSize)
+          let offset = 0
+          for (const chunk of pcmQueue) {
+            merged.set(chunk, offset)
+            offset += chunk.length
+          }
+
+          const frame = merged.slice(0, TARGET_CHUNK_BYTES)
+          const remaining = merged.slice(TARGET_CHUNK_BYTES)
+          pcmQueue = remaining.length > 0 ? [remaining] : []
+          pcmQueueSize = remaining.length
+
+          sendMessage({
+            type: 'audio_chunk',
+            robotId: robotId(),
+            timestamp: Date.now(),
+            // TODO: 后续替换 format 为 opus
+            data: { format: 'pcm', sampleRate: SAMPLE_RATE, channels: 1, sessionId, seq: seq++, frameDurationMs: FRAME_DURATION_MS, buffer: bytesToBase64(frame) },
+          })
+        }
       }
 
       sourceNode.connect(scriptProcessor)
@@ -142,6 +184,23 @@ export function useAudioRecorder(
     if (!isRecording.value) return
     isRecording.value = false
 
+    // 先发尾包，再发结束消息，避免后端先结束会话导致尾包丢失
+    if (pcmQueueSize > 0) {
+      const merged = new Uint8Array(pcmQueueSize)
+      let offset = 0
+      for (const chunk of pcmQueue) {
+        merged.set(chunk, offset)
+        offset += chunk.length
+      }
+
+      sendMessage({
+        type: 'audio_chunk',
+        robotId: robotId(),
+        timestamp: Date.now(),
+        data: { format: 'pcm', sampleRate: SAMPLE_RATE, channels: 1, sessionId, seq: seq++, frameDurationMs: FRAME_DURATION_MS, buffer: bytesToBase64(merged) },
+      })
+    }
+
     // 发送音频结束消息
     if (sessionId) {
       sendMessage({
@@ -152,7 +211,10 @@ export function useAudioRecorder(
       })
       sessionId = ''
     }
+
     seq = 0
+    pcmQueue = []
+    pcmQueueSize = 0
     cleanup()
   }
 
@@ -174,6 +236,8 @@ export function useAudioRecorder(
       mediaStream.getTracks().forEach(t => t.stop())
       mediaStream = null
     }
+    pcmQueue = []
+    pcmQueueSize = 0
     isRecording.value = false
   }
 

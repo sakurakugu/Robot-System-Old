@@ -95,7 +95,7 @@ export interface AudioChunk {
 }
 
 export interface AudioStart {
-  format: 'opus';
+  format: 'opus' | 'pcm';
   sampleRate: 16000 | 48000;
   channels: 1 | 2;
   frameDurationMs: number;

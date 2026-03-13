@@ -261,6 +261,7 @@ class 语音识别服务 {
       let closed = false;
       let taskStarted = false;
       let finalText = '';
+      let latestText = '';
       const chunkSize = 3200; // 每次发送 3200 字节（约 100ms 的 16kHz 16bit PCM 音频）
       let currentOffset = 0;
       const timeout = setTimeout(() => {
@@ -275,6 +276,33 @@ class 语音识别服务 {
         try {
           ws.close();
         } catch { }
+      };
+
+      const extractTextFromMessage = (msg: any): { text: string; sentenceEnd: boolean } => {
+        const output = msg?.payload?.output;
+        const sentence = output?.sentence;
+
+        if (sentence && typeof sentence.text === 'string' && sentence.text.trim()) {
+          return { text: sentence.text.trim(), sentenceEnd: Boolean(sentence.sentence_end) };
+        }
+
+        if (typeof output?.text === 'string' && output.text.trim()) {
+          return { text: output.text.trim(), sentenceEnd: Boolean(output?.sentence_end) };
+        }
+
+        if (Array.isArray(output?.sentences) && output.sentences.length > 0) {
+          const last = output.sentences[output.sentences.length - 1];
+          const text = typeof last?.text === 'string' ? last.text.trim() : '';
+          if (text) {
+            return { text, sentenceEnd: Boolean(last?.sentence_end) };
+          }
+        }
+
+        if (typeof msg?.payload?.result === 'string' && msg.payload.result.trim()) {
+          return { text: msg.payload.result.trim(), sentenceEnd: true };
+        }
+
+        return { text: '', sentenceEnd: false };
       };
 
       // 分块发送音频数据（二进制格式）
@@ -360,19 +388,23 @@ class 语音识别服务 {
               break;
 
             case 'result-generated':
-              // 提取识别结果
-              if (msg.payload?.output?.sentence?.text) {
-                const text = msg.payload.output.sentence.text;
-                logger.info('[阿里云ASR] 识别结果', { text });
-                // 如果是句子结束（sentence_end 为 true），更新 finalText
-                if (msg.payload.output.sentence.sentence_end) {
-                  finalText = text;
-                  logger.info('[阿里云ASR] 句子结束，更新最终文本', { finalText });
+              {
+                const { text, sentenceEnd } = extractTextFromMessage(msg);
+                if (text) {
+                  latestText = text;
+                  logger.info('[阿里云ASR] 识别结果', { text, sentenceEnd });
+                  if (sentenceEnd) {
+                    finalText = finalText && !finalText.includes(text) ? `${finalText}${text}` : (finalText || text);
+                    logger.info('[阿里云ASR] 句子结束，更新最终文本', { finalText });
+                  }
                 }
               }
               break;
 
             case 'task-finished':
+              if (!finalText && latestText) {
+                finalText = latestText;
+              }
               logger.info('[阿里云ASR] 任务完成，最终文本', { finalText });
               cleanup();
               resolve(finalText.trim());

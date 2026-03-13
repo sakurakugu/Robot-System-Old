@@ -28,6 +28,18 @@ interface UIConfig {
   serverUrl: string
 }
 
+// 模块级共享状态，确保不同组件拿到同一套连接与状态
+const wsBusiness = ref<WebSocket | null>(null)
+const wsAudioUpload = ref<WebSocket | null>(null)
+const wsAudioDownload = ref<WebSocket | null>(null)
+
+const isConnected = ref(false)
+const isAudioUploadConnected = ref(false)
+const isAudioDownloadConnected = ref(false)
+
+const robotId = ref('')
+const messageHandlers: MessageHandler[] = []
+
 /** 将 http/https/ws/wss 或纯 host 地址统一转为 ws:// 或 wss:// 前缀 */
 function toWsOrigin(server: string): string {
   if (!server.trim()) {
@@ -105,21 +117,12 @@ function connectSocket(
 }
 
 export function useWebSocket() {
-  const wsBusiness      = ref<WebSocket | null>(null)
-  const wsAudioUpload   = ref<WebSocket | null>(null)
-  const wsAudioDownload = ref<WebSocket | null>(null)
-
-  const isConnected             = ref(false)
-  const isAudioUploadConnected  = ref(false)
-  const isAudioDownloadConnected = ref(false)
-
-  const robotId = ref('')
-  const messageHandlers: MessageHandler[] = []
-
   const dispatchMessage = (data: any) => messageHandlers.forEach(h => h(data))
 
   const onMessage = (handler: MessageHandler) => {
-    messageHandlers.push(handler)
+    if (!messageHandlers.includes(handler)) {
+      messageHandlers.push(handler)
+    }
   }
 
   const closeSocket = (wsRef: { value: WebSocket | null }, connRef: { value: boolean }) => {
@@ -151,13 +154,27 @@ export function useWebSocket() {
     const upPath = '/api/v1/web/audio/upload'
     const upUrl = buildWsUrl(server, upPath, robotId.value)
     connectSocket(upUrl, () => {}) // 上传不需要收消息
-      .then(ws => { wsAudioUpload.value = ws; isAudioUploadConnected.value = true; ws.onclose = () => isAudioUploadConnected.value = false })
+      .then(ws => {
+        wsAudioUpload.value = ws
+        isAudioUploadConnected.value = true
+        ws.onclose = () => {
+          isAudioUploadConnected.value = false
+          wsAudioUpload.value = null
+        }
+      })
       .catch(() => console.error('音频上传通道连接失败'))
 
     const downPath = '/api/v1/web/audio/download'
     const downUrl = buildWsUrl(server, downPath, robotId.value)
     connectSocket(downUrl, dispatchMessage)
-      .then(ws => { wsAudioDownload.value = ws; isAudioDownloadConnected.value = true; ws.onclose = () => isAudioDownloadConnected.value = false })
+      .then(ws => {
+        wsAudioDownload.value = ws
+        isAudioDownloadConnected.value = true
+        ws.onclose = () => {
+          isAudioDownloadConnected.value = false
+          wsAudioDownload.value = null
+        }
+      })
       .catch(() => console.error('音频下载通道连接失败'))
   }
 
@@ -180,7 +197,7 @@ export function useWebSocket() {
   const sendMessage = (message: any) => {
     const type = message?.type
     if (type === 'audio_chunk' || type === 'audio_start' || type === 'audio_end') {
-      if (!wsAudioUpload.value) { console.error('音频上传通道未连接'); return }
+      if (!wsAudioUpload.value || !isAudioUploadConnected.value) { console.error('音频上传通道未连接'); return }
       wsAudioUpload.value.send(JSON.stringify(message))
       return
     }

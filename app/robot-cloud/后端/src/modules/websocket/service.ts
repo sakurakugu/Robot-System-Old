@@ -19,7 +19,7 @@ type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
 type AudioSession = {
   robotId: string;
   sessionId: string;
-  format: 'opus';
+  format: 'opus' | 'pcm';
   sampleRate: number;
   channels: number;
   frameDurationMs: number;
@@ -935,6 +935,7 @@ class WebSocket服务 {
       logger.warn('音频开始缺少sessionId', { robotId });
       return;
     }
+    const format = audioData?.format === 'pcm' ? 'pcm' : 'opus';
     const sampleRate = Number(audioData?.sampleRate || 16000);
     const channels = Number(audioData?.channels || 1);
     const frameDurationMs = Number(audioData?.frameDurationMs || 20);
@@ -962,7 +963,7 @@ class WebSocket服务 {
     const session: AudioSession = {
       robotId,
       sessionId,
-      format: 'opus',
+      format,
       sampleRate,
       channels,
       frameDurationMs,
@@ -981,6 +982,7 @@ class WebSocket服务 {
         const streamingASR = new AliyunStreamingASR({
           model: asrOptions.model,
           sampleRate,
+          channels,
           format: 'pcm',
         });
 
@@ -992,26 +994,29 @@ class WebSocket服务 {
 
         session.streamingASR = streamingASR;
 
-        // 创建 Opus 解码器用于实时解码
-        const sr = sampleRate === 16000 || sampleRate === 48000 ? sampleRate : 16000;
-        const ch = channels === 2 ? 2 : 1;
-        try {
-          session.opusDecoder = new (OpusScript as any)(
-            sr,
-            ch,
-            (OpusScript as any).Application.VOIP
-          );
-          // 初始化 PCM 缓冲区
-          session.pcmBuffer = [];
-          session.pcmBufferSize = 0;
-          logger.debug('Opus 解码器初始化成功', { robotId, sessionId, sampleRate: sr, channels: ch });
-        } catch (error) {
-          logger.error('Opus 解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
-            robotId,
-            sessionId,
-            sampleRate: sr,
-            channels: ch,
-          });
+        // 初始化 PCM 缓冲区（仅 Opus 解码场景使用）
+        session.pcmBuffer = [];
+        session.pcmBufferSize = 0;
+
+        // 仅 Opus 需要解码器
+        if (session.format === 'opus') {
+          const sr = sampleRate === 16000 || sampleRate === 48000 ? sampleRate : 16000;
+          const ch = channels === 2 ? 2 : 1;
+          try {
+            session.opusDecoder = new (OpusScript as any)(
+              sr,
+              ch,
+              (OpusScript as any).Application.VOIP
+            );
+            logger.debug('Opus 解码器初始化成功', { robotId, sessionId, sampleRate: sr, channels: ch });
+          } catch (error) {
+            logger.error('Opus 解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
+              robotId,
+              sessionId,
+              sampleRate: sr,
+              channels: ch,
+            });
+          }
         }
       } catch (error: any) {
         logger.error('流式 ASR 初始化失败', error, { robotId, sessionId });
@@ -1022,6 +1027,7 @@ class WebSocket服务 {
     logger.debug('音频会话开始', {
       robotId,
       sessionId,
+      format,
       sampleRate,
       channels,
       frameDurationMs,
@@ -1045,7 +1051,7 @@ class WebSocket服务 {
       session = {
         robotId,
         sessionId: fallbackSessionId,
-        format: 'opus',
+        format: audioData?.format === 'pcm' ? 'pcm' : 'opus',
         sampleRate: Number(audioData?.sampleRate || 16000),
         channels: Number(audioData?.channels || 1),
         frameDurationMs: Number(audioData?.frameDurationMs || 20),
@@ -1072,57 +1078,51 @@ class WebSocket服务 {
         session.chunks.push(chunk);
         session.lastChunkAt = Date.now();
 
-        // 如果启用了流式 ASR，立即解码并累积
-        if (session.streamingASR && session.opusDecoder) {
+        // 如果启用了流式 ASR，实时推送 PCM 数据
+        if (session.streamingASR) {
           try {
             const sr = session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000;
-            const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
-            const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
-            const frameSize = Math.floor((sr * fd) / 1000);
+            if (session.format === 'pcm') {
+              // PCM 模式实时直推，不再做二次缓冲
+              session.streamingASR.pushAudio(chunk);
+            } else if (session.opusDecoder) {
+              const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
+              const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
+              const frameSize = Math.floor((sr * fd) / 1000);
 
-            // 解码 Opus 为 PCM（Int16Array）
-            const pcmData = session.opusDecoder.decode(chunk, frameSize);
-            if (pcmData && pcmData.length > 0) {
-              // 正确转换 Int16Array 为 Buffer
-              const pcmBuffer = Buffer.from(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
-
-              // 累积到缓冲区
-              session.pcmBuffer = session.pcmBuffer || [];
-              session.pcmBuffer.push(pcmBuffer);
-              session.pcmBufferSize = (session.pcmBufferSize || 0) + pcmBuffer.length;
-
-              // 当累积到约 100ms（3200 字节）时，批量发送
-              const targetSize = Math.floor((sr * 2 * 100) / 1000); // 100ms 的字节数
-              if (session.pcmBufferSize >= targetSize) {
-                const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
-                session.streamingASR.pushAudio(mergedBuffer);
-                session.pcmBuffer = [];
-                session.pcmBufferSize = 0;
-
-                logger.debug('批量推送 PCM 到流式 ASR', {
-                  robotId,
-                  sessionId,
-                  pcmSize: mergedBuffer.length,
-                  framesCount: session.pcmBuffer.length,
-                });
+              // 解码 Opus 为 PCM（Int16Array）
+              const pcmData = session.opusDecoder.decode(chunk, frameSize);
+              if (pcmData && pcmData.length > 0) {
+                const pcmBuffer = Buffer.from(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
+                session.pcmBuffer = session.pcmBuffer || [];
+                session.pcmBuffer.push(pcmBuffer);
+                session.pcmBufferSize = (session.pcmBufferSize || 0) + pcmBuffer.length;
               }
+            }
 
-              logger.debug('音频块已解码', {
+            if (session.format !== 'pcm' && (session.pcmBufferSize || 0) > 0) {
+              const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
+              session.streamingASR.pushAudio(mergedBuffer);
+              session.pcmBuffer = [];
+              session.pcmBufferSize = 0;
+
+              logger.debug('实时推送 PCM 到流式 ASR', {
                 robotId,
                 sessionId,
-                opusSize: chunk.length,
-                pcmSize: pcmBuffer.length,
+                format: session.format,
+                pcmSize: mergedBuffer.length,
                 asrStatus: session.streamingASR.getStatus(),
               });
             }
           } catch (error) {
-            logger.warn('实时解码音频块失败', {
+            logger.warn('实时处理音频块失败', {
               robotId,
               sessionId,
+              format: session.format,
               chunkLength: chunk.length,
               error: String(error),
             });
-            // 解码失败不影响整体流程，会在 handleAudioEnd 时使用降级方案
+            // 实时处理失败不影响整体流程，会在 handleAudioEnd 时使用降级方案
           }
         }
       } else {
@@ -1202,7 +1202,13 @@ class WebSocket服务 {
       // 如果流式 ASR 没有结果（未启用或失败），使用原来的批量处理方式
       if (!text.trim()) {
         logger.info('使用批量 ASR 处理', { robotId, sessionId });
-        const wavBuffer = this.decodeOpusChunksToWav(session);
+        const wavBuffer = session.format === 'pcm'
+          ? this.buildWavBuffer(
+            Buffer.concat(validChunks as any),
+            session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000,
+            session.channels === 2 ? 2 : 1,
+          )
+          : this.decodeOpusChunksToWav(session);
 
         // 使用配置好的 ASR 选项
         const asrOptions = session.asrOptions || {};

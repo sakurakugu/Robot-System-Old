@@ -887,6 +887,7 @@ class WebSocket服务 {
         x: data?.x,
         y: data?.y,
         speed: data?.speed,
+        joystick: data?.joystick,
       };
 
       const sent = this.sendToRobot(robotId, {

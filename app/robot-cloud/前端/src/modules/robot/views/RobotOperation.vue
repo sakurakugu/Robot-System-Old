@@ -75,7 +75,7 @@
             <el-slider
               v-model="speed"
               :min="1"
-              :max="10"
+              :max="30"
               size="small"
             />
           </div>
@@ -283,13 +283,13 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import ChatView from '@/modules/conversation/views/ChatView.vue'
 import ActionButton from '@/modules/robot/components/ActionButton.vue'
 import {
-    Back,
-    Camera,
-    Cellphone,
-    ChatLineSquare,
-    Setting,
-    SwitchButton,
-    VideoCamera
+  Back,
+  Camera,
+  Cellphone,
+  ChatLineSquare,
+  Setting,
+  SwitchButton,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot, Mic, MicOff } from 'lucide-vue-next'
@@ -535,68 +535,77 @@ const handleSdkModeChange = (value: boolean) => {
 }
 
 type JoystickPayload = { x: number; y: number }
+type EffectiveControlMode = 'move' | 'pose' | 'two_leg'
 
-const sendJoystick = (channel: 'move' | 'look' | 'pose', payload: JoystickPayload) => {
+const joystickAxes = ref<[number, number, number, number]>([0, 0, 0, 0])
+
+const getEffectiveMode = (modeOverride?: 'move' | 'pose'): EffectiveControlMode => {
+  if (twoLegStandActive.value) return 'two_leg'
+  const currentMode: 'move' | 'pose' = controlMode.value === 'pose' ? 'pose' : 'move'
+  return modeOverride || currentMode
+}
+
+const sendMergedJoystick = (effectiveMode: EffectiveControlMode) => {
   if (layoutEditMode.value) return
   if (!isConnected.value) return
-  const effectiveMode = twoLegStandActive.value ? 'two_leg' : controlMode.value
   wsSendMessage({
     type: 'control_input',
     robotId: robotId.value,
     timestamp: Date.now(),
     data: {
       command: 'joystick',
-      channel,
-      x: payload.x,
-      y: payload.y,
+      mode: effectiveMode,
       speed: speed.value,
-      mode: effectiveMode,
-    },
-  })
-}
-
-const stopJoystick = (channel: 'move' | 'look' | 'pose', modeOverride?: 'move' | 'pose') => {
-  if (layoutEditMode.value) return
-  if (!isConnected.value) return
-  const effectiveMode = twoLegStandActive.value ? 'two_leg' : (modeOverride || controlMode.value)
-  wsSendMessage({
-    type: 'control_input',
-    robotId: robotId.value,
-    timestamp: Date.now(),
-    data: {
-      command: 'joystick_stop',
-      channel,
-      mode: effectiveMode,
+      joystick: joystickAxes.value,
     },
   })
 }
 
 const onMoveJoystick = (payload: JoystickPayload) => {
   if (controlMode.value === 'pose' && !twoLegStandActive.value) return
-  sendJoystick('move', payload)
+  const effectiveMode = getEffectiveMode()
+  joystickAxes.value[0] = payload.x
+  joystickAxes.value[1] = payload.y
+  if (effectiveMode === 'two_leg') {
+    joystickAxes.value[2] = 0
+    joystickAxes.value[3] = 0
+  }
+  sendMergedJoystick(effectiveMode)
 }
 
 const onLookJoystick = (payload: JoystickPayload) => {
   if (rightJoystickDisabled.value) return
-  if (controlMode.value === 'pose') {
-    sendJoystick('pose', payload)
-    return
+  const effectiveMode = getEffectiveMode(controlMode.value === 'pose' ? 'pose' : 'move')
+  if (effectiveMode === 'pose') {
+    // 姿态模式：垂直轴→俯仰(Axis2)，水平轴→横滚(Axis3)
+    joystickAxes.value[2] = payload.x
+    joystickAxes.value[3] = payload.y
+  } else {
+    // 移动模式：水平轴(y)→偏航(Axis2)，垂直轴不使用
+    joystickAxes.value[2] = payload.y
+    joystickAxes.value[3] = 0
   }
-  sendJoystick('look', payload)
+  sendMergedJoystick(effectiveMode)
 }
 
 const onMoveJoystickEnd = () => {
   if (controlMode.value === 'pose' && !twoLegStandActive.value) return
-  stopJoystick('move')
+  const effectiveMode = getEffectiveMode()
+  if (effectiveMode === 'two_leg') {
+    joystickAxes.value = [0, 0, 0, 0]
+  } else {
+    joystickAxes.value[0] = 0
+    joystickAxes.value[1] = 0
+  }
+  sendMergedJoystick(effectiveMode)
 }
 
 const onLookJoystickEnd = () => {
   if (rightJoystickDisabled.value) return
-  if (controlMode.value === 'pose') {
-    stopJoystick('pose')
-    return
-  }
-  stopJoystick('look')
+  const effectiveMode = getEffectiveMode(controlMode.value === 'pose' ? 'pose' : 'move')
+  joystickAxes.value[2] = 0
+  joystickAxes.value[3] = 0
+  sendMergedJoystick(effectiveMode)
 }
 
 const openSettings = () => {
@@ -665,7 +674,7 @@ const saveLayout = async () => {
     })
     ElMessage.success('布局已保存')
     layoutEditMode.value = false
-  } catch (e) {
+  } catch {
     ElMessage.error('布局保存失败')
   }
 }
@@ -749,12 +758,9 @@ onMessage((data) => {
 
 // Watchers
 watch(controlMode, (val) => {
-  if (val === 'pose') {
-    stopJoystick('move', 'move')
-    stopJoystick('look', 'move')
-  } else {
-    stopJoystick('pose', 'pose')
-  }
+  joystickAxes.value = [0, 0, 0, 0]
+  const nextMode: EffectiveControlMode = val === 'pose' ? 'pose' : 'move'
+  sendMergedJoystick(nextMode)
 })
 
 watch(selectedUuid, async (val) => {
@@ -774,7 +780,7 @@ watch(selectedUuid, async (val) => {
           data: {},
         })
       }
-    } catch (e) {
+    } catch {
       ElMessage.error('连接失败，请检查后端服务或网络')
     }
   }

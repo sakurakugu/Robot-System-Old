@@ -13,11 +13,11 @@ init = colorama.init
 Fore = colorama.Fore
 init(autoreset=True)
 
-DOG_IP       = "192.168.5.111"
+DOG_IP       = "192.168.1.108"
 SEND_PORT    = 8081
 LISTEN_PORT  = 8080
-# DATA_PACKAGE = json.dumps({"type": "heartbeat", "heartbeat": 1}).encode()
-DATA_PACKAGE = json.dumps({"type": "cmd", "cmd": 4}).encode()
+DATA_PACKAGE = json.dumps({"type": "heartbeat", "heartbeat": 1}).encode()
+# DATA_PACKAGE = json.dumps({"type": "cmd", "cmd": 4}).encode()
 
 
 def _read_pcap_packets(pcap_path: Path):

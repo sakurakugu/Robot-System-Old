@@ -203,6 +203,7 @@ export interface ControlInputMessage {
     x?: number;
     y?: number;
     speed?: number;
+    joystick?: number[];
   };
 }
 

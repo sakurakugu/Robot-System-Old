@@ -141,3 +141,37 @@ export interface ApiResponse<T = any> {
   message?: string
   data?: T
 }
+
+export interface SubmitFeedbackDTO {
+  content: string
+}
+
+export type FeedbackStatus = 'pending' | 'processing' | 'resolved'
+
+export interface FeedbackItem {
+  id: string
+  content: string
+  client_type: string
+  device_name: string
+  user_id: string | null
+  status: FeedbackStatus
+  handled_by: string | null
+  handled_at: string | null
+  created_at: string
+  updated_at: string
+  username: string | null
+  handled_by_username: string | null
+}
+
+export interface FeedbackListResult {
+  items: FeedbackItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface FeedbackListQuery {
+  limit?: number
+  offset?: number
+  status?: FeedbackStatus
+}

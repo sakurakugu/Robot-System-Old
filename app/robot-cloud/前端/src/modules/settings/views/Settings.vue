@@ -62,6 +62,12 @@
             >
               保存
             </el-button>
+            <el-button
+              style="margin-left: 12px"
+              @click="openFeedbackDialog"
+            >
+              反馈
+            </el-button>
             <el-text
               v-if="saved"
               type="success"
@@ -73,12 +79,43 @@
         </el-form>
       </el-card>
     </div>
+
+    <el-dialog
+      v-model="feedbackDialogVisible"
+      title="提交反馈"
+      width="520px"
+      destroy-on-close
+    >
+      <el-input
+        v-model="feedbackContent"
+        type="textarea"
+        :rows="6"
+        maxlength="1000"
+        show-word-limit
+        placeholder="请输入反馈内容"
+      />
+      <template #footer>
+        <el-button @click="feedbackDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="feedbackSubmitting"
+          :disabled="!feedbackContent.trim()"
+          @click="handleSubmitFeedback"
+        >
+          提交
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
+import { submitFeedback } from '@/modules/settings/api'
 import { Select, Tools } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 
 const formData = ref({})
@@ -86,6 +123,9 @@ const theme = ref<'system' | 'dark' | 'light'>('system')
 const language = ref<'zh-CN' | 'en-US'>('zh-CN')
 const fontSize = ref<'small' | 'medium' | 'large'>('medium')
 const saved = ref(false)
+const feedbackDialogVisible = ref(false)
+const feedbackContent = ref('')
+const feedbackSubmitting = ref(false)
 
 onMounted(() => {
   theme.value = (localStorage.getItem('rc_theme') as any) || 'system'
@@ -99,6 +139,29 @@ const save = () => {
   localStorage.setItem('rc_fontSize', fontSize.value)
   saved.value = true
   setTimeout(() => (saved.value = false), 1200)
+}
+
+const openFeedbackDialog = () => {
+  feedbackContent.value = ''
+  feedbackDialogVisible.value = true
+}
+
+const handleSubmitFeedback = async () => {
+  const content = feedbackContent.value.trim()
+  if (!content || feedbackSubmitting.value) {
+    return
+  }
+  feedbackSubmitting.value = true
+  try {
+    await submitFeedback({ content })
+    ElMessage.success('反馈提交成功')
+    feedbackDialogVisible.value = false
+    feedbackContent.value = ''
+  } catch (error: any) {
+    ElMessage.error(error?.message || '反馈提交失败')
+  } finally {
+    feedbackSubmitting.value = false
+  }
 }
 </script>
 

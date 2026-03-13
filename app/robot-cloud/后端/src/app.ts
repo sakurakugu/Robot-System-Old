@@ -9,6 +9,9 @@ import { AccountService } from './modules/account/service';
 import { KnowledgeController } from './modules/knowledge/controller';
 import { createKnowledgeRoutes } from './modules/knowledge/routes';
 import { KnowledgeService } from './modules/knowledge/service';
+import { 反馈控制器 } from './modules/反馈/controller';
+import { createFeedbackRoutes } from './modules/反馈/routes';
+import { 反馈服务 } from './modules/反馈/service';
 import WebSocketService from './modules/websocket/service';
 import { 对话服务 } from './modules/大模型交互/chat-service';
 import { 对话控制器 } from './modules/大模型交互/controller';
@@ -52,6 +55,7 @@ export class 应用程序 {
   private 机器人包服务: 机器人包服务;
   private 账号服务: AccountService;
   private 知识库服务: KnowledgeService;
+  private 反馈服务: 反馈服务;
 
   // 控制器实例
   private 机器人控制器: 机器人控制器;
@@ -64,6 +68,7 @@ export class 应用程序 {
   private 机器人包控制器: 机器人包控制器;
   private 账号控制器: AccountController;
   private 知识库控制器: KnowledgeController;
+  private 反馈控制器: 反馈控制器;
 
   constructor() {
     this.应用 = express();
@@ -82,6 +87,7 @@ export class 应用程序 {
     this.机器人包服务 = new 机器人包服务(this.数据库);
     this.账号服务 = new AccountService(this.数据库);
     this.知识库服务 = new KnowledgeService(this.数据库);
+    this.反馈服务 = new 反馈服务(this.数据库);
 
     // 初始化控制器
     this.机器人控制器 = new 机器人控制器(this.机器人服务);
@@ -94,6 +100,7 @@ export class 应用程序 {
     this.机器人包控制器 = new 机器人包控制器(this.机器人包服务);
     this.账号控制器 = new AccountController(this.账号服务);
     this.知识库控制器 = new KnowledgeController(this.知识库服务);
+    this.反馈控制器 = new 反馈控制器(this.反馈服务);
 
     // 加载持久化配置
     this.加载持久化配置();
@@ -179,6 +186,9 @@ export class 应用程序 {
       manage: requireRole('admin', 'super_admin'),
     }));
     路由器.use('/knowledge', createKnowledgeRoutes(this.知识库控制器));
+    路由器.use('/feedback', createFeedbackRoutes(this.反馈控制器, {
+      manage: requireRole('admin', 'super_admin'),
+    }));
     路由器.use('/', createSystemRoutes(this.数据库, this.WebSocket服务));
 
     // 兼容旧路由
@@ -199,4 +209,3 @@ export class 应用程序 {
     });
   }
 }
-

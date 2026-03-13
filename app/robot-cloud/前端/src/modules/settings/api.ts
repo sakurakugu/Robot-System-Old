@@ -5,11 +5,16 @@ import type {
     AIConfig,
     ApiResponse,
     AppVersionInfo,
+    FeedbackItem,
+    FeedbackListQuery,
+    FeedbackListResult,
+    FeedbackStatus,
     LLMConfig,
     LLMProvider,
     NetworkInfo,
     ReleaseChannel,
     RobotPackageInfo,
+    SubmitFeedbackDTO,
     SystemStatus,
     UIConfig,
     UpdateAIConfigDTO,
@@ -64,6 +69,24 @@ export function getUIConfig() {
  */
 export function updateUIConfig(data: UpdateUIConfigDTO) {
   return http.put<ApiResponse>('/api/v1/config/ui', data)
+}
+
+export function submitFeedback(data: SubmitFeedbackDTO) {
+  return http.post<ApiResponse<{ id: string }>>('/api/v1/feedback', data)
+}
+
+export function getFeedbackList(query?: FeedbackListQuery) {
+  return http.get<ApiResponse<FeedbackListResult>>('/api/v1/feedback', {
+    params: query,
+  })
+}
+
+export function getFeedbackDetail(id: string) {
+  return http.get<ApiResponse<FeedbackItem>>(`/api/v1/feedback/${id}`)
+}
+
+export function updateFeedbackStatus(id: string, status: FeedbackStatus) {
+  return http.patch<ApiResponse<FeedbackItem>>(`/api/v1/feedback/${id}/status`, { status })
 }
 
 /**

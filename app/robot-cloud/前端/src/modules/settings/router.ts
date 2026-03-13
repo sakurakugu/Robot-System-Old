@@ -24,6 +24,16 @@ export const systemRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/feedback-manage',
+    name: 'FeedbackManage',
+    component: () => import('@/modules/settings/views/FeedbackManage.vue'),
+    meta: {
+      title: '反馈管理',
+      icon: 'ChatDotRound',
+      roles: ['admin', 'super_admin'],
+    },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/modules/settings/views/Settings.vue'),

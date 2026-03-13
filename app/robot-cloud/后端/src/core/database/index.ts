@@ -3,6 +3,7 @@ import path from 'path';
 import 配置 from '../../config';
 import type { AccountRole, UserRecord, UserSessionRecord } from '../../modules/account/types';
 import type { KnowledgeEntryRecord } from '../../modules/knowledge/types';
+import type { FeedbackListItem, FeedbackStatus } from '../../modules/反馈/types';
 import type { RobotRecord, 机器人状态 } from '../../modules/机器人管理/types';
 import type { RoleRecord } from '../../modules/角色管理/types';
 import type { ActionStatus, ConversationRecord, 对话类型 } from '../../types';
@@ -91,6 +92,23 @@ class 数据库服务 {
       )
     `);
 
+    this.数据库.exec(`
+      CREATE TABLE IF NOT EXISTS feedback_entries (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        client_type TEXT NOT NULL DEFAULT 'unknown',
+        device_name TEXT,
+        user_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'resolved')),
+        handled_by TEXT,
+        handled_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
     // 角色表
     this.数据库.exec(`
       CREATE TABLE IF NOT EXISTS roles (
@@ -175,6 +193,8 @@ class 数据库服务 {
       CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
       CREATE INDEX IF NOT EXISTS idx_knowledge_entries_updated_at ON knowledge_entries(updated_at);
+      CREATE INDEX IF NOT EXISTS idx_feedback_entries_created_at ON feedback_entries(created_at);
+      CREATE INDEX IF NOT EXISTS idx_feedback_entries_user_id ON feedback_entries(user_id);
     `);
 
     // 数据库迁移：添加 is_default 列（如果不存在）
@@ -195,6 +215,11 @@ class 数据库服务 {
     const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
     const hasAsrProvider = tableInfo.some(col => col.name === 'asr_provider');
     const hasAsrModel = tableInfo.some(col => col.name === 'asr_model');
+    const feedbackTableInfo = this.数据库.prepare("PRAGMA table_info(feedback_entries)").all() as Array<{ name: string }>;
+    const hasFeedbackStatus = feedbackTableInfo.some(col => col.name === 'status');
+    const hasFeedbackHandledBy = feedbackTableInfo.some(col => col.name === 'handled_by');
+    const hasFeedbackHandledAt = feedbackTableInfo.some(col => col.name === 'handled_at');
+    const hasFeedbackUpdatedAt = feedbackTableInfo.some(col => col.name === 'updated_at');
 
     if (!hasIsDefault) {
       logger.info('正在迁移数据库：添加 is_default 列...');
@@ -212,7 +237,42 @@ class 数据库服务 {
       this.数据库.exec('ALTER TABLE roles ADD COLUMN asr_model TEXT');
     }
 
-    if (!hasIsDefault || !hasAsrProvider || !hasAsrModel) {
+    if (!hasFeedbackStatus) {
+      logger.info('正在迁移数据库：添加 feedback status 列...');
+      this.数据库.exec("ALTER TABLE feedback_entries ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+    }
+
+    if (!hasFeedbackHandledBy) {
+      logger.info('正在迁移数据库：添加 feedback handled_by 列...');
+      this.数据库.exec('ALTER TABLE feedback_entries ADD COLUMN handled_by TEXT');
+    }
+
+    if (!hasFeedbackHandledAt) {
+      logger.info('正在迁移数据库：添加 feedback handled_at 列...');
+      this.数据库.exec('ALTER TABLE feedback_entries ADD COLUMN handled_at DATETIME');
+    }
+
+    if (!hasFeedbackUpdatedAt) {
+      logger.info('正在迁移数据库：添加 feedback updated_at 列...');
+      this.数据库.exec('ALTER TABLE feedback_entries ADD COLUMN updated_at DATETIME');
+      this.数据库.exec(`
+        UPDATE feedback_entries
+        SET updated_at = COALESCE(created_at, datetime('now'))
+        WHERE updated_at IS NULL
+      `);
+    }
+
+    this.数据库.exec('CREATE INDEX IF NOT EXISTS idx_feedback_entries_status ON feedback_entries(status)');
+
+    if (
+      !hasIsDefault
+      || !hasAsrProvider
+      || !hasAsrModel
+      || !hasFeedbackStatus
+      || !hasFeedbackHandledBy
+      || !hasFeedbackHandledAt
+      || !hasFeedbackUpdatedAt
+    ) {
       logger.info('数据库迁移完成');
     }
 
@@ -852,6 +912,97 @@ move动作支持三种控制方式：
   deleteKnowledgeEntry(id: string): void {
     const stmt = this.数据库.prepare('DELETE FROM knowledge_entries WHERE id = ?');
     stmt.run(id);
+  }
+
+  createFeedbackEntry(data: {
+    id: string;
+    content: string;
+    client_type: string;
+    device_name: string;
+    user_id: string | null;
+  }): void {
+    const stmt = this.数据库.prepare(`
+      INSERT INTO feedback_entries (id, content, client_type, device_name, user_id, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))
+    `);
+    stmt.run(data.id, data.content, data.client_type, data.device_name, data.user_id);
+  }
+
+  listFeedbackEntries(limit = 100, offset = 0, status?: FeedbackStatus): FeedbackListItem[] {
+    if (status) {
+      const stmt = this.数据库.prepare(`
+        SELECT
+          f.*,
+          u.username AS username,
+          hu.username AS handled_by_username
+        FROM feedback_entries f
+        LEFT JOIN users u ON u.id = f.user_id
+        LEFT JOIN users hu ON hu.id = f.handled_by
+        WHERE f.status = ?
+        ORDER BY f.created_at DESC
+        LIMIT ? OFFSET ?
+      `);
+      return stmt.all(status, limit, offset) as FeedbackListItem[];
+    }
+
+    const stmt = this.数据库.prepare(`
+      SELECT
+        f.*,
+        u.username AS username,
+        hu.username AS handled_by_username
+      FROM feedback_entries f
+      LEFT JOIN users u ON u.id = f.user_id
+      LEFT JOIN users hu ON hu.id = f.handled_by
+      ORDER BY f.created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+    return stmt.all(limit, offset) as FeedbackListItem[];
+  }
+
+  getFeedbackEntryById(id: string): FeedbackListItem | null {
+    const stmt = this.数据库.prepare(`
+      SELECT
+        f.*,
+        u.username AS username,
+        hu.username AS handled_by_username
+      FROM feedback_entries f
+      LEFT JOIN users u ON u.id = f.user_id
+      LEFT JOIN users hu ON hu.id = f.handled_by
+      WHERE f.id = ?
+      LIMIT 1
+    `);
+    return (stmt.get(id) as FeedbackListItem | undefined) || null;
+  }
+
+  updateFeedbackEntryStatus(id: string, status: FeedbackStatus, handledBy: string | null): void {
+    if (status === 'pending') {
+      const stmt = this.数据库.prepare(`
+        UPDATE feedback_entries
+        SET status = ?, handled_by = NULL, handled_at = NULL, updated_at = datetime('now')
+        WHERE id = ?
+      `);
+      stmt.run(status, id);
+      return;
+    }
+
+    const stmt = this.数据库.prepare(`
+      UPDATE feedback_entries
+      SET status = ?, handled_by = ?, handled_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `);
+    stmt.run(status, handledBy, id);
+  }
+
+  getFeedbackEntryCount(status?: FeedbackStatus): number {
+    if (status) {
+      const stmt = this.数据库.prepare('SELECT COUNT(1) AS total FROM feedback_entries WHERE status = ?');
+      const row = stmt.get(status) as { total: number } | undefined;
+      return Number(row?.total || 0);
+    }
+
+    const stmt = this.数据库.prepare('SELECT COUNT(1) AS total FROM feedback_entries');
+    const row = stmt.get() as { total: number } | undefined;
+    return Number(row?.total || 0);
   }
 
   // ==================== 工具方法 ====================

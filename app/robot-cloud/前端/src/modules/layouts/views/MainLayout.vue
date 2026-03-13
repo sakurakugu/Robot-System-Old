@@ -104,6 +104,15 @@
             </template>
           </el-menu-item>
           <el-menu-item
+            v-if="authStore.isAdmin"
+            index="/feedback-manage"
+          >
+            <el-icon><ChatDotRound /></el-icon>
+            <template #title>
+              反馈管理
+            </template>
+          </el-menu-item>
+          <el-menu-item
             v-if="authStore.isSuperAdmin"
             index="/users"
           >
@@ -152,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { Collection, DArrowLeft, DArrowRight, Film, List, Monitor, Setting, Tools, UploadFilled, User, UserFilled, VideoPlay } from '@element-plus/icons-vue'
+import { ChatDotRound, Collection, DArrowLeft, DArrowRight, Film, List, Monitor, Setting, Tools, UploadFilled, User, UserFilled, VideoPlay } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/modules/auth/store'
 import { Bot } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
@@ -188,6 +197,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/params')) return '/params'
   if (path.startsWith('/update-manage')) return '/update-manage'
   if (path.startsWith('/kb')) return '/kb'
+  if (path.startsWith('/feedback-manage')) return '/feedback-manage'
   if (path.startsWith('/users')) return '/users'
   if (path.startsWith('/personal')) return '/personal'
   if (path.startsWith('/sessions')) return '/sessions'

@@ -22,18 +22,20 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 type JoystickPayload = { x: number; y: number }
 
 const emit = defineEmits<{
-  (e: 'change', payload: JoystickPayload): void
-  (e: 'end'): void
+  change: [payload: JoystickPayload]
+  end: []
 }>()
 
 const props = withDefaults(
   defineProps<{
     size?: number
     stickSize?: number
+    strictCircleHit?: boolean
   }>(),
   {
     size: 140,
     stickSize: 60,
+    strictCircleHit: false,
   }
 )
 
@@ -85,6 +87,16 @@ const onPointerUp = (event?: PointerEvent) => {
 }
 
 const onPointerDown = (event: PointerEvent) => {
+  if (props.strictCircleHit && padRef.value) {
+    const rect = padRef.value.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const dx = event.clientX - centerX
+    const dy = event.clientY - centerY
+    if (dx * dx + dy * dy > radius.value * radius.value) {
+      return
+    }
+  }
   event.preventDefault()
   event.stopPropagation()
   isActive.value = true

@@ -208,6 +208,7 @@
           <JoystickPad
             class="joystick-pad"
             :class="{ 'is-disabled': layoutEditMode || (controlMode === 'pose' && !twoLegStandActive) }"
+            :strict-circle-hit="true"
             @change="onMoveJoystick"
             @end="onMoveJoystickEnd"
           />
@@ -236,6 +237,7 @@
           <JoystickPad
             class="joystick-pad"
             :class="{ 'is-disabled': layoutEditMode || rightJoystickDisabled }"
+            :strict-circle-hit="true"
             @change="onLookJoystick"
             @end="onLookJoystickEnd"
           />
@@ -281,13 +283,13 @@ import { useWebSocket } from '@/composables/useWebSocket'
 import ChatView from '@/modules/conversation/views/ChatView.vue'
 import ActionButton from '@/modules/robot/components/ActionButton.vue'
 import {
-  Back,
-  Camera,
-  Cellphone,
-  ChatLineSquare,
-  Setting,
-  SwitchButton,
-  VideoCamera
+    Back,
+    Camera,
+    Cellphone,
+    ChatLineSquare,
+    Setting,
+    SwitchButton,
+    VideoCamera
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot, Mic, MicOff } from 'lucide-vue-next'

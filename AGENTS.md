@@ -53,8 +53,6 @@ npm run lint
 npm run typecheck
 ```
 
-确保两条命令均无错误后，才算完成任务。
-
 ---
 
 ## Python 项目
@@ -67,17 +65,10 @@ ruff check .
 mypy . --fix
 ```
 
-确保两条命令均无错误后，才算完成任务。
-
-### 规范
-
-- 使用 Python 3.10+ 语法，善用类型注解。
-- 遵循 `pyproject.toml` 中已配置的 ruff/mypy 规则。
-
 ---
 
 ## 工作流
 
 1. 理解需求后，先阅读相关文件，再进行修改。
-2. 修改完成后，在对应子项目目录执行 lint 和 typecheck。
+2. 修改完成后，在对应子项目目录执行 lint 和 typecheck (为确保防止出现编辑错误)。
 3. 所有回复使用**中文**。

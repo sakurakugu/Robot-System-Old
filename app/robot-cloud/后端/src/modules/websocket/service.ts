@@ -4,7 +4,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import 配置 from '../../config';
 import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
-import { hasVisionTag, isValidRobotId, RateLimiter, removeActionTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
+import { hasVisionTag, isValidRobotId, parseNormalizedTargetPosition, RateLimiter, removeActionTags, removeTargetTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
@@ -533,6 +533,7 @@ class WebSocket服务 {
       const needsVision = hasVisionTag(response.text);
 
       let finalResponse = response;
+      let visionImage: { base64: string; format?: string } | undefined;
 
       if (needsVision) {
         logger.info('检测到视觉识别需求，开始拍照', { robotId });
@@ -557,6 +558,10 @@ class WebSocket服务 {
 
           // 调用拍照功能
           const photoResult = await this.机器人服务.拍照(robotId);
+          visionImage = {
+            base64: photoResult.image,
+            format: photoResult.format || 'jpeg',
+          };
 
           logger.info('拍照成功，开始视觉分析', { robotId });
 
@@ -612,6 +617,7 @@ class WebSocket服务 {
       const processingTime = Date.now() - startTime;
       const ttsText = this.sanitizeTtsText(finalResponse.text);
       const ttsDone = Boolean(ttsText);
+      const targetPosition = parseNormalizedTargetPosition(finalResponse.text);
 
       // 发送文本回复（广播到机器人和所有UI）
       this.broadcastMessage(robotId, {
@@ -623,7 +629,10 @@ class WebSocket服务 {
           text: finalResponse.text,
           ttsDone,
           noTTS: ttsDone ? undefined : true,
+          actions: finalResponse.actions.map(action => action.name),
           vision: needsVision,
+          visionImage,
+          targetPosition,
         },
       }, 'business');
 
@@ -690,7 +699,7 @@ class WebSocket服务 {
       }
 
       // 发送动作指令
-      for (const action of response.actions) {
+      for (const action of finalResponse.actions) {
         this.sendToRobot(robotId, {
           type: 'action_command',
           robotId,
@@ -712,25 +721,27 @@ class WebSocket服务 {
         robot_id: robotId,
         type: inputType,
         user_input: text,
-        ai_response: response.text,
-        actions: response.actions,
+        ai_response: finalResponse.text,
+        actions: finalResponse.actions,
         processing_time: processingTime,
         metadata: {
-          ...response.metadata,
+          ...finalResponse.metadata,
           conversationId: traceId,
           inputType,
           asrTime: audioMeta?.asrTime,
           audioDurationMs: audioMeta?.durationMs,
           audioSessionId: audioMeta?.sessionId,
+          visionImage,
+          targetPosition,
         },
       });
 
       logger.记录对话({
         robotId,
         input: text,
-        output: response.text,
+        output: finalResponse.text,
         processingTime,
-        actions: response.actions,
+        actions: finalResponse.actions,
       });
     } catch (error: any) {
       logger.error('处理文本输入失败', error, { robotId });
@@ -1402,6 +1413,7 @@ class WebSocket服务 {
 
     // 移除视觉标记 {{vision=true}}
     result = removeVisionTags(result);
+    result = removeTargetTags(result);
 
     return result.trim();
   }

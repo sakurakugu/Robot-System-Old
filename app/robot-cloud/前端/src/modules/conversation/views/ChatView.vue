@@ -2,6 +2,17 @@
   <div class="chatview">
     <section class="content">
       <div
+        v-if="visionStatus"
+        class="vision-status-banner"
+      >
+        <el-alert
+          :title="visionStatus.message"
+          :type="visionStatus.alertType"
+          :closable="false"
+          show-icon
+        />
+      </div>
+      <div
         ref="chatArea"
         class="chat-area"
       >
@@ -44,6 +55,21 @@
             </div>
             <div class="message-content">
               {{ msg.text }}
+            </div>
+            <div
+              v-if="msg.imageUrl"
+              class="message-image-wrap"
+            >
+              <img
+                :src="msg.imageUrl"
+                class="message-image"
+                alt="视觉识别图片"
+              >
+              <div
+                v-if="msg.targetPosition"
+                class="target-box"
+                :style="buildTargetBoxStyle(msg.targetPosition)"
+              />
             </div>
             <div
               v-if="msg.actions && msg.actions.length > 0"
@@ -162,15 +188,15 @@
 import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import {
-    ChatDotSquare,
-    Clock,
-    Lightning,
-    Loading,
-    Microphone,
-    Promotion,
-    Select,
-    User,
-    WarningFilled
+  ChatDotSquare,
+  Clock,
+  Lightning,
+  Loading,
+  Microphone,
+  Promotion,
+  Select,
+  User,
+  WarningFilled
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
@@ -184,11 +210,27 @@ type Message = {
   text: string
   timestamp: number
   actions?: string[]
+  imageUrl?: string
+  visionImageBase64?: string
+  visionImageFormat?: string
+  targetPosition?: {
+    label: string
+    cx: number
+    cy: number
+    w: number
+    h: number
+  }
   latency?: number
   sentToRobot?: boolean
   sendingToRobot?: boolean
   audioUrl?: string
   audioDuration?: number
+}
+
+type VisionStatus = {
+  status: 'capturing' | 'analyzing' | 'error' | 'done'
+  message: string
+  alertType: 'info' | 'success' | 'warning' | 'error'
 }
 
 const {
@@ -209,6 +251,7 @@ const inputText = ref('')
 const chatArea = ref<HTMLElement>()
 const messageCount = ref(0)
 const avgLatency = ref(0)
+const visionStatus = ref<VisionStatus | null>(null)
 
 let requestTimestamps = new Map<number, number>()
 
@@ -246,7 +289,7 @@ const connectToRobot = async (uuid?: string) => {
   robotId.value = uuid
   try {
     await wsConnect()
-  } catch (e) {
+  } catch {
     try {
       localStorage.removeItem('rc_server_url')
       await wsConnect()
@@ -397,7 +440,39 @@ const scrollToBottom = async () => {
   }
 }
 
+const clampUnit = (value: number) => Math.max(0, Math.min(1, value))
+
+const buildTargetBoxStyle = (target: NonNullable<Message['targetPosition']>) => {
+  const cx = clampUnit(target.cx)
+  const cy = clampUnit(target.cy)
+  const w = clampUnit(target.w)
+  const h = clampUnit(target.h)
+  return {
+    left: `${cx * 100}%`,
+    top: `${cy * 100}%`,
+    width: `${w * 100}%`,
+    height: `${h * 100}%`,
+    transform: 'translate(-50%, -50%)',
+  }
+}
+
 onMessage((data) => {
+  if (data.type === 'vision_status') {
+    const status = data.data?.status as VisionStatus['status']
+    const alertTypeMap: Record<VisionStatus['status'], VisionStatus['alertType']> = {
+      capturing: 'info',
+      analyzing: 'warning',
+      done: 'success',
+      error: 'error',
+    }
+    const message = data.data?.message || '视觉识别处理中...'
+    visionStatus.value = {
+      status,
+      message,
+      alertType: alertTypeMap[status] || 'info',
+    }
+    return
+  }
   if (data.type === 'asr_transcript') {
     const timestamp = Date.now()
     const asrMessage: Message = {
@@ -414,6 +489,11 @@ onMessage((data) => {
   if (data.type === 'text_response') {
     const timestamp = Date.now()
     let latency: number | undefined
+    const visionImageBase64 = data.data?.visionImage?.base64
+    const visionImageFormat = data.data?.visionImage?.format || 'jpeg'
+    const imageUrl = visionImageBase64
+      ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
+      : undefined
 
     const lastRequestTime = Array.from(requestTimestamps.values()).pop()
     if (lastRequestTime) {
@@ -429,6 +509,10 @@ onMessage((data) => {
       text: data.data.text,
       timestamp,
       actions: data.data.actions,
+      imageUrl,
+      visionImageBase64,
+      visionImageFormat,
+      targetPosition: data.data?.targetPosition,
       latency,
       sentToRobot: false,
       sendingToRobot: true,
@@ -438,6 +522,9 @@ onMessage((data) => {
     scrollToBottom()
 
     aiMessage.sendingToRobot = false
+    if (data.data?.vision) {
+      visionStatus.value = null
+    }
 
     if (!data.data?.noTTS && !data.data?.ttsDone) {
       const m = messages.value.find(mm => mm.id === aiMessage.id)
@@ -493,7 +580,9 @@ onMessage((data) => {
         playRequestId.value = null
         playAudio(url)
       }
-    } catch {}
+    } catch (error) {
+      console.error('处理音频响应失败:', error)
+    }
   } else if (data.type === 'error') {
     if (data.data?.code === 'ASR_ERROR' || String(data.data?.message || '').includes('Opus解码失败')) {
       return
@@ -586,6 +675,10 @@ watch(
   flex-direction: column;
   overflow: hidden;
   background: var(--el-bg-color);
+}
+
+.vision-status-banner {
+  padding: 12px 24px 0;
 }
 
 .chat-area {
@@ -696,6 +789,32 @@ watch(
   line-height: 1.6;
   word-wrap: break-word;
   white-space: pre-wrap;
+}
+
+.message-image-wrap {
+  margin-top: 10px;
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.message-image {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  width: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color);
+}
+
+.target-box {
+  position: absolute;
+  border: 2px solid #ff3b30;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
 .message-actions {

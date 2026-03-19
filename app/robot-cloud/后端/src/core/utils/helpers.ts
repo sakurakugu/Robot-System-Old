@@ -71,6 +71,53 @@ export function hasVisionTag(text: string): boolean {
   return /\{\{\s*vision\s*=\s*true\s*\}\}/i.test(text);
 }
 
+export interface NormalizedTargetPosition {
+  label: string;
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
+}
+
+export function parseNormalizedTargetPosition(text: string): NormalizedTargetPosition | undefined {
+  const toUnit = (value: string): number => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    if (n < 0) return 0;
+    if (n > 1) return 1;
+    return n;
+  };
+  const tagRegex = /\{\{\s*([^}]+)\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = tagRegex.exec(text)) !== null) {
+    const content = match[1];
+    const kv: Record<string, string> = {};
+    const parts = content.split(',').map(item => item.trim()).filter(Boolean);
+    for (const part of parts) {
+      const splitIndex = part.indexOf('=');
+      if (splitIndex <= 0) continue;
+      const key = part.slice(0, splitIndex).trim().toLowerCase();
+      const value = part.slice(splitIndex + 1).trim();
+      kv[key] = value;
+    }
+    if (!(kv.cx && kv.cy && kv.w && kv.h)) {
+      continue;
+    }
+    return {
+      label: kv.target || kv.action || 'target',
+      cx: toUnit(kv.cx),
+      cy: toUnit(kv.cy),
+      w: toUnit(kv.w),
+      h: toUnit(kv.h),
+    };
+  }
+  return undefined;
+}
+
+export function removeTargetTags(text: string): string {
+  return text.replace(/\{\{\s*target\s*=\s*[^}]+\}\}/gi, '').trim();
+}
+
 /**
  * 移除文本中的视觉标记
  */

@@ -14,6 +14,7 @@ export class 动作控制器 {
     'walk_backward',
     'jump',
     'move',
+    'approach_target',
   ]);
 
   // 安全规则
@@ -23,6 +24,7 @@ export class 动作控制器 {
     { action: 'turn_left', maxValue: 720 },
     { action: 'turn_right', maxValue: 720 },
     { action: 'move', maxValue: 5 }, // duration最大5秒
+    { action: 'approach_target', maxValue: 8 },
   ];
 
   // 频率限制器 (每分钟最多10次动作)
@@ -131,6 +133,62 @@ export class 动作控制器 {
               reason: '持续时间不能为负数',
             };
           }
+        }
+
+        if (modified) {
+          return {
+            safe: true,
+            reason: '参数已自动调整到安全范围',
+            sanitizedAction,
+          };
+        }
+      } else if (action.name === 'approach_target') {
+        const sanitizedAction = { ...action, parameters: { ...action.parameters } };
+        let modified = false;
+        const clamp01 = (value: any, key: string) => {
+          const n = Number(value);
+          if (!Number.isFinite(n)) {
+            sanitizedAction.parameters[key] = 0.5;
+            modified = true;
+            return;
+          }
+          if (n < 0) {
+            sanitizedAction.parameters[key] = 0;
+            modified = true;
+            return;
+          }
+          if (n > 1) {
+            sanitizedAction.parameters[key] = 1;
+            modified = true;
+            return;
+          }
+          sanitizedAction.parameters[key] = n;
+        };
+        clamp01(action.parameters.cx, 'cx');
+        clamp01(action.parameters.cy, 'cy');
+        clamp01(action.parameters.w, 'w');
+        clamp01(action.parameters.h, 'h');
+
+        const stopArea = Number(action.parameters.stop_area ?? 0.22);
+        if (!Number.isFinite(stopArea) || stopArea <= 0) {
+          sanitizedAction.parameters.stop_area = 0.22;
+          modified = true;
+        } else if (stopArea > 0.8) {
+          sanitizedAction.parameters.stop_area = 0.8;
+          modified = true;
+        } else {
+          sanitizedAction.parameters.stop_area = stopArea;
+        }
+
+        const maxSeconds = Number(action.parameters.max_seconds ?? 6);
+        if (!Number.isFinite(maxSeconds) || maxSeconds <= 0) {
+          sanitizedAction.parameters.max_seconds = 6;
+          modified = true;
+        } else if (maxSeconds > rule.maxValue!) {
+          sanitizedAction.parameters.max_seconds = rule.maxValue;
+          modified = true;
+        } else {
+          sanitizedAction.parameters.max_seconds = maxSeconds;
         }
 
         if (modified) {

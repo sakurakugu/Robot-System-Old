@@ -225,6 +225,7 @@ export type ServerMessage =
   | ActionCommandMessage
   | ControlCommandMessage
   | TextResponseMessage
+  | VisionStatusMessage
   | VideoFrameMessage
   | ErrorMessage
   | BatteryStatusMessage
@@ -308,6 +309,29 @@ export interface TextResponseMessage {
     noTTS?: boolean;
     ttsDone?: boolean;
     actions?: string[];
+    vision?: boolean;
+    visionImage?: {
+      base64: string;
+      format?: string;
+    };
+    targetPosition?: {
+      label: string;
+      cx: number;
+      cy: number;
+      w: number;
+      h: number;
+    };
+  };
+}
+
+export interface VisionStatusMessage {
+  type: 'vision_status';
+  robotId: string;
+  timestamp: number;
+  conversationId?: string;
+  data: {
+    status: 'capturing' | 'analyzing' | 'error' | 'done';
+    message: string;
   };
 }
 

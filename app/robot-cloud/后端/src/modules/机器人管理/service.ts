@@ -5,9 +5,16 @@ import { v7 as uuidv7, validate as validUUID } from 'uuid';
 import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
-import type { 机器人包服务 } from '../机器人包管理/service';
 import type WebSocketService from '../websocket/service';
-import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto } from './types';
+import type { 机器人包服务 } from '../机器人包管理/service';
+import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto, 音频路由配置 } from './types';
+
+const 默认音频路由配置: 音频路由配置 = {
+  mode: 'robot',
+  targetPhoneDeviceId: null,
+  fallback: 'robot',
+  updatedAt: '',
+};
 
 /**
  * 机器人服务
@@ -633,6 +640,66 @@ export class 机器人服务 {
     } catch (error: any) {
       throw new Error(`更新配置失败: ${error.message}`);
     }
+  }
+
+  /**
+   * 获取音频路由配置（数据库持久化）
+   */
+  获取音频路由配置(uuid: string): 音频路由配置 {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    if (!robot.audio_route_config) {
+      return { ...默认音频路由配置, updatedAt: robot.updated_at };
+    }
+
+    try {
+      const parsed = JSON.parse(robot.audio_route_config) as Partial<音频路由配置>;
+      return {
+        mode: parsed.mode === 'phone' || parsed.mode === 'mute' ? parsed.mode : 'robot',
+        targetPhoneDeviceId: typeof parsed.targetPhoneDeviceId === 'string' && parsed.targetPhoneDeviceId.trim()
+          ? parsed.targetPhoneDeviceId.trim()
+          : null,
+        fallback: parsed.fallback === 'drop' ? 'drop' : 'robot',
+        updatedAt: parsed.updatedAt || robot.updated_at,
+      };
+    } catch {
+      return { ...默认音频路由配置, updatedAt: robot.updated_at };
+    }
+  }
+
+  /**
+   * 更新音频路由配置（数据库持久化）
+   */
+  更新音频路由配置(uuid: string, input: Partial<音频路由配置>): 音频路由配置 {
+    const robot = this.database.getRobot(uuid);
+    if (!robot) {
+      throw new Error('机器人不存在');
+    }
+
+    const current = this.获取音频路由配置(uuid);
+    const next: 音频路由配置 = {
+      mode: input.mode === 'phone' || input.mode === 'mute' || input.mode === 'robot' ? input.mode : current.mode,
+      targetPhoneDeviceId: input.targetPhoneDeviceId === null
+        ? null
+        : (typeof input.targetPhoneDeviceId === 'string' && input.targetPhoneDeviceId.trim()
+          ? input.targetPhoneDeviceId.trim()
+          : current.targetPhoneDeviceId),
+      fallback: input.fallback === 'drop' || input.fallback === 'robot' ? input.fallback : current.fallback,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (next.mode === 'phone' && !next.targetPhoneDeviceId) {
+      throw new Error('phone 模式下必须指定 targetPhoneDeviceId');
+    }
+
+    this.database.updateRobot(uuid, {
+      audio_route_config: JSON.stringify(next),
+    });
+
+    return next;
   }
 }
 

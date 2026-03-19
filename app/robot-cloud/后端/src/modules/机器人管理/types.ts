@@ -5,6 +5,16 @@ import type { RoleRecord } from '../角色管理/types';
 
 export type 机器人状态 = 'online' | 'offline' | 'error';
 
+export type 音频路由模式 = 'robot' | 'phone' | 'mute';
+export type 音频路由回退策略 = 'drop' | 'robot';
+
+export interface 音频路由配置 {
+  mode: 音频路由模式;
+  targetPhoneDeviceId: string | null;
+  fallback: 音频路由回退策略;
+  updatedAt: string;
+}
+
 // ============ 数据库实体 ============
 
 /**
@@ -22,6 +32,7 @@ export interface RobotRecord {
   tags: string | null; // JSON 数组 string
   sn: string | null;
   role_uuid: string | null;
+  audio_route_config: string | null; // JSON string
   status: 机器人状态;
   last_connected_at: string | null; // 最后一次连接时间
   registered_at: string | null; // 机器人注册时间

@@ -12,6 +12,7 @@ import 语音识别服务 from '../大模型交互/asr-service';
 import 对话服务 from '../大模型交互/chat-service';
 import TTSService from '../大模型交互/tts-service';
 import type { 机器人服务 } from '../机器人管理/service';
+import type { 音频路由配置 } from '../机器人管理/types';
 
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
@@ -35,6 +36,21 @@ type AudioSession = {
   pcmBufferSize?: number;
 };
 
+type UISocketMeta = {
+  robotId: string;
+  channel: Channel;
+  phoneSessionId?: string;
+  phoneDeviceId?: string;
+  lastActiveAt: number;
+};
+
+const 默认音频路由配置: 音频路由配置 = {
+  mode: 'robot',
+  targetPhoneDeviceId: null,
+  fallback: 'robot',
+  updatedAt: '',
+};
+
 class WebSocket服务 {
   private wssMap: Map<Channel, WebSocketServer> = new Map();
   private pathToChannelMap: Map<string, Channel> = new Map();
@@ -43,6 +59,10 @@ class WebSocket服务 {
   private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
   // UI 控制端连接（按通道，可多）
   private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
+  // 每个 UI socket 的元数据（用于定向路由）
+  private uiSocketMeta: WeakMap<WebSocket, UISocketMeta> = new WeakMap();
+  // robotId -> phoneDeviceId -> phoneSessionId -> lastActiveAt
+  private phoneSessionIndex: Map<string, Map<string, Map<string, number>>> = new Map();
   private database: DatabaseService;
   private 对话服务?: 对话服务;
   private 机器人服务?: 机器人服务;
@@ -143,6 +163,9 @@ class WebSocket服务 {
     // 手机端独立连接：phoneId 是手机侧会话 ID，与机器人无关
     // 存在 phoneId 时，以它作为连接 key，跳过机器人数据库读写
     const phoneId = url.searchParams.get('phoneId');
+    const phoneSessionId = url.searchParams.get('phoneSessionId') || phoneId || undefined;
+    const rawPhoneDeviceId = url.searchParams.get('phoneDeviceId') || undefined;
+    const phoneDeviceId = rawPhoneDeviceId?.trim() || undefined;
     const isPhoneSession = !!(phoneId && role === 'ui');
     if (isPhoneSession) {
       robotId = phoneId!;
@@ -161,10 +184,22 @@ class WebSocket服务 {
         byChannel.set(channel, new Set());
       }
       byChannel.get(channel)!.add(ws);
+      this.uiSocketMeta.set(ws, {
+        robotId,
+        channel,
+        phoneSessionId,
+        phoneDeviceId,
+        lastActiveAt: Date.now(),
+      });
+      if (!isPhoneSession && phoneSessionId && phoneDeviceId) {
+        this.upsertPhoneSessionIndex(robotId, phoneDeviceId, phoneSessionId);
+      }
       logger.info('UI连接建立', {
         robotId,
         channel,
         uiCount: byChannel.get(channel)!.size,
+        phoneSessionId,
+        phoneDeviceId,
       });
     } else {
       // 机器人连接：唯一，先关闭旧连接
@@ -237,12 +272,13 @@ class WebSocket服务 {
 
     // 设置消息处理器
     ws.on('message', (data: Buffer) => {
-      this.handleMessage(robotId, data, channel);
+      this.handleMessage(robotId, data, channel, ws, role);
     });
 
     // 设置关闭处理器
     ws.on('close', () => {
       if (role === 'ui') {
+        this.removePhoneSessionBySocket(ws);
         const byChannel = this.uiConnections.get(robotId);
         if (byChannel) {
           const set = byChannel.get(channel);
@@ -274,8 +310,11 @@ class WebSocket服务 {
   /**
    * 处理客户端消息
    */
-  private async handleMessage(robotId: string, data: Buffer, channel: Channel): Promise<void> {
+  private async handleMessage(robotId: string, data: Buffer, channel: Channel, ws?: WebSocket, role?: string): Promise<void> {
     try {
+      if (role === 'ui' && ws) {
+        this.touchPhoneSessionBySocket(ws);
+      }
       const message: ClientMessage = JSON.parse(data.toString());
 
       if (!this.isAllowedMessageType(channel, (message as any).type)) {
@@ -641,7 +680,7 @@ class WebSocket服务 {
           const streamEnabled = ttsOptions?.stream !== false;
           if (streamEnabled) {
             const sessionId = traceId;
-            this.broadcastMessage(robotId, {
+            this.sendAudioMessageByRoute(robotId, {
               type: 'audio_stream_start',
               robotId,
               timestamp: Date.now(),
@@ -650,9 +689,9 @@ class WebSocket服务 {
                 sessionId,
                 format: 'mp3',
               },
-            }, 'audio_download');
+            });
             const audio = await this.ttsService.synthesizeStream(ttsText, ttsOptions, (chunk: { seq: number; base64: string; format: 'mp3' }) => {
-              this.broadcastMessage(robotId, {
+              this.sendAudioMessageByRoute(robotId, {
                 type: 'audio_stream_chunk',
                 robotId,
                 timestamp: Date.now(),
@@ -662,9 +701,9 @@ class WebSocket服务 {
                   seq: chunk.seq,
                   buffer: chunk.base64,
                 },
-              }, 'audio_download');
+              });
             });
-            this.broadcastMessage(robotId, {
+            this.sendAudioMessageByRoute(robotId, {
               type: 'audio_stream_end',
               robotId,
               timestamp: Date.now(),
@@ -673,23 +712,23 @@ class WebSocket服务 {
                 sessionId,
                 duration: audio.duration,
               },
-            }, 'audio_download');
-            this.broadcastMessage(robotId, {
+            });
+            this.sendAudioMessageByRoute(robotId, {
               type: 'audio_response',
               robotId,
               timestamp: Date.now(),
               conversationId: traceId,
               data: audio,
-            }, 'audio_download');
+            });
           } else {
             const audio = await this.ttsService.synthesize(ttsText, ttsOptions);
-            this.broadcastMessage(robotId, {
+            this.sendAudioMessageByRoute(robotId, {
               type: 'audio_response',
               robotId,
               timestamp: Date.now(),
               conversationId: traceId,
               data: audio,
-            }, 'audio_download');
+            });
           }
         } else {
           logger.info('TTS跳过：回复文本为空或仅包含表情', { robotId });
@@ -773,7 +812,7 @@ class WebSocket服务 {
       const streamEnabled = ttsOptions?.stream !== false;
       const sessionId = conversationId || uuidv7();
       if (streamEnabled) {
-        this.broadcastMessage(robotId, {
+        this.sendAudioMessageByRoute(robotId, {
           type: 'audio_stream_start',
           robotId,
           timestamp: Date.now(),
@@ -782,9 +821,9 @@ class WebSocket服务 {
             sessionId,
             format: 'mp3',
           },
-        }, 'audio_download');
+        });
         const audio = await this.ttsService.synthesizeStream(sanitizedText, ttsOptions, (chunk: { seq: number; base64: string; format: 'mp3' }) => {
-          this.broadcastMessage(robotId, {
+          this.sendAudioMessageByRoute(robotId, {
             type: 'audio_stream_chunk',
             robotId,
             timestamp: Date.now(),
@@ -794,9 +833,9 @@ class WebSocket服务 {
               seq: chunk.seq,
               buffer: chunk.base64,
             },
-          }, 'audio_download');
+          });
         });
-        this.broadcastMessage(robotId, {
+        this.sendAudioMessageByRoute(robotId, {
           type: 'audio_stream_end',
           robotId,
           timestamp: Date.now(),
@@ -805,23 +844,23 @@ class WebSocket服务 {
             sessionId,
             duration: audio.duration,
           },
-        }, 'audio_download');
-        this.broadcastMessage(robotId, {
+        });
+        this.sendAudioMessageByRoute(robotId, {
           type: 'audio_response',
           robotId,
           timestamp: Date.now(),
           conversationId: sessionId,
           data: audio,
-        }, 'audio_download');
+        });
       } else {
         const audio = await this.ttsService.synthesize(sanitizedText, ttsOptions);
-        this.broadcastMessage(robotId, {
+        this.sendAudioMessageByRoute(robotId, {
           type: 'audio_response',
           robotId,
           timestamp: Date.now(),
           conversationId,
           data: audio,
-        }, 'audio_download');
+        });
       }
     } catch (e: any) {
       logger.error('TTS生成失败', e, { robotId });
@@ -1631,6 +1670,145 @@ class WebSocket服务 {
   }
 
   /**
+   * 写入或刷新手机会话索引（用于按设备定向音频）
+   */
+  private upsertPhoneSessionIndex(robotId: string, phoneDeviceId: string, phoneSessionId: string): void {
+    if (!this.phoneSessionIndex.has(robotId)) {
+      this.phoneSessionIndex.set(robotId, new Map());
+    }
+    const deviceMap = this.phoneSessionIndex.get(robotId)!;
+    if (!deviceMap.has(phoneDeviceId)) {
+      deviceMap.set(phoneDeviceId, new Map());
+    }
+    deviceMap.get(phoneDeviceId)!.set(phoneSessionId, Date.now());
+  }
+
+  /**
+   * 刷新 socket 对应会话的活跃时间
+   */
+  private touchPhoneSessionBySocket(ws: WebSocket): void {
+    const meta = this.uiSocketMeta.get(ws);
+    if (!meta) {
+      return;
+    }
+    meta.lastActiveAt = Date.now();
+    this.uiSocketMeta.set(ws, meta);
+    if (meta.phoneDeviceId && meta.phoneSessionId) {
+      this.upsertPhoneSessionIndex(meta.robotId, meta.phoneDeviceId, meta.phoneSessionId);
+    }
+  }
+
+  /**
+   * UI 断开时清理会话索引
+   */
+  private removePhoneSessionBySocket(ws: WebSocket): void {
+    const meta = this.uiSocketMeta.get(ws);
+    if (!meta?.phoneDeviceId || !meta.phoneSessionId) {
+      return;
+    }
+
+    const deviceMap = this.phoneSessionIndex.get(meta.robotId);
+    const sessionMap = deviceMap?.get(meta.phoneDeviceId);
+    if (sessionMap) {
+      sessionMap.delete(meta.phoneSessionId);
+      if (sessionMap.size === 0) {
+        deviceMap!.delete(meta.phoneDeviceId);
+      }
+    }
+    if (deviceMap && deviceMap.size === 0) {
+      this.phoneSessionIndex.delete(meta.robotId);
+    }
+  }
+
+  /**
+   * 解析某个手机设备在当前 robot 下最活跃的会话
+   */
+  private resolveActivePhoneSession(robotId: string, phoneDeviceId: string): string | undefined {
+    const deviceMap = this.phoneSessionIndex.get(robotId)?.get(phoneDeviceId);
+    if (!deviceMap || deviceMap.size === 0) {
+      return undefined;
+    }
+    let latestSessionId: string | undefined;
+    let latestTs = -1;
+    for (const [sessionId, ts] of deviceMap.entries()) {
+      if (ts > latestTs) {
+        latestTs = ts;
+        latestSessionId = sessionId;
+      }
+    }
+    return latestSessionId;
+  }
+
+  /**
+   * 获取机器人音频路由配置
+   */
+  private getAudioRouteConfig(robotId: string): 音频路由配置 {
+    const robot = this.database.getRobot(robotId);
+    const raw = robot?.audio_route_config;
+    if (!raw) {
+      return 默认音频路由配置;
+    }
+    try {
+      const parsed = JSON.parse(raw) as Partial<音频路由配置>;
+      return {
+        mode: parsed.mode === 'phone' || parsed.mode === 'mute' ? parsed.mode : 'robot',
+        targetPhoneDeviceId: typeof parsed.targetPhoneDeviceId === 'string' && parsed.targetPhoneDeviceId.trim()
+          ? parsed.targetPhoneDeviceId.trim()
+          : null,
+        fallback: parsed.fallback === 'drop' ? 'drop' : 'robot',
+        updatedAt: parsed.updatedAt || '',
+      };
+    } catch {
+      return 默认音频路由配置;
+    }
+  }
+
+  /**
+   * 按路由策略发送 audio_download 消息
+   */
+  private sendAudioMessageByRoute(robotId: string, message: ServerMessage): void {
+    const route = this.getAudioRouteConfig(robotId);
+
+    if (route.mode === 'mute') {
+      return;
+    }
+
+    if (route.mode === 'robot') {
+      this.sendToRobot(robotId, message, 'audio_download');
+      return;
+    }
+
+    const phoneDeviceId = route.targetPhoneDeviceId;
+    if (!phoneDeviceId) {
+      this.sendAudioFallback(robotId, message, route.fallback, '未配置目标手机');
+      return;
+    }
+
+    const sessionId = this.resolveActivePhoneSession(robotId, phoneDeviceId);
+    if (!sessionId) {
+      this.sendAudioFallback(robotId, message, route.fallback, '目标手机不在线');
+      return;
+    }
+
+    const sent = this.sendToSpecificUI(robotId, sessionId, message, 'audio_download');
+    if (!sent) {
+      this.sendAudioFallback(robotId, message, route.fallback, '目标会话无可用连接');
+    }
+  }
+
+  /**
+   * 音频路由回退策略
+   */
+  private sendAudioFallback(robotId: string, message: ServerMessage, fallback: 'drop' | 'robot', reason: string): void {
+    if (fallback === 'robot') {
+      logger.info('音频路由回退到机器狗', { robotId, reason });
+      this.sendToRobot(robotId, message, 'audio_download');
+      return;
+    }
+    logger.info('音频路由丢弃', { robotId, reason });
+  }
+
+  /**
    * 广播消息到机器人和对应的所有UI
    */
   private broadcastMessage(robotId: string, message: ServerMessage, channel: Channel = 'business'): void {
@@ -1665,6 +1843,32 @@ class WebSocket服务 {
         }
       }
     }
+  }
+
+  /**
+   * 按 phoneSessionId 定向发送给单个 UI 会话
+   */
+  private sendToSpecificUI(robotId: string, phoneSessionId: string, message: ServerMessage, channel: Channel = 'business'): boolean {
+    const uis = this.uiConnections.get(robotId);
+    const byChannel = uis?.get(channel);
+    if (!byChannel || byChannel.size === 0) {
+      return false;
+    }
+
+    let sent = false;
+    for (const uiWs of byChannel.values()) {
+      const meta = this.uiSocketMeta.get(uiWs);
+      if (!meta || meta.phoneSessionId !== phoneSessionId) {
+        continue;
+      }
+      try {
+        uiWs.send(JSON.stringify(message));
+        sent = true;
+      } catch (error: any) {
+        logger.error('定向发送消息到UI失败', error, { robotId, phoneSessionId });
+      }
+    }
+    return sent;
   }
 
   /**

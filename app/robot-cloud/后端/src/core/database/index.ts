@@ -144,6 +144,7 @@ class 数据库服务 {
         tags TEXT,
         sn TEXT,
         role_uuid TEXT,
+        audio_route_config TEXT,
         status TEXT DEFAULT 'offline',
         last_connected_at DATETIME,
         registered_at DATETIME,
@@ -220,6 +221,8 @@ class 数据库服务 {
     const hasFeedbackHandledBy = feedbackTableInfo.some(col => col.name === 'handled_by');
     const hasFeedbackHandledAt = feedbackTableInfo.some(col => col.name === 'handled_at');
     const hasFeedbackUpdatedAt = feedbackTableInfo.some(col => col.name === 'updated_at');
+    const robotsTableInfo = this.数据库.prepare("PRAGMA table_info(robots)").all() as Array<{ name: string }>;
+    const hasAudioRouteConfig = robotsTableInfo.some(col => col.name === 'audio_route_config');
 
     if (!hasIsDefault) {
       logger.info('正在迁移数据库：添加 is_default 列...');
@@ -262,6 +265,11 @@ class 数据库服务 {
       `);
     }
 
+    if (!hasAudioRouteConfig) {
+      logger.info('正在迁移数据库：添加 audio_route_config 列...');
+      this.数据库.exec('ALTER TABLE robots ADD COLUMN audio_route_config TEXT');
+    }
+
     this.数据库.exec('CREATE INDEX IF NOT EXISTS idx_feedback_entries_status ON feedback_entries(status)');
 
     if (
@@ -272,6 +280,7 @@ class 数据库服务 {
       || !hasFeedbackHandledBy
       || !hasFeedbackHandledAt
       || !hasFeedbackUpdatedAt
+      || !hasAudioRouteConfig
     ) {
       logger.info('数据库迁移完成');
     }
@@ -417,8 +426,8 @@ move动作支持三种控制方式：
    */
   upsertRobot(robot: Partial<RobotRecord> & { uuid: string }): void {
     const stmt = this.数据库.prepare(`
-      INSERT INTO robots (uuid, name, model, version, motion_control_version, server_version, ip, group_name, tags, sn, role_uuid, status, last_connected_at, registered_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO robots (uuid, name, model, version, motion_control_version, server_version, ip, group_name, tags, sn, role_uuid, audio_route_config, status, last_connected_at, registered_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(uuid) DO UPDATE SET
         name = COALESCE(excluded.name, robots.name),
         model = COALESCE(excluded.model, robots.model),
@@ -430,6 +439,7 @@ move动作支持三种控制方式：
         tags = COALESCE(excluded.tags, robots.tags),
         sn = COALESCE(excluded.sn, robots.sn),
         role_uuid = COALESCE(excluded.role_uuid, robots.role_uuid),
+        audio_route_config = COALESCE(excluded.audio_route_config, robots.audio_route_config),
         status = COALESCE(excluded.status, robots.status),
         last_connected_at = COALESCE(excluded.last_connected_at, robots.last_connected_at),
         updated_at = CURRENT_TIMESTAMP
@@ -447,6 +457,7 @@ move动作支持三种控制方式：
       Array.isArray(robot.tags) ? JSON.stringify(robot.tags) : robot.tags ?? null,
       robot.sn ?? null,
       robot.role_uuid ?? null,
+      robot.audio_route_config ?? null,
       robot.status ?? 'offline',
       robot.last_connected_at ?? null,
       robot.registered_at ?? null
@@ -500,7 +511,7 @@ move动作支持三种控制方式：
     const fields: string[] = [];
     const values: any[] = [];
 
-    const allowedFields = ['name', 'model', 'version', 'motion_control_version', 'server_version', 'ip', 'group_name', 'tags', 'sn', 'role_uuid', 'status', 'last_connected_at'];
+    const allowedFields = ['name', 'model', 'version', 'motion_control_version', 'server_version', 'ip', 'group_name', 'tags', 'sn', 'role_uuid', 'audio_route_config', 'status', 'last_connected_at'];
 
     for (const field of allowedFields) {
       if ((data as any)[field] !== undefined) {

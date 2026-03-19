@@ -33,6 +33,8 @@ export function createRobotRoutes(controller: 机器人控制器): Router {
   // 配置管理
   router.get('/:uuid/config', controller.getConfig);
   router.post('/:uuid/config', controller.updateConfig);
+  router.get('/:uuid/audio-route', controller.getAudioRoute);
+  router.put('/:uuid/audio-route', controller.updateAudioRoute);
 
   return router;
 }

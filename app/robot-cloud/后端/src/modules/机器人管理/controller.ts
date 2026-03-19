@@ -264,6 +264,38 @@ export class 机器人控制器 {
       res.status(status).json({ success: false, error: error.message });
     }
   };
+
+  /**
+   * 获取机器人音频路由配置
+   */
+  getAudioRoute = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const data = this.机器人服务.获取音频路由配置(uuid);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : 500;
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
+   * 更新机器人音频路由配置
+   */
+  updateAudioRoute = async (req: Request, res: Response) => {
+    try {
+      const uuid = this.获取参数(req, 'uuid');
+      const config = req.body;
+      if (!config || typeof config !== 'object') {
+        return res.status(400).json({ success: false, error: '缺少配置数据' });
+      }
+      const data = this.机器人服务.更新音频路由配置(uuid, config);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      const status = error.message === '机器人不存在' ? 404 : (error.message.includes('必须指定') ? 400 : 500);
+      res.status(status).json({ success: false, error: error.message });
+    }
+  };
 }
 
 

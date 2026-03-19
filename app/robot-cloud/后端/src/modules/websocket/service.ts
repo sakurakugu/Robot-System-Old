@@ -713,13 +713,15 @@ class WebSocket服务 {
                 duration: audio.duration,
               },
             });
-            this.sendAudioMessageByRoute(robotId, {
-              type: 'audio_response',
-              robotId,
-              timestamp: Date.now(),
-              conversationId: traceId,
-              data: audio,
-            });
+            if (this.shouldSendFinalAudioResponse(robotId)) {
+              this.sendAudioMessageByRoute(robotId, {
+                type: 'audio_response',
+                robotId,
+                timestamp: Date.now(),
+                conversationId: traceId,
+                data: audio,
+              });
+            }
           } else {
             const audio = await this.ttsService.synthesize(ttsText, ttsOptions);
             this.sendAudioMessageByRoute(robotId, {
@@ -845,13 +847,15 @@ class WebSocket服务 {
             duration: audio.duration,
           },
         });
-        this.sendAudioMessageByRoute(robotId, {
-          type: 'audio_response',
-          robotId,
-          timestamp: Date.now(),
-          conversationId: sessionId,
-          data: audio,
-        });
+        if (this.shouldSendFinalAudioResponse(robotId)) {
+          this.sendAudioMessageByRoute(robotId, {
+            type: 'audio_response',
+            robotId,
+            timestamp: Date.now(),
+            conversationId: sessionId,
+            data: audio,
+          });
+        }
       } else {
         const audio = await this.ttsService.synthesize(sanitizedText, ttsOptions);
         this.sendAudioMessageByRoute(robotId, {
@@ -1794,6 +1798,22 @@ class WebSocket服务 {
     if (!sent) {
       this.sendAudioFallback(robotId, message, route.fallback, '目标会话无可用连接');
     }
+  }
+
+  private shouldSendFinalAudioResponse(robotId: string): boolean {
+    const route = this.getAudioRouteConfig(robotId);
+    if (route.mode !== 'phone') {
+      return true;
+    }
+    const phoneDeviceId = route.targetPhoneDeviceId;
+    if (!phoneDeviceId) {
+      return route.fallback === 'robot';
+    }
+    const activeSession = this.resolveActivePhoneSession(robotId, phoneDeviceId);
+    if (activeSession) {
+      return false;
+    }
+    return route.fallback === 'robot';
   }
 
   /**

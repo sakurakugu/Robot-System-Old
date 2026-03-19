@@ -10,7 +10,12 @@ type PendingRequest = {
   chunks: Uint8Array[];
   format: 'mp3';
   onChunk?: (chunk: { seq: number; base64: string; format: 'mp3' }) => void;
+  streamChunks: Uint8Array[];
+  streamChunkBytes: number;
+  streamSeq: number;
 };
+
+const 流式最小推送字节 = 24 * 1024;
 
 class 语音合成服务 {
   private proc?: ChildProcessWithoutNullStreams;
@@ -40,6 +45,9 @@ class 语音合成服务 {
         chunks: [],
         format: 'mp3',
         onChunk,
+        streamChunks: [],
+        streamChunkBytes: 0,
+        streamSeq: 0,
       });
       const payload = {
         id,
@@ -118,16 +126,40 @@ class 语音合成服务 {
     if (msg.type === 'chunk') {
       const base64 = String(msg.data || '');
       if (base64) {
-        const buf = new Uint8Array(Buffer.from(base64, 'base64'));
-        pending.chunks.push(buf);
+        const decoded = Buffer.from(base64, 'base64');
+        const chunkBytes = Uint8Array.from(decoded);
+        pending.chunks.push(chunkBytes);
         if (pending.onChunk) {
-          pending.onChunk({ seq: Number(msg.seq || 0), base64, format: pending.format });
+          pending.streamChunks.push(chunkBytes);
+          pending.streamChunkBytes += chunkBytes.length;
+          if (pending.streamChunkBytes >= 流式最小推送字节) {
+            const mergedChunk = Buffer.concat(pending.streamChunks as Uint8Array[]);
+            pending.streamChunks = [];
+            pending.streamChunkBytes = 0;
+            pending.streamSeq += 1;
+            pending.onChunk({
+              seq: pending.streamSeq,
+              base64: mergedChunk.toString('base64'),
+              format: pending.format,
+            });
+          }
         }
       }
       return;
     }
     if (msg.type === 'end') {
       this.pending.delete(id);
+      if (pending.onChunk && pending.streamChunks.length > 0) {
+        const mergedChunk = Buffer.concat(pending.streamChunks as Uint8Array[]);
+        pending.streamChunks = [];
+        pending.streamChunkBytes = 0;
+        pending.streamSeq += 1;
+        pending.onChunk({
+          seq: pending.streamSeq,
+          base64: mergedChunk.toString('base64'),
+          format: pending.format,
+        });
+      }
       const buffer = Buffer.concat(pending.chunks as Uint8Array[]);
       pending.resolve({
         format: pending.format,

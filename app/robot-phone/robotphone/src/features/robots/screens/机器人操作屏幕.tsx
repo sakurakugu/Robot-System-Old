@@ -581,6 +581,9 @@ export function RobotOperationScreen() {
             </Text>
           </Pressable>
 
+          <Text style={[styles.switchLabel, { color: palette.text }]}>
+            视频
+          </Text>
           <ToggleSwitch
             value={showVideo}
             onValueChange={setShowVideo}

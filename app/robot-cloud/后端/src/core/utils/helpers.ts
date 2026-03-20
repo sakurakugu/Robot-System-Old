@@ -71,6 +71,21 @@ export function hasVisionTag(text: string): boolean {
   return /\{\{\s*vision\s*=\s*true\s*\}\}/i.test(text);
 }
 
+// export function shouldForceVisionForObjectNavigation(text: string): boolean {
+//   const normalized = text.trim();
+//   if (!normalized) return false;
+//   if (!/(走向|前往|去往|靠近|接近|朝着|向着|移动到|去到|去找|导航到)/.test(normalized)) {
+//     return false;
+//   }
+//   if (/(米|步|度|秒|分钟|厘米|cm|mm|\bm\b|\bs\b)/i.test(normalized)) {
+//     return false;
+//   }
+//   if (!/[\u4e00-\u9fa5a-zA-Z0-9]/.test(normalized)) {
+//     return false;
+//   }
+//   return true;
+// }
+
 export interface NormalizedTargetPosition {
   label: string;
   cx: number;

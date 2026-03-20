@@ -41,7 +41,7 @@
 
 > 或者说较难做的需求
 
-1. 前端观看视频，使用手机端推送给后端，然后后端转发给前端（mediasoup），推送机器狗的视频流不是用手机自带的摄像头（这个尝试了好久，效果都不好）
+1. 前端观看视频，使用手机端推送给后端，然后后端转发给前端（mediasoup），推送机器狗的视频流不是用手机自带的摄像头（
    1. 前端改成从手机发送 webrtc 视频流而到服务端（不是发送图片）
    2. 然后手机端在设置里面添加一个 switch，是否允许将视频流转发到服务端，默认开启（当然要服务器向手机端询问视频流时，手机端才向服务端（前端）发送）d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\settings\screens\SettingsScreen.tsx
    3. 然后手机端向服务器发送时，会在手机端的机器人操作的顶部显示向云端上传的图标 d:\elric\Code\Repos\robot-dog\app\robot-phone\RobotPhone\src\features\robots\screens\RobotOperationScreen.tsx

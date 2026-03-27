@@ -15,7 +15,6 @@ export class 动作控制器 {
     'jump',
     'move',
     'approach_target',
-    'vision_approach_target',
   ]);
 
   // 安全规则
@@ -26,7 +25,6 @@ export class 动作控制器 {
     { action: 'turn_right', maxValue: 720 },
     { action: 'move', maxValue: 5 }, // duration最大5秒
     { action: 'approach_target', maxValue: 8 },
-    { action: 'vision_approach_target', maxValue: 30 },
   ];
 
   // 频率限制器 (每分钟最多10次动作)
@@ -144,7 +142,7 @@ export class 动作控制器 {
             sanitizedAction,
           };
         }
-      } else if (action.name === 'approach_target' || action.name === 'vision_approach_target') {
+      } else if (action.name === 'approach_target') {
         const sanitizedAction = { ...action, parameters: { ...action.parameters } };
         let modified = false;
         const clamp01 = (value: any, key: string) => {
@@ -171,26 +169,6 @@ export class 动作控制器 {
         clamp01(action.parameters.w, 'w');
         clamp01(action.parameters.h, 'h');
 
-        const clampRange = (value: any, key: string, min: number, max: number, fallback: number) => {
-          const n = Number(value);
-          if (!Number.isFinite(n)) {
-            sanitizedAction.parameters[key] = fallback;
-            modified = true;
-            return;
-          }
-          if (n < min) {
-            sanitizedAction.parameters[key] = min;
-            modified = true;
-            return;
-          }
-          if (n > max) {
-            sanitizedAction.parameters[key] = max;
-            modified = true;
-            return;
-          }
-          sanitizedAction.parameters[key] = n;
-        };
-
         const stopArea = Number(action.parameters.stop_area ?? 0.22);
         if (!Number.isFinite(stopArea) || stopArea <= 0) {
           sanitizedAction.parameters.stop_area = 0.22;
@@ -211,24 +189,6 @@ export class 动作控制器 {
           modified = true;
         } else {
           sanitizedAction.parameters.max_seconds = maxSeconds;
-        }
-
-        if (action.name === 'vision_approach_target') {
-          clampRange(action.parameters.max_track_seconds ?? 18, 'max_track_seconds', 2, rule.maxValue!, 18);
-          clampRange(action.parameters.max_lost_frames ?? 4, 'max_lost_frames', 1, 20, 4);
-          clampRange(action.parameters.min_score ?? 0.18, 'min_score', -1, 1, 0.18);
-          clampRange(action.parameters.search_margin ?? 1.8, 'search_margin', 1.1, 3.5, 1.8);
-          clampRange(action.parameters.template_update_rate ?? 0.2, 'template_update_rate', 0, 1, 0.2);
-          clampRange(action.parameters.cx_offset ?? 0, 'cx_offset', -0.25, 0.25, 0);
-          clampRange(action.parameters.cy_offset ?? 0, 'cy_offset', -0.25, 0.25, 0);
-
-          if (action.parameters.stop_height !== undefined) {
-            clampRange(action.parameters.stop_height, 'stop_height', 0, 1, 0);
-          }
-
-          if (action.parameters.timeout !== undefined) {
-            clampRange(action.parameters.timeout, 'timeout', 1, 15, 5);
-          }
         }
 
         if (modified) {
@@ -319,3 +279,4 @@ export class 动作控制器 {
 export default 动作控制器;
 
 export { 动作控制器 as ActionController };
+

@@ -739,32 +739,8 @@ class WebSocket服务 {
         logger.error('TTS生成失败', e, { robotId });
       }
 
-      const normalizedActions = finalResponse.actions.map(action => {
-        if (action.name !== 'approach_target') {
-          return action;
-        }
-        const parameters = action.parameters || {};
-        const hasTargetBox =
-          ['cx', 'cy', 'w', 'h'].every((key) => parameters[key] !== undefined);
-        if (!hasTargetBox) {
-          return action;
-        }
-        return {
-          ...action,
-          name: 'vision_approach_target',
-          parameters: {
-            ...parameters,
-            max_track_seconds: parameters.max_track_seconds ?? 18,
-            max_lost_frames: parameters.max_lost_frames ?? 4,
-            min_score: parameters.min_score ?? 0.18,
-            search_margin: parameters.search_margin ?? 1.8,
-            template_update_rate: parameters.template_update_rate ?? 0.2,
-          },
-        };
-      });
-
       // 发送动作指令
-      for (const action of normalizedActions) {
+      for (const action of finalResponse.actions) {
         this.sendToRobot(robotId, {
           type: 'action_command',
           robotId,
@@ -787,7 +763,7 @@ class WebSocket服务 {
         type: inputType,
         user_input: text,
         ai_response: finalResponse.text,
-        actions: normalizedActions,
+        actions: finalResponse.actions,
         processing_time: processingTime,
         metadata: {
           ...finalResponse.metadata,

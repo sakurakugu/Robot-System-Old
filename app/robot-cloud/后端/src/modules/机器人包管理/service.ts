@@ -101,30 +101,6 @@ export class 机器人包服务 {
         fs.mkdirSync(dir, { recursive: true });
       }
     }
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS robot_package_versions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        version_code INTEGER NOT NULL,
-        channel TEXT NOT NULL CHECK(channel IN ('stable', 'beta')),
-        changelog TEXT,
-        is_active INTEGER DEFAULT 0,
-        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        agent_file_name TEXT,
-        agent_file_size INTEGER,
-        agent_file_hash TEXT,
-        server_file_name TEXT,
-        server_file_size INTEGER,
-        server_file_hash TEXT,
-        common_file_name TEXT,
-        common_file_size INTEGER,
-        common_file_hash TEXT
-      )
-    `);
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_robot_pkg_channel ON robot_package_versions(channel);
-      CREATE INDEX IF NOT EXISTS idx_robot_pkg_active ON robot_package_versions(is_active);
-    `);
   }
 
   /* ------------------------------------------------------------------ */

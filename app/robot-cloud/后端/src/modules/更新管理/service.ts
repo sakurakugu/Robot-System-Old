@@ -64,26 +64,6 @@ export class 更新服务 {
     if (!fs.existsSync(APK_DIR)) {
       fs.mkdirSync(APK_DIR, { recursive: true });
     }
-
-    // 确保表存在
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS app_versions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        version_name TEXT NOT NULL,
-        version_code INTEGER NOT NULL,
-        channel TEXT NOT NULL CHECK(channel IN ('stable', 'beta')),
-        file_name TEXT NOT NULL,
-        file_size INTEGER NOT NULL,
-        file_hash TEXT NOT NULL,
-        changelog TEXT,
-        is_active INTEGER DEFAULT 0,
-        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_app_versions_channel ON app_versions(channel);
-      CREATE INDEX IF NOT EXISTS idx_app_versions_active ON app_versions(is_active);
-    `);
   }
 
   /* ------------------------------------------------------------------ */

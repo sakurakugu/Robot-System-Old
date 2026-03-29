@@ -95,6 +95,21 @@ cp .env.example .env
 npm run dev
 ```
 
+数据库结构迁移使用 `node-pg-migrate` 管理，常用命令：
+
+```bash
+cd 后端
+
+# 执行所有未应用迁移
+npm run migration:up
+
+# 回滚最近一条迁移
+npm run migration:down
+
+# 创建一条新的 SQL 迁移
+npm run migration:create -- add_some_table
+```
+
 ### API 接口
 
 #### 机器人管理 `/api/v1/robots`

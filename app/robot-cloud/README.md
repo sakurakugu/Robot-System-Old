@@ -347,12 +347,59 @@ npm run build
 # 将 dist 目录部署到静态服务器
 ```
 
+### Docker 生产部署
+
+云端服务现已支持 Docker Compose 一键部署，适合直接部署到腾讯云 Linux 服务器。
+
+```bash
+cd /path/to/robot-dog
+
+# 首次运行会自动从 app/robot-cloud/.env.example 复制出 .env
+./start-cloud.sh start
+
+# 查看状态
+./start-cloud.sh status
+
+# 查看日志
+./start-cloud.sh logs
+
+# 停止并保留容器
+./start-cloud.sh stop
+
+# 彻底关闭并移除容器网络
+./start-cloud.sh down
+```
+
+部署结构：
+
+- `frontend`：构建 Vue 静态资源并通过 Nginx 提供页面
+- `backend`：运行 Node.js + Express + WebSocket 服务
+- `nginx`：对外暴露 80 端口，统一反向代理前端和 `/api/*`
+
+需要提前确认：
+
+- 服务器已安装 Docker 和 Docker Compose 插件
+- 放行腾讯云安全组的 `80` 端口
+- 如需 HTTPS，建议在云服务器外层 Nginx、宝塔或腾讯云 CLB 上终止 TLS，再转发到当前容器的 80 端口
+
+云端环境变量位于：
+
+- `app/robot-cloud/.env`
+
+常用配置项：
+
+- `HTTP_PORT`：对外暴露端口，默认 `80`
+- `SERVER_NAME`：Nginx 的域名，默认 `_`
+- `PORT`：后端容器内监听端口，默认 `9000`
+- `DB_PATH`：SQLite 数据库文件路径，默认 `./data/robot-cloud.db`
+- `WS_ROBOT_PATH` / `WS_PHONE_PATH` / `WS_WEB_PATH`：三类客户端的 WebSocket 路径
+
 ### 环境变量
 
 后端 `.env` 文件：
 
 ```env
 PORT=9000
-DATABASE_PATH=./data/robot-cloud.db
+DB_PATH=./data/robot-cloud.db
 
 ```

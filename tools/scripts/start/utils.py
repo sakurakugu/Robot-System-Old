@@ -33,21 +33,21 @@ def which(cmd: str) -> Optional[str]:
 
 def 检查运行环境() -> None:
     if which("node") is None:
-        print("❌ 未检测到 Node.js，请先安装 Node.js 24+", file=sys.stderr)
+        print("未检测到 Node.js，请先安装 Node.js 24+", file=sys.stderr)
         sys.exit(1)
     if which("npm") is None and which("npm.cmd") is None:
-        print("❌ 未检测到 npm，请安装 Node.js(自带 npm)", file=sys.stderr)
+        print("未检测到 npm，请安装 Node.js(自带 npm)", file=sys.stderr)
         sys.exit(1)
     py_cmd = "python3" if which("python3") is not None else ("python" if which("python") is not None else None)
     if py_cmd is None:
-        print("❌ 未检测到 Python，请先安装 Python 3.10+", file=sys.stderr)
+        print("未检测到 Python，请先安装 Python 3.10+", file=sys.stderr)
         sys.exit(1)
 
     try:
         node_v = subprocess.check_output(["node", "--version"], text=True).strip()
         py_v = subprocess.check_output([py_cmd, "--version"], text=True).strip()
-        print(f"✅ Node.js 版本: {node_v}")
-        print(f"✅ Python 版本: {py_v}")
+        print(f"Node.js 版本: {node_v}")
+        print(f"Python 版本: {py_v}")
     except Exception:
         pass
 
@@ -153,10 +153,10 @@ def kill_pid_file(name: str) -> bool:
 
 def 确保node_modules存在(dir_path: Path) -> None:
     if not (dir_path / "node_modules").exists():
-        print(f"📦 安装依赖: {dir_path}")
+        print(f"安装依赖: {dir_path}")
         run(["npm", "install"], cwd=dir_path)
     else:
-        print(f"📦 依赖已存在: {dir_path}")
+        print(f"依赖已存在: {dir_path}")
 
 
 def 复制env_example_如果没有(dir_path: Path) -> bool:
@@ -164,7 +164,7 @@ def 复制env_example_如果没有(dir_path: Path) -> bool:
     example = dir_path / ".env.example"
     if not env.exists() and example.exists():
         shutil.copyfile(example, env)
-        print("✅ 已创建 .env，请编辑配置后重新运行")
+        print("已创建 .env，请编辑配置后重新运行")
         return True
     return False
 
@@ -355,7 +355,7 @@ def kill_port(port: int) -> bool:
     listeners = find_listeners(port)
     any_killed = False
     for pid, cmd in listeners:
-        print(f"🔪 Killing process on port {port}: PID={pid}")
+        print(f"Killing process on port {port}: PID={pid}")
         if terminate_pid(pid):
             any_killed = True
     return any_killed
@@ -365,7 +365,7 @@ def 持续监控直到中断(完成提示: str) -> int:
     """统一的前台监控循环，按 Ctrl+C 返回 130。"""
     print("")
     print("========================================")
-    print(f"  ✅ {完成提示}")
+    print(f"  {完成提示}")
     print("========================================")
     print("按 Ctrl+C 停止所有服务")
     try:
@@ -388,7 +388,7 @@ def 确保端口可用(ports: dict, interactive: bool = True) -> bool:
     if not blocked:
         return True
 
-    print("⚠️  发现端口占用:")
+    print("发现端口占用:")
     for name, port, listeners in blocked:
         print(f"  - {name}: {port}")
         for pid, cmd in listeners:
@@ -399,7 +399,7 @@ def 确保端口可用(ports: dict, interactive: bool = True) -> bool:
         for pid, cmd in listeners:
             if is_managed_process(pid, cmd):
                 ok = terminate_pid(pid)
-                print(f"✅ 自动清理 pid={pid} ({name})" if ok else f"❌ 自动清理失败 pid={pid} ({name})")
+                print(f"自动清理 pid={pid} ({name}) 成功" if ok else f"自动清理 pid={pid} ({name}) 失败")
             else:
                 auto_killed = False
 
@@ -408,18 +408,18 @@ def 确保端口可用(ports: dict, interactive: bool = True) -> bool:
         return True
 
     if not interactive or not sys.stdin.isatty():
-        print("❌ 存在非本项目进程占用端口，未自动清理。")
+        print("存在非本项目进程占用端口，未自动清理。")
         return False
 
     resp = input("存在非本项目进程占用端口，是否继续清理？(y/N): ").strip().lower()
     if resp != "y":
-        print("❌ 已取消清理，请手动处理端口占用。")
+        print("已取消清理，请手动处理端口占用。")
         return False
 
     for name, port, listeners in blocked:
         for pid, cmd in listeners:
             if not is_managed_process(pid, cmd):
                 ok = terminate_pid(pid)
-                print(f"✅ 已清理 pid={pid} ({name})" if ok else f"❌ 清理失败 pid={pid} ({name})")
+                print(f"已清理 pid={pid} ({name})" if ok else f"清理失败 pid={pid} ({name})")
     time.sleep(0.5)
     return True

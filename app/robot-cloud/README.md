@@ -58,7 +58,7 @@ robot-cloud/
 │                        外部服务                                  │
 ├─────────────┬─────────────┬─────────────┬───────────────────────┤
 │  robot-agent │  阿里云 LLM  │  阿里云 ASR  │      数据库           │
-│  (WebSocket) │  (API)      │  (API)      │   (SQLite)            │
+│  (WebSocket) │  (API)      │  (API)      │   (PostgreSQL)        │
 └─────────────┴─────────────┴─────────────┴───────────────────────┘
 ```
 
@@ -68,10 +68,10 @@ robot-cloud/
 
 ### 技术栈
 
-- **运行时**: Node.js 18+
+- **运行时**: Node.js 24+
 - **框架**: Express
 - **语言**: TypeScript
-- **数据库**: SQLite (better-sqlite3)
+- **数据库**: PostgreSQL
 - **WebSocket**: ws
 - **AI 服务**: 阿里云百炼
 
@@ -391,7 +391,8 @@ cd /path/to/robot-dog
 - `HTTP_PORT`：对外暴露端口，默认 `80`
 - `SERVER_NAME`：Nginx 的域名，默认 `_`
 - `PORT`：后端容器内监听端口，默认 `9000`
-- `DB_PATH`：SQLite 数据库文件路径，默认 `./data/robot-cloud.db`
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`：PostgreSQL 容器初始化账号
+- `DB_EXPOSE_PORT`：本机映射的 PostgreSQL 端口，默认 `15432`
 - `WS_ROBOT_PATH` / `WS_PHONE_PATH` / `WS_WEB_PATH`：三类客户端的 WebSocket 路径
 
 ### 环境变量
@@ -400,6 +401,10 @@ cd /path/to/robot-dog
 
 ```env
 PORT=9000
-DB_PATH=./data/robot-cloud.db
+DB_HOST=127.0.0.1
+DB_PORT=15432
+DB_NAME=robotdog
+DB_USER=robotdog
+DB_PASSWORD=robotdog
 
 ```

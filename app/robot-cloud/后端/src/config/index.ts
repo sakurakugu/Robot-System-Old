@@ -57,8 +57,13 @@ export interface 配置 {
 
   // 数据库配置
   database: {
-    type: 'sqlite';
-    path: string;
+    type: 'postgresql';
+    host: string;
+    port: number;
+    user: string;
+    password: string;
+    database: string;
+    connectionString?: string;
   };
 
   // 日志配置
@@ -146,8 +151,13 @@ const 配置: 配置 = {
   },
 
   database: {
-    type: 'sqlite',
-    path: process.env.DB_PATH || path.join(__dirname, '../../data/robot.db'),
+    type: 'postgresql',
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    user: process.env.DB_USER || 'robotdog',
+    password: process.env.DB_PASSWORD || 'robotdog',
+    database: process.env.DB_NAME || 'robotdog',
+    connectionString: process.env.DATABASE_URL || undefined,
   },
 
   logging: {

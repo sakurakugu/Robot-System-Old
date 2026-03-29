@@ -1,8 +1,8 @@
-import type Database from 'better-sqlite3';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import type DatabaseService from '../../core/database';
+import type { 同步数据库实例 } from '../../core/database/types';
 import { logger } from '../../core/logger';
 import type {
     AppVersionInfo,
@@ -55,7 +55,7 @@ function toVersionInfo(record: AppVersionRecord): AppVersionInfo {
 }
 
 export class 更新服务 {
-  private db: Database.Database;
+  private db: 同步数据库实例;
 
   constructor(database: DatabaseService) {
     this.db = database.getDb();

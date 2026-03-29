@@ -1,7 +1,7 @@
 import argparse
 import sys
 import time
-from scripts.start.orchestrator import start_all, stop_all, test_all
+from scripts.start.orchestrator import start_all, status_all, stop_all, test_all
 from scripts.start.utils import 持续监控直到中断
 
 
@@ -11,6 +11,7 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--start", "-s", action="store_true")
     group.add_argument("--stop", "-x", action="store_true")
     group.add_argument("--restart", "-r", action="store_true")
+    group.add_argument("--status", action="store_true")
     group.add_argument("--test", "-t", action="store_true")
     group.add_argument("--help", "-h", action="store_true")
     return parser.parse_args()
@@ -23,6 +24,8 @@ def resolve_action(ns: argparse.Namespace) -> str:
         return "stop"
     elif ns.restart:
         return "restart"
+    elif ns.status:
+        return "status"
     elif ns.test:
         return "test"
     elif ns.help:
@@ -40,8 +43,13 @@ def show_help() -> None:
     print("  --start, -s       启动服务")
     print("  --stop, -x        停止服务")
     print("  --restart, -r     重启服务（默认）")
+    print("  --status          查看本地进程和 PostgreSQL 容器状态")
     print("  --test, -t        运行系统自检")
     print("  --help, -h        显示帮助")
+    print("")
+    print("说明：")
+    print("  默认会先用 Docker 启动 app/robot-cloud/docker-compose.yml 里的 postgres")
+    print("  然后再启动本地热更新后端和前端")
     print("")
 
 
@@ -56,6 +64,10 @@ def main() -> int:
 
     if action == "stop":
         stop_all()
+        return 0
+
+    if action == "status":
+        status_all()
         return 0
 
     if action == "test":

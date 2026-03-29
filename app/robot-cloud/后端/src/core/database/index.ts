@@ -1,5 +1,3 @@
-import Database from 'better-sqlite3';
-import path from 'path';
 import 配置 from '../../config';
 import type { AccountRole, UserRecord, UserSessionRecord } from '../../modules/account/types';
 import type { KnowledgeEntryRecord } from '../../modules/knowledge/types';
@@ -9,27 +7,28 @@ import type { RoleRecord } from '../../modules/角色管理/types';
 import type { ActionLogRecord, ActionStatus, ConversationRecord, 对话类型 } from '../../types';
 import { 默认系统提示词 } from '../const';
 import { logger } from '../logger';
+import { Postgres同步数据库 } from './sync-pg';
+import type { 同步数据库实例 } from './types';
 /**
  * 数据库服务
  * 统一管理所有数据库操作
  */
 class 数据库服务 {
-  private 数据库!: Database.Database;
+  private 数据库!: 同步数据库实例;
 
   constructor() {
     this.初始化();
   }
 
   private 初始化() {
-    const 数据库路径 = 配置.database.path!;
-    const 数据库目录 = path.dirname(数据库路径);
-
-    // 确保数据目录存在
-    if (!require('fs').existsSync(数据库目录)) {
-      require('fs').mkdirSync(数据库目录, { recursive: true });
-    }
-
-    this.数据库 = new Database(数据库路径);
+    this.数据库 = new Postgres同步数据库({
+      host: 配置.database.host,
+      port: 配置.database.port,
+      user: 配置.database.user,
+      password: 配置.database.password,
+      database: 配置.database.database,
+      connectionString: 配置.database.connectionString,
+    });
     this.创建表();
   }
 
@@ -218,23 +217,36 @@ class 数据库服务 {
    * 数据库迁移
    */
   private migrateDatabase(): void {
-    // 检查 roles 表是否有 is_default 列
-    const tableInfo = this.数据库.prepare("PRAGMA table_info(roles)").all() as Array<{ name: string }>;
-    const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
-    const hasAsrProvider = tableInfo.some(col => col.name === 'asr_provider');
-    const hasAsrModel = tableInfo.some(col => col.name === 'asr_model');
-    const feedbackTableInfo = this.数据库.prepare("PRAGMA table_info(feedback_entries)").all() as Array<{ name: string }>;
-    const hasFeedbackStatus = feedbackTableInfo.some(col => col.name === 'status');
-    const hasFeedbackHandledBy = feedbackTableInfo.some(col => col.name === 'handled_by');
-    const hasFeedbackHandledAt = feedbackTableInfo.some(col => col.name === 'handled_at');
-    const hasFeedbackUpdatedAt = feedbackTableInfo.some(col => col.name === 'updated_at');
-    const robotsTableInfo = this.数据库.prepare("PRAGMA table_info(robots)").all() as Array<{ name: string }>;
-    const hasAudioRouteConfig = robotsTableInfo.some(col => col.name === 'audio_route_config');
-    const conversationsTableInfo = this.数据库.prepare("PRAGMA table_info(conversations)").all() as Array<{ name: string }>;
-    const hasConversationId = conversationsTableInfo.some(col => col.name === 'conversation_id');
-    const actionLogsTableInfo = this.数据库.prepare("PRAGMA table_info(action_logs)").all() as Array<{ name: string }>;
-    const hasActionConversationId = actionLogsTableInfo.some(col => col.name === 'conversation_id');
-    const hasActionResultDetail = actionLogsTableInfo.some(col => col.name === 'result_detail');
+    const 获取列名 = (tableName: string): string[] => {
+      const rows = this.数据库.prepare(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ?
+      `).all(tableName) as Array<{ column_name: string }>;
+      return rows.map((row) => row.column_name);
+    };
+
+    const roleColumns = 获取列名('roles');
+    const hasIsDefault = roleColumns.includes('is_default');
+    const hasAsrProvider = roleColumns.includes('asr_provider');
+    const hasAsrModel = roleColumns.includes('asr_model');
+
+    const feedbackColumns = 获取列名('feedback_entries');
+    const hasFeedbackStatus = feedbackColumns.includes('status');
+    const hasFeedbackHandledBy = feedbackColumns.includes('handled_by');
+    const hasFeedbackHandledAt = feedbackColumns.includes('handled_at');
+    const hasFeedbackUpdatedAt = feedbackColumns.includes('updated_at');
+
+    const robotColumns = 获取列名('robots');
+    const hasAudioRouteConfig = robotColumns.includes('audio_route_config');
+
+    const conversationColumns = 获取列名('conversations');
+    const hasConversationId = conversationColumns.includes('conversation_id');
+
+    const actionLogColumns = 获取列名('action_logs');
+    const hasActionConversationId = actionLogColumns.includes('conversation_id');
+    const hasActionResultDetail = actionLogColumns.includes('result_detail');
 
     if (!hasIsDefault) {
       logger.info('正在迁移数据库：添加 is_default 列...');
@@ -269,10 +281,10 @@ class 数据库服务 {
 
     if (!hasFeedbackUpdatedAt) {
       logger.info('正在迁移数据库：添加 feedback updated_at 列...');
-      this.数据库.exec('ALTER TABLE feedback_entries ADD COLUMN updated_at DATETIME');
+      this.数据库.exec('ALTER TABLE feedback_entries ADD COLUMN updated_at TIMESTAMPTZ');
       this.数据库.exec(`
         UPDATE feedback_entries
-        SET updated_at = COALESCE(created_at, datetime('now'))
+        SET updated_at = COALESCE(created_at, CURRENT_TIMESTAMP)
         WHERE updated_at IS NULL
       `);
     }
@@ -285,11 +297,6 @@ class 数据库服务 {
     if (!hasConversationId) {
       logger.info('正在迁移数据库：添加 conversations.conversation_id 列...');
       this.数据库.exec('ALTER TABLE conversations ADD COLUMN conversation_id TEXT');
-      this.数据库.exec(`
-        UPDATE conversations
-        SET conversation_id = json_extract(metadata, '$.conversationId')
-        WHERE conversation_id IS NULL AND metadata IS NOT NULL AND json_valid(metadata)
-      `);
       this.数据库.exec('CREATE INDEX IF NOT EXISTS idx_conversations_conversation_id ON conversations(conversation_id)');
     }
 
@@ -1066,7 +1073,7 @@ class 数据库服务 {
   /**
    * 获取原始数据库实例（用于高级操作）
    */
-  getDb(): Database.Database {
+  getDb(): 同步数据库实例 {
     return this.数据库;
   }
 }

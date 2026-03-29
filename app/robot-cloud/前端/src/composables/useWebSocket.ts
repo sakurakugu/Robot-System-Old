@@ -56,7 +56,8 @@ function toWsOrigin(server: string): string {
 }
 
 function buildWsUrl(server: string, path: string, robotId: string): string {
-  return `${toWsOrigin(server)}${path}?robotId=${robotId}&role=ui`
+  const token = encodeURIComponent(localStorage.getItem('auth_token') || '')
+  return `${toWsOrigin(server)}${path}?robotId=${robotId}&role=ui&token=${token}`
 }
 
 /** 从后端拉取 UI 配置（serverUrl 可在设置页面修改） */

@@ -25,6 +25,17 @@ export class 对话服务 {
     return history.length > limit ? history.slice(-limit) : history;
   }
 
+  private 获取回灌历史(robotId: string, maxHistory: number): Message[] {
+    const history = this.database.getRecentConversationMessages(robotId, maxHistory);
+    if (history.length > 0) {
+      logger.info('已从数据库回灌对话上下文', {
+        robotId,
+        rounds: Math.ceil(history.length / 2),
+      });
+    }
+    return this.裁剪历史(history, maxHistory);
+  }
+
   private 更新会话(robotId: string): void {
     const now = Date.now();
     if (this.lastActiveAt.has(robotId)) {
@@ -63,8 +74,12 @@ export class 对话服务 {
     try {
       this.更新会话(robotId);
       // 获取或初始化对话历史
-      let history = this.conversationHistory.get(robotId) || [];
       const maxHistory = context?.maxHistory || 10;
+      let history = this.conversationHistory.get(robotId);
+
+      if (!history || history.length === 0) {
+        history = this.获取回灌历史(robotId, maxHistory);
+      }
 
       // 保持历史记录在限制范围内
       history = this.裁剪历史(history, maxHistory);
@@ -215,7 +230,11 @@ export class 对话服务 {
       }
 
       // 更新对话历史（记录用户问题和AI回复）
-      const history = this.裁剪历史(this.conversationHistory.get(robotId) || [], maxHistory);
+      let history = this.conversationHistory.get(robotId);
+      if (!history || history.length === 0) {
+        history = this.获取回灌历史(robotId, maxHistory);
+      }
+      history = this.裁剪历史(history, maxHistory);
       history.push(
         {
           role: 'user',

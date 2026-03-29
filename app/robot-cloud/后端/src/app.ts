@@ -3,7 +3,7 @@ import express from 'express';
 import DatabaseService from './core/database';
 import { logger } from './core/logger';
 import { AccountController } from './modules/account/controller';
-import { requireRole, withAuthContext } from './modules/account/middleware';
+import { requireAuth, requireRole, withAuthContext } from './modules/account/middleware';
 import { createAccountRoutes } from './modules/account/routes';
 import { AccountService } from './modules/account/service';
 import { KnowledgeController } from './modules/knowledge/controller';
@@ -113,7 +113,8 @@ export class 应用程序 {
     this.机器人服务.setWebSocketService(this.WebSocket服务);
     // 注入机器人包服务到机器人服务（用于推送安装包）
     this.机器人服务.set机器人包服务(this.机器人包服务);
-    // 延迟注入机器人服务和对话服务到WebSocket服务
+    // 延迟注入账号服务、机器人服务和对话服务到 WebSocket 服务
+    this.WebSocket服务.set账号服务(this.账号服务);
     this.WebSocket服务.set机器人服务(this.机器人服务);
     this.WebSocket服务.set对话服务(this.对话服务);
   }
@@ -164,35 +165,43 @@ export class 应用程序 {
    */
   private 设置路由(): void {
     const 路由器 = express.Router();
+    const 受保护路由器 = express.Router();
+    受保护路由器.use(requireAuth);
 
-    // 注册各模块路由
+    // 公开路由
     路由器.use('/auth', createAccountRoutes(this.账号控制器));
-    路由器.use('/robots', createRobotRoutes(this.机器人控制器));
-    路由器.use('/conversations', createConversationRoutes(this.对话控制器));
-    路由器.use('/config', createLLMRoutes(this.大模型控制器, {
-      updateLLM: requireRole('super_admin'),
-    }));
-    路由器.use('/config', createSettingsRoutes(this.设置控制器, {
-      updateAI: requireRole('super_admin'),
-      updateUI: requireRole('admin', 'super_admin'),
-    }));
-
-    路由器.use('/roles', createRoleRoutes(this.角色控制器));
-    路由器.use('/choreo', createChoreoRoutes(this.编舞控制器));
     路由器.use('/updates', createUpdateRoutes(this.更新控制器, {
+      read: requireAuth,
       manage: requireRole('admin', 'super_admin'),
     }));
     路由器.use('/robot-packages', createRobotPackageRoutes(this.机器人包控制器, {
+      read: requireAuth,
       manage: requireRole('admin', 'super_admin'),
     }));
-    路由器.use('/knowledge', createKnowledgeRoutes(this.知识库控制器));
-    路由器.use('/feedback', createFeedbackRoutes(this.反馈控制器, {
+    路由器.use('/', createSystemRoutes(this.数据库, this.WebSocket服务, {
+      protectedRead: requireAuth,
+    }));
+
+    // 需要登录的业务路由
+    受保护路由器.use('/robots', createRobotRoutes(this.机器人控制器));
+    受保护路由器.use('/conversations', createConversationRoutes(this.对话控制器));
+    受保护路由器.use('/config', createLLMRoutes(this.大模型控制器, {
+      updateLLM: requireRole('super_admin'),
+    }));
+    受保护路由器.use('/config', createSettingsRoutes(this.设置控制器, {
+      updateAI: requireRole('super_admin'),
+      updateUI: requireRole('admin', 'super_admin'),
+    }));
+    受保护路由器.use('/roles', createRoleRoutes(this.角色控制器));
+    受保护路由器.use('/choreo', createChoreoRoutes(this.编舞控制器));
+    受保护路由器.use('/knowledge', createKnowledgeRoutes(this.知识库控制器));
+    受保护路由器.use('/feedback', createFeedbackRoutes(this.反馈控制器, {
       manage: requireRole('admin', 'super_admin'),
     }));
-    路由器.use('/', createSystemRoutes(this.数据库, this.WebSocket服务));
+    路由器.use(受保护路由器);
 
     // 兼容旧路由
-    路由器.post('/robot/:robotId/command', (请求, 响应) => {
+    路由器.post('/robot/:robotId/command', requireAuth, (请求, 响应) => {
       this.对话控制器.sendCommand(请求, 响应);
     });
 

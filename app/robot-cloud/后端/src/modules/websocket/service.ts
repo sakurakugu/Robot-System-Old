@@ -7,6 +7,7 @@ import { logger } from '../../core/logger';
 import { hasVisionTag, isValidRobotId, parseNormalizedTargetPosition, RateLimiter, removeActionTags, removeTargetTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
+import type { AccountService } from '../account/service';
 import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import 语音识别服务 from '../大模型交互/asr-service';
 import 对话服务 from '../大模型交互/chat-service';
@@ -64,6 +65,7 @@ class WebSocket服务 {
   // robotId -> phoneDeviceId -> phoneSessionId -> lastActiveAt
   private phoneSessionIndex: Map<string, Map<string, Map<string, number>>> = new Map();
   private database: DatabaseService;
+  private 账号服务?: AccountService;
   private 对话服务?: 对话服务;
   private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
@@ -97,8 +99,35 @@ class WebSocket服务 {
     this.机器人服务 = 机器人服务;
   }
 
+  set账号服务(账号服务: AccountService): void {
+    this.账号服务 = 账号服务;
+  }
+
   set对话服务(对话服务: 对话服务): void {
     this.对话服务 = 对话服务;
+  }
+
+  private 从请求解析Token(req: any): string | null {
+    const authHeader = String(req.headers.authorization || '');
+    if (authHeader.startsWith('Bearer ')) {
+      return authHeader.slice(7).trim();
+    }
+
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+    const token = String(url.searchParams.get('token') || '').trim();
+    return token || null;
+  }
+
+  private 是否需要校验UI连接(pathname: string): boolean {
+    return pathname.startsWith(配置.ws.webPath) || pathname.startsWith(配置.ws.phonePath);
+  }
+
+  private UI连接已认证(req: any): boolean {
+    if (!this.账号服务) {
+      return false;
+    }
+    const token = this.从请求解析Token(req);
+    return this.账号服务.buildUserContext(token).mode === 'authenticated';
   }
 
   /**
@@ -125,6 +154,11 @@ class WebSocket服务 {
         const targetChannel = this.pathToChannelMap.get(pathname);
 
         if (targetChannel) {
+          if (this.是否需要校验UI连接(pathname) && !this.UI连接已认证(request)) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
           const targetWss = this.wssMap.get(targetChannel);
           if (targetWss) {
             targetWss.handleUpgrade(request, socket, head, (ws) => {
@@ -739,8 +773,32 @@ class WebSocket服务 {
         logger.error('TTS生成失败', e, { robotId });
       }
 
+      const normalizedActions = finalResponse.actions.map(action => {
+        if (action.name !== 'approach_target') {
+          return action;
+        }
+        const parameters = action.parameters || {};
+        const hasTargetBox =
+          ['cx', 'cy', 'w', 'h'].every((key) => parameters[key] !== undefined);
+        if (!hasTargetBox) {
+          return action;
+        }
+        return {
+          ...action,
+          name: 'vision_approach_target',
+          parameters: {
+            ...parameters,
+            max_track_seconds: parameters.max_track_seconds ?? 18,
+            max_lost_frames: parameters.max_lost_frames ?? 4,
+            min_score: parameters.min_score ?? 0.18,
+            search_margin: parameters.search_margin ?? 1.8,
+            template_update_rate: parameters.template_update_rate ?? 0.2,
+          },
+        };
+      });
+
       // 发送动作指令
-      for (const action of finalResponse.actions) {
+      for (const action of normalizedActions) {
         this.sendToRobot(robotId, {
           type: 'action_command',
           robotId,
@@ -754,16 +812,23 @@ class WebSocket服务 {
         }, 'business');
 
         // 记录动作
-        this.database.insertActionLog(robotId, action.name, action.parameters, 'success');
+        this.database.insertActionLog(robotId, action.name, action.parameters, 'success', {
+          conversationId: traceId,
+          resultDetail: {
+            source: 'llm',
+            safetyChecked: true,
+          },
+        });
       }
 
       // 记录对话
       this.database.insertConversation({
         robot_id: robotId,
+        conversation_id: traceId,
         type: inputType,
         user_input: text,
         ai_response: finalResponse.text,
-        actions: finalResponse.actions,
+        actions: normalizedActions,
         processing_time: processingTime,
         metadata: {
           ...finalResponse.metadata,
@@ -877,6 +942,7 @@ class WebSocket服务 {
    */
   private async handleActionInput(robotId: string, action: string, parameters?: Record<string, any>): Promise<void> {
     try {
+      const traceId = uuidv7();
       logger.info('收到动作输入', { robotId, action, parameters });
 
       // 验证动作名称
@@ -890,6 +956,7 @@ class WebSocket服务 {
         type: 'action_command',
         robotId,
         timestamp: Date.now(),
+        conversationId: traceId,
         data: {
           action,
           parameters: parameters || {},
@@ -898,13 +965,20 @@ class WebSocket服务 {
       }, 'business');
 
       // 记录动作
-      this.database.insertActionLog(robotId, action, parameters || {}, 'success');
+      this.database.insertActionLog(robotId, action, parameters || {}, 'success', {
+        conversationId: traceId,
+        resultDetail: {
+          source: 'manual_action_input',
+          safetyChecked: true,
+        },
+      });
 
       // 通知UI已发送（添加 noTTS 标记，不生成TTS音频）
       this.broadcastMessage(robotId, {
         type: 'text_response',
         robotId,
         timestamp: Date.now(),
+        conversationId: traceId,
         data: {
           text: `动作已发送: ${action}`,
           noTTS: true,  // 标记不需要生成TTS

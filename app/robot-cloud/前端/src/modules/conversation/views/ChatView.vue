@@ -186,6 +186,8 @@
 
 <script setup lang="ts">
 import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
+import { getConversationHistory } from '@/modules/conversation/api'
+import type { Conversation } from '@/modules/conversation/types'
 import { useWebSocket } from '@/composables/useWebSocket'
 import {
   ChatDotSquare,
@@ -628,9 +630,87 @@ const handlePlayClick = (msg: Message) => {
 
 const lastAudioUrl = ref<string | null>(null)
 
+const 解析JSON = <T,>(value?: string | null): T | undefined => {
+  if (!value) return undefined
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return undefined
+  }
+}
+
+const 加载历史消息 = async (uuid?: string) => {
+  if (!uuid) {
+    messages.value = []
+    return
+  }
+
+  try {
+    const response = await getConversationHistory(uuid, 50, 0)
+    const history = response.data.conversations
+      .slice()
+      .reverse()
+      .flatMap((item: Conversation) => {
+        const timestamp = new Date(item.timestamp).getTime()
+        const metadata = 解析JSON<Record<string, any>>(item.metadata)
+        const actions = 解析JSON<Array<{ name?: string }> | string[]>(item.actions)
+        const normalizedActions = Array.isArray(actions)
+          ? actions
+              .map((action) =>
+                typeof action === 'string'
+                  ? action
+                  : typeof action?.name === 'string'
+                    ? action.name
+                    : ''
+              )
+              .filter(Boolean)
+          : []
+        const visionImageBase64 = metadata?.visionImage?.base64
+        const visionImageFormat = metadata?.visionImage?.format || 'jpeg'
+        const imageUrl = visionImageBase64
+          ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
+          : undefined
+        const latency =
+          typeof item.processing_time === 'number' ? item.processing_time : undefined
+
+        return [
+          {
+            id: `history-user-${item.uuid}`,
+            type: 'user' as const,
+            target: String(metadata?.from || '') === 'controller' ? 'robot' as const : 'ai' as const,
+            text: item.user_input,
+            timestamp,
+            sentToRobot: String(metadata?.from || '') === 'controller',
+            sendingToRobot: false,
+          },
+          {
+            id: `history-ai-${item.uuid}`,
+            type: 'ai' as const,
+            text: item.ai_response,
+            timestamp,
+            actions: normalizedActions,
+            imageUrl,
+            visionImageBase64,
+            visionImageFormat,
+            targetPosition: metadata?.targetPosition,
+            latency,
+            sentToRobot: false,
+            sendingToRobot: false,
+          },
+        ]
+      })
+
+    messages.value = history
+    await scrollToBottom()
+  } catch (error) {
+    console.error('加载历史对话失败:', error)
+  }
+}
+
 onMounted(() => {
   const uuid = resolveRobotUuid()
   if (uuid) {
+    加载历史消息(uuid)
     connectToRobot(uuid)
   }
 })
@@ -642,6 +722,7 @@ watch(
   () => props.robotUuid,
   (val) => {
     if (val) {
+      加载历史消息(val)
       connectToRobot(val)
     }
   }
@@ -652,6 +733,7 @@ watch(
   (val) => {
     const uuid = val as string | undefined
     if (uuid && !props.robotUuid) {
+      加载历史消息(uuid)
       connectToRobot(uuid)
     }
   }

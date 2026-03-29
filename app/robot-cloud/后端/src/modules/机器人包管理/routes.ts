@@ -29,7 +29,7 @@ const pkgFields = upload.fields([
 
 export function createRobotPackageRoutes(
   controller: 机器人包控制器,
-  guards?: { manage?: RequestHandler }
+  guards?: { read?: RequestHandler; manage?: RequestHandler }
 ): Router {
   const router = Router();
 
@@ -41,7 +41,11 @@ export function createRobotPackageRoutes(
   }
 
   // 版本列表 ?channel=stable
-  router.get('/versions', controller.list);
+  if (guards?.read) {
+    router.get('/versions', guards.read, controller.list);
+  } else {
+    router.get('/versions', controller.list);
+  }
 
   // 获取当前活跃版本信息（机器人和手机端下载前调用）
   router.get('/active', controller.getActive);

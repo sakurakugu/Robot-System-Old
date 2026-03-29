@@ -42,14 +42,20 @@ export const router = createRouter({
 // 路由守卫
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
+  const isAuthPage = to.path === '/auth'
 
   // 设置页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - 机器狗对话系统`
   }
 
-  if (to.meta.requireAuth && !authStore.isAuthenticated) {
+  if (!isAuthPage && !authStore.isAuthenticated) {
     next('/auth')
+    return
+  }
+
+  if (isAuthPage && authStore.isAuthenticated) {
+    next('/robots')
     return
   }
 

@@ -26,6 +26,7 @@ export interface MessageMetadata {
 export interface Conversation {
   uuid: number
   robot_id: string
+  conversation_id?: string | null
   timestamp: string
   type: 'audio' | 'text'
   user_input: string

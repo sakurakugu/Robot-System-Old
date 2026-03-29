@@ -6,7 +6,7 @@ import type { KnowledgeEntryRecord } from '../../modules/knowledge/types';
 import type { FeedbackListItem, FeedbackStatus } from '../../modules/反馈/types';
 import type { RobotRecord, 机器人状态 } from '../../modules/机器人管理/types';
 import type { RoleRecord } from '../../modules/角色管理/types';
-import type { ActionStatus, ConversationRecord, 对话类型 } from '../../types';
+import type { ActionLogRecord, ActionStatus, ConversationRecord, 对话类型 } from '../../types';
 import { 默认系统提示词 } from '../const';
 import { logger } from '../logger';
 /**
@@ -160,6 +160,7 @@ class 数据库服务 {
       CREATE TABLE IF NOT EXISTS conversations (
         uuid INTEGER PRIMARY KEY AUTOINCREMENT,
         robot_id TEXT NOT NULL,
+        conversation_id TEXT,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         type TEXT CHECK(type IN ('audio', 'text')),
         user_input TEXT NOT NULL,
@@ -176,31 +177,36 @@ class 数据库服务 {
       CREATE TABLE IF NOT EXISTS action_logs (
         uuid INTEGER PRIMARY KEY AUTOINCREMENT,
         robot_id TEXT NOT NULL,
+        conversation_id TEXT,
         action_name TEXT NOT NULL,
         parameters TEXT,
         status TEXT CHECK(status IN ('success', 'failed', 'rejected')) DEFAULT 'success',
+        result_detail TEXT,
         executed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (robot_id) REFERENCES robots(uuid) ON DELETE CASCADE
       )
     `);
+
+    // 数据库迁移：添加 is_default 列（如果不存在）
+    this.migrateDatabase();
 
     // 创建索引
     this.数据库.exec(`
       CREATE INDEX IF NOT EXISTS idx_robots_status ON robots(status);
       CREATE INDEX IF NOT EXISTS idx_robots_group ON robots(group_name);
       CREATE INDEX IF NOT EXISTS idx_conversations_robot_id ON conversations(robot_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_conversation_id ON conversations(conversation_id);
       CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
       CREATE INDEX IF NOT EXISTS idx_action_logs_robot_id ON action_logs(robot_id);
+      CREATE INDEX IF NOT EXISTS idx_action_logs_conversation_id ON action_logs(conversation_id);
       CREATE INDEX IF NOT EXISTS idx_action_logs_executed_at ON action_logs(executed_at);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
       CREATE INDEX IF NOT EXISTS idx_knowledge_entries_updated_at ON knowledge_entries(updated_at);
       CREATE INDEX IF NOT EXISTS idx_feedback_entries_created_at ON feedback_entries(created_at);
       CREATE INDEX IF NOT EXISTS idx_feedback_entries_user_id ON feedback_entries(user_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_entries_status ON feedback_entries(status);
     `);
-
-    // 数据库迁移：添加 is_default 列（如果不存在）
-    this.migrateDatabase();
 
     // 初始化默认角色
     this.initializeDefaultRole();
@@ -224,6 +230,11 @@ class 数据库服务 {
     const hasFeedbackUpdatedAt = feedbackTableInfo.some(col => col.name === 'updated_at');
     const robotsTableInfo = this.数据库.prepare("PRAGMA table_info(robots)").all() as Array<{ name: string }>;
     const hasAudioRouteConfig = robotsTableInfo.some(col => col.name === 'audio_route_config');
+    const conversationsTableInfo = this.数据库.prepare("PRAGMA table_info(conversations)").all() as Array<{ name: string }>;
+    const hasConversationId = conversationsTableInfo.some(col => col.name === 'conversation_id');
+    const actionLogsTableInfo = this.数据库.prepare("PRAGMA table_info(action_logs)").all() as Array<{ name: string }>;
+    const hasActionConversationId = actionLogsTableInfo.some(col => col.name === 'conversation_id');
+    const hasActionResultDetail = actionLogsTableInfo.some(col => col.name === 'result_detail');
 
     if (!hasIsDefault) {
       logger.info('正在迁移数据库：添加 is_default 列...');
@@ -271,8 +282,27 @@ class 数据库服务 {
       this.数据库.exec('ALTER TABLE robots ADD COLUMN audio_route_config TEXT');
     }
 
-    this.数据库.exec('CREATE INDEX IF NOT EXISTS idx_feedback_entries_status ON feedback_entries(status)');
+    if (!hasConversationId) {
+      logger.info('正在迁移数据库：添加 conversations.conversation_id 列...');
+      this.数据库.exec('ALTER TABLE conversations ADD COLUMN conversation_id TEXT');
+      this.数据库.exec(`
+        UPDATE conversations
+        SET conversation_id = json_extract(metadata, '$.conversationId')
+        WHERE conversation_id IS NULL AND metadata IS NOT NULL AND json_valid(metadata)
+      `);
+      this.数据库.exec('CREATE INDEX IF NOT EXISTS idx_conversations_conversation_id ON conversations(conversation_id)');
+    }
 
+    if (!hasActionConversationId) {
+      logger.info('正在迁移数据库：添加 action_logs.conversation_id 列...');
+      this.数据库.exec('ALTER TABLE action_logs ADD COLUMN conversation_id TEXT');
+      this.数据库.exec('CREATE INDEX IF NOT EXISTS idx_action_logs_conversation_id ON action_logs(conversation_id)');
+    }
+
+    if (!hasActionResultDetail) {
+      logger.info('正在迁移数据库：添加 action_logs.result_detail 列...');
+      this.数据库.exec('ALTER TABLE action_logs ADD COLUMN result_detail TEXT');
+    }
     if (
       !hasIsDefault
       || !hasAsrProvider
@@ -282,6 +312,9 @@ class 数据库服务 {
       || !hasFeedbackHandledAt
       || !hasFeedbackUpdatedAt
       || !hasAudioRouteConfig
+      || !hasConversationId
+      || !hasActionConversationId
+      || !hasActionResultDetail
     ) {
       logger.info('数据库迁移完成');
     }
@@ -611,6 +644,7 @@ class 数据库服务 {
    */
   insertConversation(data: {
     robot_id: string;
+    conversation_id?: string;
     type: 对话类型;
     user_input: string;
     ai_response: string;
@@ -619,12 +653,13 @@ class 数据库服务 {
     metadata?: any;
   }): number {
     const stmt = this.数据库.prepare(`
-      INSERT INTO conversations (robot_id, timestamp, type, user_input, ai_response, actions, processing_time, metadata)
-      VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (robot_id, conversation_id, timestamp, type, user_input, ai_response, actions, processing_time, metadata)
+      VALUES (?, ?, datetime('now'), ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       data.robot_id,
+      data.conversation_id ?? null,
       data.type,
       data.user_input,
       data.ai_response,
@@ -634,6 +669,45 @@ class 数据库服务 {
     );
 
     return result.lastInsertRowid as number;
+  }
+
+  /**
+   * 获取最近若干轮对话消息，用于回灌 LLM 上下文
+   */
+  getRecentConversationMessages(robotId: string, rounds = 10): Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+  }> {
+    const safeRounds = Math.max(1, Math.floor(rounds));
+    const stmt = this.数据库.prepare(`
+      SELECT user_input, ai_response, timestamp
+      FROM conversations
+      WHERE robot_id = ?
+      ORDER BY timestamp DESC, uuid DESC
+      LIMIT ?
+    `);
+    const rows = stmt.all(robotId, safeRounds) as Array<{
+      user_input: string;
+      ai_response: string;
+      timestamp: string;
+    }>;
+
+    return rows.reverse().flatMap((row) => {
+      const timestamp = new Date(row.timestamp);
+      return [
+        {
+          role: 'user' as const,
+          content: row.user_input,
+          timestamp,
+        },
+        {
+          role: 'assistant' as const,
+          content: row.ai_response,
+          timestamp,
+        },
+      ];
+    });
   }
 
   /**
@@ -662,25 +736,41 @@ class 数据库服务 {
   /**
    * 插入动作日志
    */
-  insertActionLog(robotId: string, actionName: string, parameters: any, status: ActionStatus): void {
+  insertActionLog(
+    robotId: string,
+    actionName: string,
+    parameters: any,
+    status: ActionStatus,
+    options?: {
+      conversationId?: string;
+      resultDetail?: any;
+    }
+  ): void {
     const stmt = this.数据库.prepare(`
-      INSERT INTO action_logs (robot_id, action_name, parameters, status, executed_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
+      INSERT INTO action_logs (robot_id, conversation_id, action_name, parameters, status, result_detail, executed_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
     `);
-    stmt.run(robotId, actionName, JSON.stringify(parameters), status);
+    stmt.run(
+      robotId,
+      options?.conversationId ?? null,
+      actionName,
+      JSON.stringify(parameters),
+      status,
+      options?.resultDetail === undefined ? null : JSON.stringify(options.resultDetail)
+    );
   }
 
   /**
    * 获取动作日志
    */
-  getActionLogs(robotId: string, limit = 50, offset = 0) {
+  getActionLogs(robotId: string, limit = 50, offset = 0): ActionLogRecord[] {
     const stmt = this.数据库.prepare(`
       SELECT * FROM action_logs
       WHERE robot_id = ?
       ORDER BY executed_at DESC
       LIMIT ? OFFSET ?
     `);
-    return stmt.all(robotId, limit, offset);
+    return stmt.all(robotId, limit, offset) as ActionLogRecord[];
   }
 
   // ==================== 账号管理 ====================

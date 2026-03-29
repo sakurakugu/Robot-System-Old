@@ -7,7 +7,7 @@ import type { ApiResponse, ConversationHistoryResponse, SendCommandDTO } from '.
  * 获取对话历史
  */
 export function getConversationHistory(robotId: string, limit = 50, offset = 0) {
-  return http.get<ConversationHistoryResponse>(`/api/v1/interaction/${robotId}`, {
+  return http.get<ConversationHistoryResponse>(`/api/v1/conversations/${robotId}`, {
     params: { limit, offset },
   })
 }

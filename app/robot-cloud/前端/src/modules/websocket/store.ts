@@ -34,7 +34,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     role.value = wsRole
     status.value = 'connecting'
 
-    const url = `${WS_BASE_URL}${WS_PATH}?robotId=${rid}&role=${wsRole}`
+    const token = encodeURIComponent(localStorage.getItem('auth_token') || '')
+    const url = `${WS_BASE_URL}${WS_PATH}?robotId=${rid}&role=${wsRole}&token=${token}`
     
     try {
       ws.value = new WebSocket(url)

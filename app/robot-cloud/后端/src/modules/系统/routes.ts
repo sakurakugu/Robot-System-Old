@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { Router } from 'express';
 import os from 'os';
 import type DatabaseService from '../../core/database';
@@ -7,14 +7,15 @@ import type WebSocketService from '../websocket/service';
 
 export function createSystemRoutes(
   database: DatabaseService,
-  websocketService: WebSocketService
+  websocketService: WebSocketService,
+  guards?: { protectedRead?: RequestHandler }
 ): Router {
   const router = Router();
 
   /**
    * 获取系统状态
    */
-  router.get('/status', (_req: Request, res: Response) => {
+  const 状态处理器 = (_req: Request, res: Response) => {
     try {
       const onlineRobots = websocketService.getOnlineCount();
       const allRobots = database.getAllRobots();
@@ -33,7 +34,12 @@ export function createSystemRoutes(
         error: error.message,
       });
     }
-  });
+  };
+  if (guards?.protectedRead) {
+    router.get('/status', guards.protectedRead, 状态处理器);
+  } else {
+    router.get('/status', 状态处理器);
+  }
 
   /**
    * 健康检查
@@ -51,7 +57,7 @@ export function createSystemRoutes(
   /**
    * 获取本机IP
    */
-  router.get('/network/local-ip', (_req: Request, res: Response) => {
+  const 本机IP处理器 = (_req: Request, res: Response) => {
     try {
       const interfaces = os.networkInterfaces();
       const addresses: string[] = [];
@@ -66,7 +72,12 @@ export function createSystemRoutes(
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
-  });
+  };
+  if (guards?.protectedRead) {
+    router.get('/network/local-ip', guards.protectedRead, 本机IP处理器);
+  } else {
+    router.get('/network/local-ip', 本机IP处理器);
+  }
 
   return router;
 }

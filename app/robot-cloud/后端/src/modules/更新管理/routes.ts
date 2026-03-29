@@ -20,7 +20,7 @@ const upload = multer({
 
 export function createUpdateRoutes(
   controller: 更新控制器,
-  guards?: { manage?: RequestHandler }
+  guards?: { read?: RequestHandler; manage?: RequestHandler }
 ): Router {
   const router = Router();
 
@@ -38,7 +38,11 @@ export function createUpdateRoutes(
   router.get('/download/:id', controller.download);
 
   // 版本列表 ?channel=stable
-  router.get('/versions', controller.list);
+  if (guards?.read) {
+    router.get('/versions', guards.read, controller.list);
+  } else {
+    router.get('/versions', controller.list);
+  }
 
   // 回滚到指定版本
   if (guards?.manage) {

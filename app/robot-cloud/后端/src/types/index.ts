@@ -16,6 +16,7 @@ export type ActionStatus = 'success' | 'failed' | 'rejected';
 export interface ConversationRecord {
   uuid: number;
   robot_id: string;
+  conversation_id: string | null;
   timestamp: string;
   type: 对话类型;
   user_input: string;
@@ -31,9 +32,11 @@ export interface ConversationRecord {
 export interface ActionLogRecord {
   uuid: number;
   robot_id: string;
+  conversation_id: string | null;
   action_name: string;
   parameters: string | null; // JSON 字符串
   status: ActionStatus;
+  result_detail: string | null;
   executed_at: string;
 }
 

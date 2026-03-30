@@ -16,6 +16,7 @@
  * WebSocket 路径自动派生，不再支持手改
  */
 
+import { getUIConfig } from '@/modules/settings/api'
 import { v7 as uuidv7 } from 'uuid'
 import { ref } from 'vue'
 
@@ -63,8 +64,8 @@ function buildWsUrl(server: string, path: string, robotId: string): string {
 /** 从后端拉取 UI 配置（serverUrl 可在设置页面修改） */
 async function fetchUIConfig(): Promise<UIConfig> {
   try {
-    const res = await fetch('/api/v1/config/ui').then(r => r.json())
-    if (res?.success && res.data) {
+    const res = await getUIConfig()
+    if (res?.data) {
       const data = res.data
       if (data.serverUrl) {
         localStorage.setItem(LS_SERVER_KEY, data.serverUrl)

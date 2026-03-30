@@ -186,8 +186,17 @@
 
 <script setup lang="ts">
 import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
-import { getConversationHistory } from '@/modules/conversation/api'
-import type { Conversation } from '@/modules/conversation/types'
+import { getConversationHistory, sendCommand } from '@/modules/conversation/api'
+import {
+  buildAudioUrl,
+  buildTargetBoxStyle,
+  buildVisionImageUrl,
+  formatMessageTime as formatTime,
+  normalizeConversationHistory,
+  parseActionFormat,
+  type ChatMessage,
+  type VisionStatus,
+} from '@/modules/conversation/chat'
 import { useWebSocket } from '@/composables/useWebSocket'
 import {
   ChatDotSquare,
@@ -198,42 +207,12 @@ import {
   Promotion,
   Select,
   User,
-  WarningFilled
+  WarningFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-
-type Message = {
-  id: string
-  type: 'user' | 'ai'
-  target?: 'ai' | 'robot'
-  text: string
-  timestamp: number
-  actions?: string[]
-  imageUrl?: string
-  visionImageBase64?: string
-  visionImageFormat?: string
-  targetPosition?: {
-    label: string
-    cx: number
-    cy: number
-    w: number
-    h: number
-  }
-  latency?: number
-  sentToRobot?: boolean
-  sendingToRobot?: boolean
-  audioUrl?: string
-  audioDuration?: number
-}
-
-type VisionStatus = {
-  status: 'capturing' | 'analyzing' | 'error' | 'done'
-  message: string
-  alertType: 'info' | 'success' | 'warning' | 'error'
-}
 
 const {
   isConnected,
@@ -248,7 +227,7 @@ const {
 
 const route = useRoute()
 const props = defineProps<{ robotUuid?: string }>()
-const messages = ref<Message[]>([])
+const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const chatArea = ref<HTMLElement>()
 const messageCount = ref(0)
@@ -301,39 +280,13 @@ const connectToRobot = async (uuid?: string) => {
   }
 }
 
-// 解析动作格式 {{action=xxx}} 或 {{action=xxx,param=value}}
-const parseActionFormat = (text: string): { action: string; parameters: Record<string, any> } | null => {
-  const actionRegex = /^\{\{action=([a-zA-Z_][a-zA-Z0-9_]*)((?:,[a-zA-Z_][a-zA-Z0-9_]*=[^,}]+)*)\}\}$/
-  const match = text.match(actionRegex)
-
-  if (!match) return null
-
-  const action = match[1]
-  const paramsStr = match[2]
-  const parameters: Record<string, any> = {}
-
-  // 解析参数
-  if (paramsStr) {
-    const paramPairs = paramsStr.slice(1).split(',')
-    for (const pair of paramPairs) {
-      const [key, value] = pair.split('=')
-      if (key && value !== undefined) {
-        // 尝试转换为数字，否则保留为字符串
-        parameters[key.trim()] = isNaN(Number(value)) ? value : Number(value)
-      }
-    }
-  }
-
-  return { action, parameters }
-}
-
 const sendMessage = (target: 'ai' | 'robot') => {
   if (!inputText.value.trim() || !isConnected.value) return
 
   const text = inputText.value.trim()
   const timestamp = Date.now()
 
-  const userMessage: Message = {
+  const userMessage: ChatMessage = {
     id: `user-${timestamp}`,
     type: 'user',
     target,
@@ -410,51 +363,21 @@ const sendMessage = (target: 'ai' | 'robot') => {
 
 const sendToRobot = async (text: string): Promise<boolean> => {
   try {
-    // 这里需要调用实际的机器狗API
-    // 假设有一个发送到机器狗的接口
-    const response = await fetch(`/api/v1/robot/${robotId.value}/command`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text }),
-    })
-    return response.ok
+    if (!robotId.value) {
+      return false
+    }
+    await sendCommand(robotId.value, { text })
+    return true
   } catch (error) {
     console.error('发送到机器狗失败:', error)
     return false
   }
 }
 
-const formatTime = (timestamp: number) => {
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-}
-
 const scrollToBottom = async () => {
   await nextTick()
   if (chatArea.value) {
     chatArea.value.scrollTop = chatArea.value.scrollHeight
-  }
-}
-
-const clampUnit = (value: number) => Math.max(0, Math.min(1, value))
-
-const buildTargetBoxStyle = (target: NonNullable<Message['targetPosition']>) => {
-  const cx = clampUnit(target.cx)
-  const cy = clampUnit(target.cy)
-  const w = clampUnit(target.w)
-  const h = clampUnit(target.h)
-  return {
-    left: `${cx * 100}%`,
-    top: `${cy * 100}%`,
-    width: `${w * 100}%`,
-    height: `${h * 100}%`,
-    transform: 'translate(-50%, -50%)',
   }
 }
 
@@ -477,7 +400,7 @@ onMessage((data) => {
   }
   if (data.type === 'asr_transcript') {
     const timestamp = Date.now()
-    const asrMessage: Message = {
+    const asrMessage: ChatMessage = {
       id: `asr-${timestamp}`,
       type: 'user',
       target: 'ai',
@@ -493,9 +416,7 @@ onMessage((data) => {
     let latency: number | undefined
     const visionImageBase64 = data.data?.visionImage?.base64
     const visionImageFormat = data.data?.visionImage?.format || 'jpeg'
-    const imageUrl = visionImageBase64
-      ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
-      : undefined
+    const imageUrl = buildVisionImageUrl(visionImageBase64, visionImageFormat)
 
     const lastRequestTime = Array.from(requestTimestamps.values()).pop()
     if (lastRequestTime) {
@@ -505,7 +426,7 @@ onMessage((data) => {
       avgLatency.value = Math.round(totalLatency / messageCount.value)
     }
 
-    const aiMessage: Message = {
+    const aiMessage: ChatMessage = {
       id: `ai-${timestamp}`,
       type: 'ai',
       text: data.data.text,
@@ -543,20 +464,7 @@ onMessage((data) => {
   } else if (data.type === 'audio_response') {
     try {
       const b64 = data.data.buffer || ''
-      let url = ''
-      const fmt = (data.data.format || 'opus').toLowerCase()
-      const mime = fmt === 'mp3' ? 'audio/mpeg' : 'audio/webm;codecs=opus'
-      try {
-        const bin = atob(b64)
-        const len = bin.length
-        const bytes = new Uint8Array(len)
-        for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i)
-        const blob = new Blob([bytes], { type: mime })
-        url = URL.createObjectURL(blob)
-      } catch {
-        const prefix = fmt === 'mp3' ? 'data:audio/mpeg;base64,' : 'data:audio/webm;codecs=opus;base64,'
-        url = `${prefix}${b64}`
-      }
+      const url = buildAudioUrl(b64, data.data.format || 'opus')
       lastAudioUrl.value = url
       let assignedId: string | null = null
       const nextId = pendingTTS.value.shift() || null
@@ -590,7 +498,7 @@ onMessage((data) => {
       return
     }
     const timestamp = Date.now()
-    const aiMessage: Message = {
+    const aiMessage: ChatMessage = {
       id: `ai-${timestamp}`,
       type: 'ai',
       text: `发生错误：${data.data?.message || '未知错误'}`,
@@ -609,7 +517,7 @@ const playAudio = (url: string) => {
   audio.play()
 }
 
-const handlePlayClick = (msg: Message) => {
+const handlePlayClick = (msg: ChatMessage) => {
   if (msg.audioUrl) {
     playAudio(msg.audioUrl)
     return
@@ -630,16 +538,7 @@ const handlePlayClick = (msg: Message) => {
 
 const lastAudioUrl = ref<string | null>(null)
 
-const 解析JSON = <T,>(value?: string | null): T | undefined => {
-  if (!value) return undefined
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return undefined
-  }
-}
-
-const 加载历史消息 = async (uuid?: string) => {
+const loadHistoryMessages = async (uuid?: string) => {
   if (!uuid) {
     messages.value = []
     return
@@ -647,60 +546,7 @@ const 加载历史消息 = async (uuid?: string) => {
 
   try {
     const response = await getConversationHistory(uuid, 50, 0)
-    const history = response.data.conversations
-      .slice()
-      .reverse()
-      .flatMap((item: Conversation) => {
-        const timestamp = new Date(item.timestamp).getTime()
-        const metadata = 解析JSON<Record<string, any>>(item.metadata)
-        const actions = 解析JSON<Array<{ name?: string }> | string[]>(item.actions)
-        const normalizedActions = Array.isArray(actions)
-          ? actions
-              .map((action) =>
-                typeof action === 'string'
-                  ? action
-                  : typeof action?.name === 'string'
-                    ? action.name
-                    : ''
-              )
-              .filter(Boolean)
-          : []
-        const visionImageBase64 = metadata?.visionImage?.base64
-        const visionImageFormat = metadata?.visionImage?.format || 'jpeg'
-        const imageUrl = visionImageBase64
-          ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
-          : undefined
-        const latency =
-          typeof item.processing_time === 'number' ? item.processing_time : undefined
-
-        return [
-          {
-            id: `history-user-${item.uuid}`,
-            type: 'user' as const,
-            target: String(metadata?.from || '') === 'controller' ? 'robot' as const : 'ai' as const,
-            text: item.user_input,
-            timestamp,
-            sentToRobot: String(metadata?.from || '') === 'controller',
-            sendingToRobot: false,
-          },
-          {
-            id: `history-ai-${item.uuid}`,
-            type: 'ai' as const,
-            text: item.ai_response,
-            timestamp,
-            actions: normalizedActions,
-            imageUrl,
-            visionImageBase64,
-            visionImageFormat,
-            targetPosition: metadata?.targetPosition,
-            latency,
-            sentToRobot: false,
-            sendingToRobot: false,
-          },
-        ]
-      })
-
-    messages.value = history
+    messages.value = normalizeConversationHistory(response.data.conversations)
     await scrollToBottom()
   } catch (error) {
     console.error('加载历史对话失败:', error)
@@ -710,7 +556,7 @@ const 加载历史消息 = async (uuid?: string) => {
 onMounted(() => {
   const uuid = resolveRobotUuid()
   if (uuid) {
-    加载历史消息(uuid)
+    loadHistoryMessages(uuid)
     connectToRobot(uuid)
   }
 })
@@ -722,7 +568,7 @@ watch(
   () => props.robotUuid,
   (val) => {
     if (val) {
-      加载历史消息(val)
+      loadHistoryMessages(val)
       connectToRobot(val)
     }
   }
@@ -733,7 +579,7 @@ watch(
   (val) => {
     const uuid = val as string | undefined
     if (uuid && !props.robotUuid) {
-      加载历史消息(uuid)
+      loadHistoryMessages(uuid)
       connectToRobot(uuid)
     }
   }

@@ -48,14 +48,9 @@ export const choreoApi = {
 
   /** 导出项目 */
   async exportProject(uuid: string): Promise<Blob> {
-    const response = await fetch(`${BASE_URL}/projects/${uuid}/export`, {
-      method: 'GET',
-      credentials: 'include',
+    return http.get<Blob>(`${BASE_URL}/projects/${uuid}/export`, {
+      responseType: 'blob',
     })
-    if (!response.ok) {
-      throw new Error('导出失败')
-    }
-    return response.blob()
   },
 
   /** 导入项目 */

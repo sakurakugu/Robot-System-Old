@@ -50,480 +50,57 @@
           label="基本信息"
           name="basic"
         >
-          <div class="pane-content">
-            <h3 class="section-title">
-              基本信息
-            </h3>
-            <el-form
-              :model="formData"
-              label-width="100px"
-            >
-              <el-form-item label="名称">
-                <el-input
-                  v-model="formData.name"
-                  maxlength="16"
-                  show-word-limit
-                  placeholder="请输入机器人名称"
-                  @change="autoSave('name')"
-                />
-              </el-form-item>
-              <el-form-item label="类型">
-                <el-input
-                  v-model="formData.model"
-                  disabled
-                />
-              </el-form-item>
-              <el-form-item label="角色">
-                <el-select
-                  v-model="formData.role_id"
-                  placeholder="选择角色"
-                  clearable
-                  @change="autoSave('role_id')"
-                >
-                  <el-option
-                    v-for="role in roles"
-                    :key="role.uuid"
-                    :label="role.name"
-                    :value="role.uuid"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="分组">
-                <el-select
-                  v-model="formData.group_name"
-                  placeholder="选择分组"
-                  allow-create
-                  filterable
-                  default-first-option
-                  @change="autoSave('group_name')"
-                >
-                  <el-option
-                    label="默认分组"
-                    value="Default"
-                  />
-                  <el-option
-                    label="开发测试"
-                    value="Dev"
-                  />
-                  <el-option
-                    label="演示展厅"
-                    value="Demo"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="标签">
-                <div class="tags-container">
-                  <el-tag
-                    v-for="tag in tags"
-                    :key="tag"
-                    closable
-                    :disable-transitions="false"
-                    @close="handleCloseTag(tag)"
-                  >
-                    {{ tag }}
-                  </el-tag>
-                  <el-input
-                    v-if="inputVisible"
-                    ref="InputRef"
-                    v-model="inputValue"
-                    class="input-new-tag"
-                    size="small"
-                    @keyup.enter="handleInputConfirm"
-                    @blur="handleInputConfirm"
-                  />
-                  <el-button
-                    v-else
-                    class="button-new-tag"
-                    size="small"
-                    @click="showInput"
-                  >
-                    + New Tag
-                  </el-button>
-                </div>
-              </el-form-item>
-              <el-divider />
-              <h4 class="subsection-title">
-                系统音量
-              </h4>
-              <el-form-item label="音量">
-                <div class="volume-control">
-                  <el-slider
-                    v-model="volumeData.volume"
-                    :min="0"
-                    :max="100"
-                    :disabled="volumeData.loading || !status.connected"
-                    style="flex: 1; margin-right: 12px;"
-                    @change="handleVolumeChange"
-                  />
-                  <el-input-number
-                    v-model="volumeData.volume"
-                    :min="0"
-                    :max="100"
-                    :disabled="volumeData.loading || !status.connected"
-                    style="width: 100px; margin-right: 8px;"
-                    @change="handleVolumeChange"
-                  />
-                  <el-button
-                    :icon="volumeData.muted ? 'VideoPause' : 'VideoPlay'"
-                    :disabled="volumeData.loading || !status.connected"
-                    :type="volumeData.muted ? 'danger' : 'default'"
-                    @click="handleMuteToggle"
-                  >
-                    {{ volumeData.muted ? '静音' : '取消静音' }}
-                  </el-button>
-                  <el-button
-                    :loading="volumeData.loading"
-                    :disabled="!status.connected"
-                    icon="Refresh"
-                    circle
-                    @click="loadVolume"
-                  />
-                </div>
-                <el-text
-                  v-if="!status.connected"
-                  type="info"
-                  size="small"
-                >
-                  机器人未连接，无法控制音量
-                </el-text>
-              </el-form-item>
-              <el-divider />
-              <el-form-item label="SN">
-                <el-input
-                  v-model="formData.sn"
-                  disabled
-                />
-              </el-form-item>
-              <el-form-item label="UUID">
-                <el-input
-                  v-model="formData.uuid"
-                  disabled
-                />
-              </el-form-item>
-              <el-divider />
-              <div class="status-grid">
-                <div class="status-item">
-                  <span class="label">温度</span>
-                  <span class="value">{{ status.temperature }}°C</span>
-                </div>
-                <div class="status-item">
-                  <span class="label">电量</span>
-                  <span class="value">{{ status.battery !== undefined ? status.battery + '%' : '--' }}</span>
-                </div>
-                <div class="status-item">
-                  <span class="label">连接状态</span>
-                  <el-tag :type="status.connected ? 'success' : 'danger'">
-                    {{ status.connected ? '在线' : '离线' }}
-                  </el-tag>
-                </div>
-              </div>
-            </el-form>
-          </div>
+          <RobotSettingsBasicTab
+            :form-data="formData"
+            :roles="roles"
+            :tags="tags"
+            :status="status"
+            :volume-data="volumeData"
+            @auto-save="autoSave"
+            @update-field="updateFormField"
+            @remove-tag="handleRemoveTag"
+            @add-tag="handleAddTag"
+            @update-volume="updateVolume"
+            @change-volume="handleVolumeChange"
+            @toggle-mute="handleMuteToggle"
+            @reload-volume="loadVolume"
+          />
         </el-tab-pane>
 
         <el-tab-pane
           label="网络配置"
           name="network"
         >
-          <div class="pane-content">
-            <h3 class="section-title">
-              网络配置
-            </h3>
-            <el-form
-              :model="formData"
-              label-width="100px"
-            >
-              <el-form-item label="机器人IP">
-                <el-input
-                  v-model="formData.ip"
-                  placeholder="例如：192.168.1.110"
-                  @change="autoSave('ip')"
-                >
-                  <template #append>
-                    <el-button
-                      :disabled="!formData.ip"
-                      @click="copyText(formData.ip)"
-                    >
-                      复制
-                    </el-button>
-                  </template>
-                </el-input>
-                <el-text
-                  v-if="formData.ip && !isValidIP(formData.ip)"
-                  type="danger"
-                  size="small"
-                >
-                  IP格式不正确
-                </el-text>
-              </el-form-item>
-              <el-form-item label="本地IP">
-                <el-input
-                  v-model="formData.local_ip"
-                  disabled
-                />
-              </el-form-item>
-              <!-- <el-form-item label="本地端口">
-                <el-input v-model="formData.local_port" disabled />
-              </el-form-item> -->
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  :loading="testingNetwork"
-                  @click="testConnection"
-                >
-                  测试连接
-                </el-button>
-                <el-button
-                  type="success"
-                  :disabled="!canOpenWifi"
-                  @click="openWifiSettings"
-                >
-                  修改WiFi
-                </el-button>
-                <span
-                  v-if="networkResult"
-                  :class="['network-result', networkResult.success ? 'success' : 'error']"
-                >
-                  {{ networkResult.message }}
-                </span>
-              </el-form-item>
-            </el-form>
-          </div>
+          <RobotSettingsNetworkTab
+            :form-data="formData"
+            :robot-uuid="uuid"
+            :connected="status.connected"
+            @auto-save="autoSave"
+            @connection-tested="handleConnectionTested"
+            @update-field="updateFormField"
+          />
         </el-tab-pane>
 
         <el-tab-pane
           label="日志管理"
           name="logs"
         >
-          <div class="pane-content">
-            <h3 class="section-title">
-              日志管理
-            </h3>
-
-            <div class="log-mark-section">
-              <h4 class="subsection-title">
-                日志标记
-              </h4>
-              <el-form label-width="80px">
-                <el-form-item label="标记内容">
-                  <el-input
-                    v-model="markMessage"
-                    placeholder="可选，空则使用默认标记"
-                    clearable
-                    style="max-width: 360px;"
-                  />
-                </el-form-item>
-                <el-form-item>
-                  <el-button
-                    type="warning"
-                    :loading="markingLog"
-                    :disabled="!status.connected"
-                    @click="markLog"
-                  >
-                    打日志标记
-                  </el-button>
-                  <el-text
-                    v-if="!status.connected"
-                    type="info"
-                    size="small"
-                    style="margin-left: 8px;"
-                  >
-                    机器人未连接
-                  </el-text>
-                </el-form-item>
-              </el-form>
-            </div>
-
-            <el-divider />
-
-            <el-form label-position="top">
-              <el-form-item label="时间范围">
-                <el-date-picker
-                  v-model="logDateRange"
-                  type="datetimerange"
-                  range-separator="至"
-                  start-placeholder="开始时间"
-                  end-placeholder="结束时间"
-                  style="width: 100%"
-                />
-              </el-form-item>
-              <el-form-item label="日志类型">
-                <el-radio-group v-model="logType">
-                  <el-radio-button label="robot">
-                    机器人日志
-                  </el-radio-button>
-                  <el-radio-button label="app">
-                    APP日志
-                  </el-radio-button>
-                  <el-radio-button label="all">
-                    全部日志
-                  </el-radio-button>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  :loading="uploadingLogs"
-                  @click="uploadLogs"
-                >
-                  打包上传
-                </el-button>
-              </el-form-item>
-            </el-form>
-
-            <div class="log-history">
-              <h4>最近上传记录</h4>
-              <el-table
-                :data="logHistory"
-                style="width: 100%"
-                size="small"
-              >
-                <el-table-column
-                  prop="time"
-                  label="时间"
-                  width="160"
-                />
-                <el-table-column
-                  prop="type"
-                  label="类型"
-                  width="100"
-                >
-                  <template #default="scope">
-                    {{ getLogTypeLabel(scope.row.type) }}
-                  </template>
-                </el-table-column>
-                <el-table-column
-                  prop="size"
-                  label="大小"
-                />
-              </el-table>
-            </div>
-          </div>
+          <RobotSettingsLogsTab
+            :robot-uuid="uuid"
+            :connected="status.connected"
+          />
         </el-tab-pane>
 
         <el-tab-pane
           label="AI 配置"
           name="ai"
         >
-          <div class="pane-content">
-            <h3 class="section-title">
-              AI 配置
-            </h3>
-            <el-form
-              :model="formData"
-              label-position="top"
-            >
-              <el-form-item label="回复温度">
-                <el-slider
-                  v-model="formData.ai_temperature"
-                  :min="0"
-                  :max="2"
-                  :step="0.1"
-                  show-input
-                  :input-size="'small'"
-                  @change="autoSave('ai_temperature')"
-                />
-              </el-form-item>
-              <el-form-item label="使用模型">
-                <el-select
-                  v-model="formData.ai_model"
-                  placeholder="请选择模型"
-                  style="width: 100%"
-                  @change="autoSave('ai_model')"
-                >
-                  <el-option
-                    v-for="m in availableModels"
-                    :key="m.value"
-                    :label="m.label"
-                    :value="m.value"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="音色">
-                <el-select
-                  v-model="formData.ai_voice"
-                  placeholder="请选择音色"
-                  style="width: 100%"
-                  @change="autoSave('ai_voice')"
-                >
-                  <el-option
-                    label="女声-温柔"
-                    value="female-soft"
-                  />
-                  <el-option
-                    label="女声-活泼"
-                    value="female-bright"
-                  />
-                  <el-option
-                    label="男声-低沉"
-                    value="male-deep"
-                  />
-                  <el-option
-                    label="男声-洪亮"
-                    value="male-bright"
-                  />
-                  <el-option
-                    label="童声"
-                    value="child"
-                  />
-                  <el-option
-                    label="电子音"
-                    value="robotic"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="意图识别">
-                <el-select
-                  v-model="formData.ai_intent"
-                  placeholder="请选择方案"
-                  style="width: 100%"
-                  @change="autoSave('ai_intent')"
-                >
-                  <el-option
-                    label="规则引擎"
-                    value="rule-based"
-                  />
-                  <el-option
-                    label="LLM分类器"
-                    value="llm-classifier"
-                  />
-                  <el-option
-                    label="混合策略"
-                    value="hybrid"
-                  />
-                </el-select>
-              </el-form-item>
-
-              <el-divider content-position="left">
-                系统提示词
-              </el-divider>
-
-              <el-form-item label="角色名称">
-                <el-input
-                  v-model="formData.ai_role_name"
-                  placeholder="例如：导航助手"
-                  @change="autoSave('ai_role_name')"
-                />
-              </el-form-item>
-              <el-form-item label="系统提示词">
-                <el-input
-                  v-model="formData.ai_system_prompt"
-                  type="textarea"
-                  :rows="6"
-                  placeholder="例如：保持安全、简洁、友好"
-                  @change="autoSave('ai_system_prompt')"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  @click="saveAIConfig"
-                >
-                  保存配置
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
+          <RobotSettingsAiTab
+            :form-data="formData"
+            :robot-uuid="uuid"
+            @auto-save="autoSave"
+            @update-field="updateFormField"
+          />
         </el-tab-pane>
 
         <el-tab-pane name="upgrade">
@@ -536,65 +113,11 @@
               />
             </span>
           </template>
-          <div class="pane-content">
-            <h3 class="section-title">
-              系统升级
-            </h3>
-
-            <div class="upgrade-card">
-              <div class="upgrade-header">
-                <h4>版本信息</h4>
-                <el-tag
-                  size="small"
-                  type="info"
-                >
-                  当前
-                </el-tag>
-              </div>
-              <div class="version-list">
-                <div class="version-item">
-                  <span>Agent版本</span>
-                  <el-text>{{ formData.version || '-' }}</el-text>
-                </div>
-                <div class="version-item">
-                  <span>运控版本</span>
-                  <el-text>{{ formData.motion_control_version || '-' }}</el-text>
-                </div>
-                <div class="version-item">
-                  <span>Server版本</span>
-                  <el-text>{{ formData.server_version || '-' }}</el-text>
-                </div>
-              </div>
-            </div>
-
-            <div class="upgrade-card">
-              <div class="upgrade-header">
-                <h4>机器狗固件</h4>
-                <el-tag
-                  size="small"
-                  type="info"
-                >
-                  当前版本 {{ formData.server_version || '-' }}
-                </el-tag>
-              </div>
-              <div class="upgrade-body">
-                <p v-if="firmwareUpdateAvailable">
-                  发现新版本 v2.4.0 (2025-01-18)
-                </p>
-                <p v-else>
-                  当前已是最新版本
-                </p>
-                <el-button
-                  type="primary"
-                  size="small"
-                  :disabled="!firmwareUpdateAvailable"
-                  @click="handleUpgrade('firmware')"
-                >
-                  {{ firmwareUpdateAvailable ? '立即升级' : '检查更新' }}
-                </el-button>
-              </div>
-            </div>
-          </div>
+          <RobotSettingsUpgradeTab
+            :form-data="formData"
+            :firmware-update-available="firmwareUpdateAvailable"
+            @upgrade="handleUpgrade"
+          />
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -602,32 +125,16 @@
 </template>
 
 <script setup lang="ts">
-import type { InputInstance } from 'element-plus'
-import { ElMessage } from 'element-plus'
-import { isValidIP } from '@/utils/validator'
 import { Bot } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getRoles } from '../../role/api'
-import type { Role } from '../../role/types'
-import {
-  deleteRobot as removeRobot,
-  getLocalNetworkIp,
-  getRobotDetail,
-  getRobotVolume,
-  markRobotLog,
-  setRobotMute,
-  setRobotVolume,
-  testRobotConnection as runRobotConnectionTest,
-  updateRobot as updateRobotDetail,
-} from '../api'
-import {
-  buildRobotAutoSavePayload,
-  buildRobotSettingsState,
-  createRobotSettingsFormData,
-  getRobotErrorMessage,
-} from '../settings'
-import type { RobotSettingsField, RobotSettingsFormData } from '../settings'
+import RobotSettingsAiTab from '../components/RobotSettingsAiTab.vue'
+import RobotSettingsBasicTab from '../components/RobotSettingsBasicTab.vue'
+import RobotSettingsLogsTab from '../components/RobotSettingsLogsTab.vue'
+import RobotSettingsNetworkTab from '../components/RobotSettingsNetworkTab.vue'
+import RobotSettingsUpgradeTab from '../components/RobotSettingsUpgradeTab.vue'
+import { useRobotSettingsState } from '../composables/useRobotSettingsState'
+import { useRobotSettingsVolume } from '../composables/useRobotSettingsVolume'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string; hideTabs?: boolean; activeTab?: string }>()
 const route = useRoute()
@@ -635,348 +142,44 @@ const router = useRouter()
 const uuid = computed(() => props.robotUuid || (route.params.uuid as string | undefined))
 
 const currentTab = ref(props.activeTab || 'basic')
-const loading = ref(false)
-
-// Data Models
-const formData = reactive<RobotSettingsFormData>(createRobotSettingsFormData())
-
-const roles = ref<Role[]>([])
-
-const tags = ref<string[]>([])
-const inputVisible = ref(false)
-const inputValue = ref('')
-const InputRef = ref<InputInstance>()
-
 const status = reactive({
   temperature: 42,
   battery: undefined as number | undefined,
-  connected: true
+  connected: true,
 })
 
-// Volume Control
-const volumeData = reactive({
-  volume: 50,
-  muted: false,
-  loading: false
+const {
+  volumeData,
+  loadVolume,
+  updateVolume,
+  handleVolumeChange,
+  handleMuteToggle,
+} = useRobotSettingsVolume({
+  uuid,
+  status,
 })
 
-// Logs
-const logDateRange = ref('')
-const logType = ref('all')
-const uploadingLogs = ref(false)
-const markingLog = ref(false)
-const markMessage = ref('')
-type LogHistoryEntry = { time: string; type: string; size: string }
-const logHistory = ref<LogHistoryEntry[]>([])
-
-// Network Test
-const testingNetwork = ref(false)
-const networkResult = ref<{ success: boolean; message: string } | null>(null)
-
-// AI Options (Mock)
-const availableModels = [
-  { value: 'gpt-4o', label: 'OpenAI GPT-4o' },
-  { value: 'gpt-4o-mini', label: 'OpenAI GPT-4o-mini' },
-  { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' }
-]
-
-// Update Status (Mock)
-const firmwareUpdateAvailable = ref(false)
-const hasUpdate = computed(() => firmwareUpdateAvailable.value)
-const canOpenWifi = computed(() => status.connected && isValidIP(formData.ip))
-
-const loadRoles = async () => {
-  try {
-    roles.value = await getRoles()
-  } catch {
-    // 角色列表加载失败不影响当前页面编辑
-  }
-}
-
-const loadData = async () => {
-  const currentUuid = uuid.value
-  const rolesPromise = loadRoles()
-  if (!currentUuid) {
-    await rolesPromise
-    return
-  }
-
-  loading.value = true
-  try {
-    const [robotResponse, localIpResponse] = await Promise.all([
-      getRobotDetail(currentUuid),
-      getLocalNetworkIp().catch(() => null),
-    ])
-
-    const robotState = buildRobotSettingsState(robotResponse.data)
-    Object.assign(formData, robotState.form)
-    tags.value = robotState.tags
-    status.connected = robotState.connected
-    status.battery = robotState.battery
-
-    if (localIpResponse?.data?.ip) {
-      formData.local_ip = localIpResponse.data.ip
-    }
-
-    if (status.connected) {
-      await loadVolume()
-    }
-  } catch (error) {
-    ElMessage.error(getRobotErrorMessage(error, '加载数据失败'))
-  } finally {
-    loading.value = false
-  }
-
-  await rolesPromise
-}
-
-// Auto Save
-const autoSave = async (field: RobotSettingsField) => {
-  const currentUuid = uuid.value
-  if (!currentUuid) {
-    ElMessage.warning('请先选择机器人')
-    return
-  }
-
-  const { payload, errorMessage } = buildRobotAutoSavePayload(field, formData, tags.value)
-  if (errorMessage) {
-    ElMessage.warning(errorMessage)
-  }
-  if (!payload) {
-    return
-  }
-
-  try {
-    await updateRobotDetail(currentUuid, payload)
-    ElMessage.success({ message: '保存成功', duration: 1000 })
-  } catch (error) {
-    ElMessage.error(getRobotErrorMessage(error, '保存失败'))
-  }
-}
-
-// Tags
-const handleCloseTag = (tag: string) => {
-  tags.value.splice(tags.value.indexOf(tag), 1)
-  autoSave('tags')
-}
-
-const showInput = () => {
-  inputVisible.value = true
-  nextTick(() => {
-    InputRef.value?.input?.focus()
-  })
-}
-
-const handleInputConfirm = () => {
-  if (inputValue.value) {
-    tags.value.push(inputValue.value)
-    autoSave('tags')
-  }
-  inputVisible.value = false
-  inputValue.value = ''
-}
-
-// Network
-const copyText = (text: string) => {
-  navigator.clipboard.writeText(text)
-  ElMessage.success('已复制')
-}
-
-const testConnection = async () => {
-  const currentUuid = uuid.value
-  if (!currentUuid) {
-    ElMessage.warning('请先选择机器人')
-    return
-  }
-  testingNetwork.value = true
-  networkResult.value = null
-  try {
-    const result = await runRobotConnectionTest(currentUuid)
-    status.connected = result.connected
-    networkResult.value = {
-      success: result.connected,
-      message: result.message || (result.connected ? '连接成功' : '连接失败'),
-    }
-    if (result.connected) {
-      await loadVolume()
-    }
-  } catch (error) {
-    networkResult.value = {
-      success: false,
-      message: getRobotErrorMessage(error, '测试失败'),
-    }
-  } finally {
-    testingNetwork.value = false
-  }
-}
-
-// Update Methods
-const handleUpgrade = async (type: 'firmware') => {
-  ElMessage.info(`暂不支持${type === 'firmware' ? '固件' : '系统'}升级功能`)
-  // TODO: 实现升级功能
-}
-
-// Logs
-const getLogTypeLabel = (type: string) => {
-  const map: Record<string, string> = { robot: '机器人', app: 'APP', all: '全部' }
-  return map[type] || type
-}
-
-const uploadLogs = () => {
-  uploadingLogs.value = true
-  setTimeout(() => {
-    uploadingLogs.value = false
-    ElMessage.success('日志上传成功')
-    logHistory.value.unshift({
-      time: new Date().toLocaleString(),
-      type: logType.value,
-      size: '1.5MB'
-    })
-    if (logHistory.value.length > 5) logHistory.value.pop()
-  }, 1500)
-}
-
-// AI
-const saveAIConfig = () => {
-  if (!uuid.value) {
-    ElMessage.warning('请先选择机器人')
-    return
-  }
-
-  updateRobotDetail(uuid.value, {
-    ai_temperature: formData.ai_temperature,
-    ai_model: formData.ai_model,
-    ai_voice: formData.ai_voice,
-    ai_intent: formData.ai_intent,
-    ai_role_name: formData.ai_role_name,
-    ai_system_prompt: formData.ai_system_prompt,
-  })
-    .then(() => {
-      ElMessage.success('AI配置已保存')
-    })
-    .catch((error: unknown) => {
-      ElMessage.error(getRobotErrorMessage(error, 'AI配置保存失败'))
-    })
-}
-
-const markLog = async () => {
-  const currentUuid = uuid.value
-  if (!currentUuid) {
-    ElMessage.warning('请先选择机器人')
-    return
-  }
-  markingLog.value = true
-  try {
-    await markRobotLog(currentUuid, markMessage.value)
-    ElMessage.success('日志标记已写入')
-  } catch (error) {
-    ElMessage.error(`写入标记失败: ${getRobotErrorMessage(error, '网络错误')}`)
-  } finally {
-    markingLog.value = false
-  }
-}
-
-const openWifiSettings = () => {
-  if (!status.connected) {
-    ElMessage.warning('机器人未连接')
-    return
-  }
-  if (!formData.ip || !isValidIP(formData.ip)) {
-    ElMessage.warning('IP格式不正确')
-    return
-  }
-  const url = `http://${formData.ip}:8080`
-  window.open(url, '_blank')
-}
-
-// Volume Control
-let volumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-const loadVolume = async () => {
-  const currentUuid = uuid.value
-  if (!currentUuid || !status.connected) return
-
-  volumeData.loading = true
-  try {
-    const response = await getRobotVolume(currentUuid)
-    if (response.data) {
-      volumeData.volume = response.data.volume || 50
-      volumeData.muted = response.data.muted || false
-    }
-  } catch (error) {
-    console.error('加载音量失败:', error)
-  } finally {
-    volumeData.loading = false
-  }
-}
-
-const handleVolumeChange = (value?: number) => {
-  // 防抖处理
-  if (volumeDebounceTimer) {
-    clearTimeout(volumeDebounceTimer)
-  }
-
-  const nextVolume = typeof value === 'number' ? value : volumeData.volume
-  volumeDebounceTimer = setTimeout(async () => {
-    const currentUuid = uuid.value
-    if (!currentUuid) return
-
-    volumeData.loading = true
-    try {
-      await setRobotVolume(currentUuid, nextVolume)
-      ElMessage.success({ message: `音量已设置为 ${nextVolume}`, duration: 1000 })
-    } catch (error) {
-      ElMessage.error(`设置音量失败: ${getRobotErrorMessage(error, '网络错误')}`)
-    } finally {
-      volumeData.loading = false
-    }
-  }, 500)
-}
-
-const handleMuteToggle = async () => {
-  const currentUuid = uuid.value
-  if (!currentUuid) return
-
-  const newMuteState = !volumeData.muted
-  volumeData.loading = true
-
-  try {
-    await setRobotMute(currentUuid, newMuteState)
-    volumeData.muted = newMuteState
-    ElMessage.success(newMuteState ? '已静音' : '已取消静音')
-  } catch (error) {
-    ElMessage.error(`设置静音失败: ${getRobotErrorMessage(error, '网络错误')}`)
-  } finally {
-    volumeData.loading = false
-  }
-}
-
-onBeforeUnmount(() => {
-  if (volumeDebounceTimer) {
-    clearTimeout(volumeDebounceTimer)
-    volumeDebounceTimer = null
-  }
+const {
+  loading,
+  formData,
+  roles,
+  tags,
+  firmwareUpdateAvailable,
+  hasUpdate,
+  loadData,
+  autoSave,
+  updateFormField,
+  handleRemoveTag,
+  handleAddTag,
+  handleConnectionTested,
+  handleUpgrade,
+  handleUnbind,
+} = useRobotSettingsState({
+  uuid,
+  router,
+  loadVolume,
+  status,
 })
-
-// Unbind
-const handleUnbind = async () => {
-  const currentUuid = uuid.value
-  if (!currentUuid) {
-    ElMessage.warning('请先选择机器人')
-    return
-  }
-
-  loading.value = true
-  try {
-    await removeRobot(currentUuid)
-    ElMessage.success('解除绑定成功')
-    router.push('/robots')
-  } catch (error) {
-    ElMessage.error(`解除绑定失败: ${getRobotErrorMessage(error, '网络错误')}`)
-  } finally {
-    loading.value = false
-  }
-}
 
 watch(
   () => props.activeTab,
@@ -1047,71 +250,6 @@ watch(
   padding: 0;
 }
 
-.pane-content {
-  padding-right: 10px;
-}
-
-.section-title {
-  margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.subsection-title {
-  margin-top: 15px;
-  margin-bottom: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #606266;
-}
-
-.volume-control {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 8px;
-}
-
-.tags-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.input-new-tag {
-  width: 90px;
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-  margin-top: 10px;
-}
-
-.status-item {
-  background: #f5f7fa;
-  padding: 10px;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-}
-
-.status-item .label {
-  font-size: 12px;
-  color: #909399;
-}
-
-.status-item .value {
-  font-size: 16px;
-  font-weight: bold;
-  color: #303133;
-}
-
 .network-result {
   margin-left: 10px;
   font-size: 13px;
@@ -1142,47 +280,5 @@ watch(
   height: 6px;
   background: #f56c6c;
   border-radius: 50%;
-}
-
-.upgrade-card {
-  background: #f5f7fa;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
-}
-
-.upgrade-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.upgrade-header h4 {
-  margin: 0;
-}
-
-.upgrade-body {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.upgrade-body p {
-  margin: 0;
-  color: #606266;
-  font-size: 14px;
-}
-
-.version-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.version-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 </style>

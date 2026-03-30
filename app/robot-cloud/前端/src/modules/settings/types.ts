@@ -1,44 +1,32 @@
 // 系统设置模块 - 类型定义
 
-export interface LLMConfig {
-  provider: 'openai' | 'bigmodel' | 'anthropic' | 'deepseek' | 'aliyun';
-  openai: {
-    model: string
-    baseUrl: string
-    hasApiKey: boolean
-    apiKeyLength: number
-  }
-  bigmodel: {
-    model: string
-    baseUrl: string
-    hasApiKey: boolean
-    apiKeyLength: number
-  }
-  anthropic: {
-    model: string
-    baseUrl: string
-    hasApiKey: boolean
-    apiKeyLength: number
-  }
-  deepseek: {
-    model: string
-    baseUrl: string
-    hasApiKey: boolean
-    apiKeyLength: number
-  }
-  aliyun: {
-    model: string
-    baseUrl: string
-    hasApiKey: boolean
-    apiKeyLength: number
-  }
+export type LLMProviderKey = 'openai' | 'bigmodel' | 'anthropic' | 'deepseek' | 'aliyun'
+
+export interface LLMProviderConfigView {
+  model: string
+  baseUrl: string
+  hasApiKey: boolean
+  apiKeyLength: number
 }
 
-export interface UpdateLLMConfigDTO {
-  provider?: string
+export interface LLMConfig {
+  provider: LLMProviderKey
+  providers: Record<LLMProviderKey, LLMProviderConfigView>
+}
+
+export interface LLMProviderConfigInput {
   apiKey?: string
   model?: string
   baseUrl?: string
+}
+
+export interface UpdateLLMConfigDTO {
+  provider?: LLMProviderKey
+  openai?: LLMProviderConfigInput
+  bigmodel?: LLMProviderConfigInput
+  anthropic?: LLMProviderConfigInput
+  deepseek?: LLMProviderConfigInput
+  aliyun?: LLMProviderConfigInput
 }
 
 export interface AIConfig {

@@ -1,3 +1,4 @@
+import { http } from '@/api/request'
 import type { BoundRobot, LlmProviderOption, Role, RoleFormData } from './types'
 
 type ApiEnvelope<T> = {
@@ -7,35 +8,41 @@ type ApiEnvelope<T> = {
   message?: string
 }
 
-async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers)
-  if (init?.body && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json')
-  }
+async function requestJson<T>(
+  method: 'get' | 'post' | 'put' | 'delete',
+  url: string,
+  body?: unknown,
+): Promise<T> {
+  let payload: ApiEnvelope<T>
 
-  const response = await fetch(input, {
-    ...init,
-    headers,
-  })
-
-  const payload = await response.json().catch(() => ({})) as ApiEnvelope<T>
-  if (!response.ok || payload.success === false) {
-    throw new Error(payload.error || payload.message || `HTTP ${response.status}`)
+  switch (method) {
+    case 'get':
+      payload = await http.get<ApiEnvelope<T>>(url)
+      break
+    case 'post':
+      payload = await http.post<ApiEnvelope<T>>(url, body)
+      break
+    case 'put':
+      payload = await http.put<ApiEnvelope<T>>(url, body)
+      break
+    case 'delete':
+      payload = await http.delete<ApiEnvelope<T>>(url)
+      break
   }
 
   return (payload.data ?? payload) as T
 }
 
 export function getLlmProviders() {
-  return requestJson<LlmProviderOption[]>('/api/v1/config/llm/providers')
+  return requestJson<LlmProviderOption[]>('get', '/api/v1/config/llm/providers')
 }
 
 export function getRoles() {
-  return requestJson<Role[]>('/api/v1/roles')
+  return requestJson<Role[]>('get', '/api/v1/roles')
 }
 
 export function getRoleRobots(roleUuid: string) {
-  return requestJson<BoundRobot[]>(`/api/v1/roles/${roleUuid}/robots`)
+  return requestJson<BoundRobot[]>('get', `/api/v1/roles/${roleUuid}/robots`)
 }
 
 export async function getRolesWithRobotCount() {
@@ -53,28 +60,17 @@ export async function getRolesWithRobotCount() {
 }
 
 export function createRole(data: RoleFormData) {
-  return requestJson<Role>('/api/v1/roles', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  })
+  return requestJson<Role>('post', '/api/v1/roles', data)
 }
 
 export function updateRole(uuid: string, data: RoleFormData) {
-  return requestJson<Role>(`/api/v1/roles/${uuid}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  })
+  return requestJson<Role>('put', `/api/v1/roles/${uuid}`, data)
 }
 
 export function deleteRole(uuid: string) {
-  return requestJson<{ success: boolean }>(`/api/v1/roles/${uuid}`, {
-    method: 'DELETE',
-  })
+  return requestJson<{ success: boolean }>('delete', `/api/v1/roles/${uuid}`)
 }
 
 export function unbindRobotRole(robotUuid: string) {
-  return requestJson<{ success: boolean }>(`/api/v1/robots/${robotUuid}`, {
-    method: 'PUT',
-    body: JSON.stringify({ role_id: null }),
-  })
+  return requestJson<{ success: boolean }>('put', `/api/v1/robots/${robotUuid}`, { role_id: null })
 }

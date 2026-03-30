@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as settingsApi from './api'
-import type { LLMConfig, LLMProvider, SystemStatus, UIConfig } from './types'
+import type { LLMConfig, LLMProvider, SystemStatus, UIConfig, UpdateLLMConfigDTO } from './types'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
@@ -40,7 +40,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function updateLLMConfig(data: any) {
+  async function updateLLMConfig(data: UpdateLLMConfigDTO) {
     loading.value = true
     try {
       await settingsApi.updateLLMConfig(data)

@@ -12,9 +12,13 @@ import type { AccountService } from '../account/service';
 import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import 语音识别服务 from '../大模型交互/asr-service';
 import 对话服务 from '../大模型交互/chat-service';
+import type { ConversationRepository } from '../大模型交互/repository';
 import TTSService from '../大模型交互/tts-service';
+import type { RoleRepository } from '../角色管理/repository';
+import type { RoleRecord } from '../角色管理/types';
+import type { RobotRepository } from '../机器人管理/repository';
 import type { 机器人服务 } from '../机器人管理/service';
-import type { 音频路由配置 } from '../机器人管理/types';
+import type { RobotRecord, 音频路由配置 } from '../机器人管理/types';
 import { WebSocket请求响应跟踪器 } from './request-response-tracker';
 
 
@@ -78,11 +82,15 @@ class WebSocket服务 {
   private database: DatabaseService;
   private 账号服务?: AccountService;
   private 对话服务?: 对话服务;
+  private 对话仓库?: ConversationRepository;
+  private 角色仓库?: RoleRepository;
+  private 机器人仓库?: RobotRepository;
   private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
   private asrService: 语音识别服务;
   private 请求响应跟踪器: WebSocket请求响应跟踪器;
   private audioSessions: Map<string, AudioSession> = new Map();
+  private 机器人初始化任务: Map<string, Promise<void>> = new Map();
   private inputMergeTimers: Map<string, NodeJS.Timeout> = new Map();
   private pendingInputs: Map<
     string,
@@ -118,6 +126,93 @@ class WebSocket服务 {
 
   set对话服务(对话服务: 对话服务): void {
     this.对话服务 = 对话服务;
+  }
+
+  set对话仓库(对话仓库: ConversationRepository): void {
+    this.对话仓库 = 对话仓库;
+  }
+
+  set角色仓库(角色仓库: RoleRepository): void {
+    this.角色仓库 = 角色仓库;
+  }
+
+  set机器人仓库(机器人仓库: RobotRepository): void {
+    this.机器人仓库 = 机器人仓库;
+  }
+
+  private 获取机器人记录(robotId: string): Promise<RobotRecord | undefined> {
+    if (this.机器人仓库) {
+      return this.机器人仓库.getRobot(robotId);
+    }
+    return Promise.resolve(this.database.getRobot(robotId));
+  }
+
+  private async 更新机器人记录(robotId: string, data: Partial<RobotRecord>): Promise<void> {
+    if (this.机器人仓库) {
+      await this.机器人仓库.updateRobot(robotId, data);
+      return;
+    }
+    this.database.updateRobot(robotId, data);
+  }
+
+  private async 新增或更新机器人记录(data: Partial<RobotRecord> & { uuid: string }): Promise<void> {
+    if (this.机器人仓库) {
+      await this.机器人仓库.upsertRobot(data);
+      return;
+    }
+    this.database.upsertRobot(data);
+  }
+
+  private 获取角色记录(roleId: string): Promise<RoleRecord | undefined> {
+    if (this.角色仓库) {
+      return this.角色仓库.getRole(roleId);
+    }
+    return Promise.resolve(this.database.getRole(roleId));
+  }
+
+  private 记录机器人初始化任务(robotId: string, task: Promise<void>): void {
+    const wrappedTask = task.finally(() => {
+      if (this.机器人初始化任务.get(robotId) === wrappedTask) {
+        this.机器人初始化任务.delete(robotId);
+      }
+    });
+    this.机器人初始化任务.set(robotId, wrappedTask);
+  }
+
+  private async 等待机器人初始化完成(robotId: string): Promise<void> {
+    await this.机器人初始化任务.get(robotId);
+  }
+
+  private async 同步机器人在线状态(robotId: string): Promise<void> {
+    try {
+      const existing = await this.获取机器人记录(robotId);
+      if (existing) {
+        await this.更新机器人记录(robotId, { status: 'online' });
+      } else {
+        await this.新增或更新机器人记录({
+          uuid: robotId,
+          status: 'online',
+        });
+      }
+    } catch (error) {
+      logger.error(
+        '同步机器人在线状态失败',
+        error instanceof Error ? error : new Error(String(error)),
+        { robotId },
+      );
+    }
+  }
+
+  private async 标记机器人离线(robotId: string): Promise<void> {
+    try {
+      await this.更新机器人记录(robotId, { status: 'offline' });
+    } catch (error) {
+      logger.error(
+        '更新机器人离线状态失败',
+        error instanceof Error ? error : new Error(String(error)),
+        { robotId },
+      );
+    }
   }
 
   private 从请求解析Token(req: any): string | null {
@@ -293,15 +388,7 @@ class WebSocket服务 {
 
     // 仅机器人连接才需要更新数据库状态；UI 会话不写入机器人在线状态
     if (role !== 'ui' && !isPhoneSession) {
-      const existing = this.database.getRobot(robotId);
-      if (existing) {
-        this.database.updateRobot(robotId, { status: 'online' });
-      } else {
-        this.database.upsertRobot({
-          uuid: robotId,
-          status: 'online',
-        });
-      }
+      this.记录机器人初始化任务(robotId, this.同步机器人在线状态(robotId));
     }
 
     if (isPhoneSession) {
@@ -375,6 +462,9 @@ class WebSocket服务 {
    */
   private async handleMessage(robotId: string, data: Buffer, channel: Channel, ws?: WebSocket, role?: string): Promise<void> {
     try {
+      if (role !== 'ui') {
+        await this.等待机器人初始化完成(robotId);
+      }
       if (role === 'ui' && ws) {
         this.touchPhoneSessionBySocket(ws);
       }
@@ -557,7 +647,7 @@ class WebSocket服务 {
       logger.info('收到文本输入', { robotId, text, inputType });
 
       // 检查机器人是否存在
-      const robot = this.database.getRobot(robotId);
+      const robot = await this.获取机器人记录(robotId);
       if (!robot) {
         throw new Error('机器人不存在');
       }
@@ -600,7 +690,7 @@ class WebSocket服务 {
         }
         // 新数据库结构中不再使用 metadata，AI 配置从 role 获取
         if (robot.role_uuid) {
-          const role = this.database.getRole(robot.role_uuid);
+          const role = await this.获取角色记录(robot.role_uuid);
           if (role) {
             if (typeof role.max_history === 'number') {
               maxHistory = role.max_history || 10;
@@ -841,35 +931,71 @@ class WebSocket服务 {
         }, 'business');
 
         // 记录动作
-        this.database.insertActionLog(robotId, action.name, action.parameters, 'success', {
-          conversationId: traceId,
-          resultDetail: {
-            source: 'llm',
-            safetyChecked: true,
-          },
-        });
+        if (this.对话仓库) {
+          await this.对话仓库.createActionLog({
+            robot_id: robotId,
+            conversation_id: traceId,
+            action_name: action.name,
+            parameters: action.parameters,
+            status: 'success',
+            result_detail: {
+              source: 'llm',
+              safetyChecked: true,
+            },
+          });
+        } else {
+          this.database.insertActionLog(robotId, action.name, action.parameters, 'success', {
+            conversationId: traceId,
+            resultDetail: {
+              source: 'llm',
+              safetyChecked: true,
+            },
+          });
+        }
       }
 
       // 记录对话
-      this.database.insertConversation({
-        robot_id: robotId,
-        conversation_id: traceId,
-        type: inputType,
-        user_input: text,
-        ai_response: finalResponse.text,
-        actions: normalizedActions,
-        processing_time: processingTime,
-        metadata: {
-          ...finalResponse.metadata,
-          conversationId: traceId,
-          inputType,
-          asrTime: audioMeta?.asrTime,
-          audioDurationMs: audioMeta?.durationMs,
-          audioSessionId: audioMeta?.sessionId,
-          visionImage,
-          targetPosition,
-        },
-      });
+      if (this.对话仓库) {
+        await this.对话仓库.createConversation({
+          robot_id: robotId,
+          conversation_id: traceId,
+          type: inputType,
+          user_input: text,
+          ai_response: finalResponse.text,
+          actions: normalizedActions,
+          processing_time: processingTime,
+          metadata: {
+            ...finalResponse.metadata,
+            conversationId: traceId,
+            inputType,
+            asrTime: audioMeta?.asrTime,
+            audioDurationMs: audioMeta?.durationMs,
+            audioSessionId: audioMeta?.sessionId,
+            visionImage,
+            targetPosition,
+          },
+        });
+      } else {
+        this.database.insertConversation({
+          robot_id: robotId,
+          conversation_id: traceId,
+          type: inputType,
+          user_input: text,
+          ai_response: finalResponse.text,
+          actions: normalizedActions,
+          processing_time: processingTime,
+          metadata: {
+            ...finalResponse.metadata,
+            conversationId: traceId,
+            inputType,
+            asrTime: audioMeta?.asrTime,
+            audioDurationMs: audioMeta?.durationMs,
+            audioSessionId: audioMeta?.sessionId,
+            visionImage,
+            targetPosition,
+          },
+        });
+      }
 
       logger.记录对话({
         robotId,
@@ -994,13 +1120,27 @@ class WebSocket服务 {
       }, 'business');
 
       // 记录动作
-      this.database.insertActionLog(robotId, action, parameters || {}, 'success', {
-        conversationId: traceId,
-        resultDetail: {
-          source: 'manual_action_input',
-          safetyChecked: true,
-        },
-      });
+      if (this.对话仓库) {
+        await this.对话仓库.createActionLog({
+          robot_id: robotId,
+          conversation_id: traceId,
+          action_name: action,
+          parameters: parameters || {},
+          status: 'success',
+          result_detail: {
+            source: 'manual_action_input',
+            safetyChecked: true,
+          },
+        });
+      } else {
+        this.database.insertActionLog(robotId, action, parameters || {}, 'success', {
+          conversationId: traceId,
+          resultDetail: {
+            source: 'manual_action_input',
+            safetyChecked: true,
+          },
+        });
+      }
 
       // 通知UI已发送（添加 noTTS 标记，不生成TTS音频）
       this.broadcastMessage(robotId, {
@@ -1099,12 +1239,12 @@ class WebSocket服务 {
     const frameDurationMs = Number(audioData?.frameDurationMs || 20);
 
     // 获取机器人的角色配置，确定是否使用流式 ASR
-    const robot = this.database.getRobot(robotId);
+    const robot = await this.获取机器人记录(robotId);
     let asrOptions: any = {};
     let useStreamingASR = false;
 
     if (robot?.role_uuid) {
-      const role = this.database.getRole(robot.role_uuid);
+      const role = await this.获取角色记录(robot.role_uuid);
       if (role?.asr_provider) {
         asrOptions.provider = role.asr_provider;
         if (role.asr_model) {
@@ -1699,9 +1839,10 @@ class WebSocket服务 {
       const robotServerVersion = typeof metadata.robot_server_version === 'string' ? metadata.robot_server_version : undefined;
 
       // 更新机器人信息
-      const robot = this.database.getRobot(robotId);
+      const robot = await this.获取机器人记录(robotId);
 
-      this.database.updateRobot(robotId, {
+      await this.新增或更新机器人记录({
+        uuid: robotId,
         name: name || robot?.name || null,
         model: model || robot?.model || null,
         version: agentVersion || robot?.version || null,
@@ -1770,7 +1911,7 @@ class WebSocket服务 {
       connections.delete(channel);
       if (connections.size === 0) {
         this.robotConnections.delete(robotId);
-        this.database.updateRobot(robotId, { status: 'offline' });
+        void this.标记机器人离线(robotId);
         logger.info('机器人连接断开', { robotId, channel });
       }
     }

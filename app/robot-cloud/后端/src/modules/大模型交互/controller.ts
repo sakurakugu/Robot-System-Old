@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-import type DatabaseService from '../../core/database';
 import type { 对话服务 } from './chat-service';
+import type { ConversationRepository } from './repository';
 
 export class 对话控制器 {
   constructor(
     private conversationService: 对话服务,
-    private database: DatabaseService
+    private repository: ConversationRepository,
   ) {}
 
   private 获取参数(req: Request, key: string): string {
@@ -22,7 +22,7 @@ export class 对话控制器 {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      const conversations = this.conversationService.获取历史(robotId, limit, offset);
+      const conversations = await this.conversationService.获取历史(robotId, limit, offset);
 
       res.json({
         success: true,
@@ -52,7 +52,7 @@ export class 对话控制器 {
       }
 
       // 记录到对话历史（标记为控制端直接下发）
-      this.database.insertConversation({
+      await this.repository.createConversation({
         robot_id: robotId,
         type: 'text',
         user_input: `[controller] ${String(text)}`,

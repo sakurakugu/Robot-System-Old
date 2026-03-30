@@ -22,7 +22,7 @@ export class 机器人控制器 {
    */
   getAllRobots = async (_req: Request, res: Response) => {
     try {
-      const robots = this.机器人服务.获取所有机器人();
+      const robots = await this.机器人服务.获取所有机器人();
       res.json({ success: true, data: { robots } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -34,7 +34,7 @@ export class 机器人控制器 {
    */
   getGroups = async (_req: Request, res: Response) => {
     try {
-      const groups = this.机器人服务.获取分组();
+      const groups = await this.机器人服务.获取分组();
       res.json({ success: true, data: { groups } });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -47,7 +47,7 @@ export class 机器人控制器 {
   getRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid', 'robotId');
-      const robot = this.机器人服务.获取机器人(uuid);
+      const robot = await this.机器人服务.获取机器人(uuid);
       if (!robot) {
         return res.status(404).json({ success: false, error: '机器人不存在' });
       }
@@ -76,7 +76,7 @@ export class 机器人控制器 {
   updateRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const robot = this.机器人服务.更新机器人(uuid, req.body || {});
+      const robot = await this.机器人服务.更新机器人(uuid, req.body || {});
       res.json({ success: true, data: robot });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : 500;
@@ -90,7 +90,7 @@ export class 机器人控制器 {
   deleteRobot = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      this.机器人服务.删除机器人(uuid);
+      await this.机器人服务.删除机器人(uuid);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -271,7 +271,7 @@ export class 机器人控制器 {
   getAudioRoute = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const data = this.机器人服务.获取音频路由配置(uuid);
+      const data = await this.机器人服务.获取音频路由配置(uuid);
       res.json({ success: true, data });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : 500;
@@ -289,7 +289,7 @@ export class 机器人控制器 {
       if (!config || typeof config !== 'object') {
         return res.status(400).json({ success: false, error: '缺少配置数据' });
       }
-      const data = this.机器人服务.更新音频路由配置(uuid, config);
+      const data = await this.机器人服务.更新音频路由配置(uuid, config);
       res.json({ success: true, data });
     } catch (error: any) {
       const status = error.message === '机器人不存在' ? 404 : (error.message.includes('必须指定') ? 400 : 500);

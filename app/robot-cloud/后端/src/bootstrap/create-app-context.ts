@@ -12,6 +12,7 @@ import { 反馈服务 } from '../modules/反馈/service';
 import WebSocketService from '../modules/websocket/service';
 import { 对话服务 } from '../modules/大模型交互/chat-service';
 import { 对话控制器 } from '../modules/大模型交互/controller';
+import { PostgresConversationRepository } from '../modules/大模型交互/repository';
 import { 大模型管理控制器 } from '../modules/大模型管理/controller';
 import { 大模型配置服务 } from '../modules/大模型管理/service';
 import { 更新控制器 } from '../modules/更新管理/controller';
@@ -21,6 +22,7 @@ import { 机器人包控制器 } from '../modules/机器人包管理/controller'
 import { PostgresRobotPackageRepository } from '../modules/机器人包管理/repository';
 import { 机器人包服务 } from '../modules/机器人包管理/service';
 import { 机器人控制器 } from '../modules/机器人管理/controller';
+import { PostgresRobotRepository } from '../modules/机器人管理/repository';
 import { 机器人服务 } from '../modules/机器人管理/service';
 import { ChoreoController } from '../modules/编舞系统/controller';
 import { ChoreoService } from '../modules/编舞系统/service';
@@ -69,19 +71,20 @@ export function createAppContext(): 应用上下文 {
   const 设置仓库 = new PostgresSettingsRepository(异步数据库);
   const 应用版本仓库 = new PostgresAppVersionRepository(异步数据库);
   const 机器人包仓库 = new PostgresRobotPackageRepository(异步数据库);
+  const 机器人仓库 = new PostgresRobotRepository(异步数据库);
+  const 对话仓库 = new PostgresConversationRepository(异步数据库);
+  const 角色仓库 = new PostgresRoleRepository(异步数据库);
 
   数据库.resetAllRobotsStatusToOffline();
 
   const WebSocket服务 = new WebSocketService(数据库);
 
   const 服务 = {
-    机器人服务: new 机器人服务(数据库),
-    对话服务: new 对话服务(数据库),
+    机器人服务: new 机器人服务(机器人仓库),
+    对话服务: new 对话服务(对话仓库),
     大模型配置服务: new 大模型配置服务(设置仓库),
     设置服务: new 设置服务(设置仓库),
-    角色服务: new 角色服务(
-      new PostgresRoleRepository(异步数据库),
-    ),
+    角色服务: new 角色服务(角色仓库),
     编舞服务: new ChoreoService(数据库),
     更新服务: new 更新服务(应用版本仓库),
     机器人包服务: new 机器人包服务(机器人包仓库),
@@ -98,7 +101,7 @@ export function createAppContext(): 应用上下文 {
 
   const 控制器 = {
     机器人控制器: new 机器人控制器(服务.机器人服务),
-    对话控制器: new 对话控制器(服务.对话服务, 数据库),
+    对话控制器: new 对话控制器(服务.对话服务, 对话仓库),
     大模型控制器: new 大模型管理控制器(服务.大模型配置服务),
     设置控制器: new 设置控制器(服务.设置服务),
     角色控制器: new 角色控制器(服务.角色服务),
@@ -116,6 +119,9 @@ export function createAppContext(): 应用上下文 {
   WebSocket服务.set账号服务(服务.账号服务);
   WebSocket服务.set机器人服务(服务.机器人服务);
   WebSocket服务.set对话服务(服务.对话服务);
+  WebSocket服务.set对话仓库(对话仓库);
+  WebSocket服务.set角色仓库(角色仓库);
+  WebSocket服务.set机器人仓库(机器人仓库);
 
   return {
     数据库,

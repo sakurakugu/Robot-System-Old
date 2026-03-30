@@ -1,8 +1,8 @@
-import type DatabaseService from '../../core/database';
 import { logger } from "../../core/logger";
 import { parseActions } from "../../core/utils/helpers";
 import ActionController from "../机器人交互/action-controller";
 import LLM服务 from "./llm-service";
+import type { ConversationRepository } from './repository';
 import { AI响应, ConversationContext, Message } from "./types";
 
 export class 对话服务 {
@@ -13,7 +13,7 @@ export class 对话服务 {
   private conversationHistory: Map<string, Message[]>;
   private lastActiveAt: Map<string, number>;
 
-  constructor(private database: DatabaseService) {
+  constructor(private repository: ConversationRepository) {
     this.llmService = new LLM服务();
     this.actionController = new ActionController();
     this.conversationHistory = new Map();
@@ -25,8 +25,8 @@ export class 对话服务 {
     return history.length > limit ? history.slice(-limit) : history;
   }
 
-  private 获取回灌历史(robotId: string, maxHistory: number): Message[] {
-    const history = this.database.getRecentConversationMessages(robotId, maxHistory);
+  private async 获取回灌历史(robotId: string, maxHistory: number): Promise<Message[]> {
+    const history = await this.repository.getRecentConversationMessages(robotId, maxHistory);
     if (history.length > 0) {
       logger.info('已从数据库回灌对话上下文', {
         robotId,
@@ -78,7 +78,7 @@ export class 对话服务 {
       let history = this.conversationHistory.get(robotId);
 
       if (!history || history.length === 0) {
-        history = this.获取回灌历史(robotId, maxHistory);
+        history = await this.获取回灌历史(robotId, maxHistory);
       }
 
       // 保持历史记录在限制范围内
@@ -179,15 +179,15 @@ export class 对话服务 {
  * 获取对话历史
  */
   获取历史(robotId: string, limit: number = 50, offset: number = 0) {
-    return this.database.getConversations(robotId, limit, offset);
+    return this.repository.listConversations(robotId, limit, offset);
   }
 
   /**
    * 清除对话历史
    */
-  清除历史(robotId: string) {
+  async 清除历史(robotId: string): Promise<void> {
     this.conversationHistory.delete(robotId);
-    this.database.clearConversations(robotId);
+    await this.repository.clearConversations(robotId);
   }
 
   /**
@@ -232,7 +232,7 @@ export class 对话服务 {
       // 更新对话历史（记录用户问题和AI回复）
       let history = this.conversationHistory.get(robotId);
       if (!history || history.length === 0) {
-        history = this.获取回灌历史(robotId, maxHistory);
+        history = await this.获取回灌历史(robotId, maxHistory);
       }
       history = this.裁剪历史(history, maxHistory);
       history.push(

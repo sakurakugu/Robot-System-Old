@@ -2,11 +2,11 @@ import { spawn } from 'child_process';
 import net from 'net';
 import path from 'path';
 import { v7 as uuidv7, validate as validUUID } from 'uuid';
-import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
 import type WebSocketService from '../websocket/service';
 import type { 机器人包服务 } from '../机器人包管理/service';
+import type { RobotRepository } from './repository';
 import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto, 音频路由配置 } from './types';
 
 const 默认音频路由配置: 音频路由配置 = {
@@ -24,7 +24,7 @@ export class 机器人服务 {
   private websocketService?: WebSocketService;
   private packageService?: 机器人包服务;
 
-  constructor(private database: DatabaseService) {
+  constructor(private repository: RobotRepository) {
     // Windows 上通常是 python，Linux/Mac 上通常是 python3
     this.pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   }
@@ -46,7 +46,7 @@ export class 机器人服务 {
   /**
    * 转换数据库记录为 API 响应格式
    */
-  private 转换响应(record: RobotRecord | undefined): RobotResponse | undefined {
+  private async 转换响应(record: RobotRecord | undefined): Promise<RobotResponse | undefined> {
     if (!record) return undefined;
 
     // 解析 tags JSON
@@ -63,7 +63,7 @@ export class 机器人服务 {
     // 获取关联的角色
     let role = null;
     if (record.role_uuid) {
-      role = this.database.getRole(record.role_uuid) || null;
+      role = await this.repository.getRoleById(record.role_uuid) || null;
     }
 
     return {
@@ -73,27 +73,31 @@ export class 机器人服务 {
     };
   }
 
+  private 获取机器人记录(uuid: string): Promise<RobotRecord | undefined> {
+    return this.repository.getRobot(uuid);
+  }
+
   /**
    * 获取所有机器人
    */
-  获取所有机器人(): RobotResponse[] {
-    return this.database.getAllRobots()
-      .map(r => this.转换响应(r))
-      .filter((r): r is RobotResponse => r !== undefined);
+  async 获取所有机器人(): Promise<RobotResponse[]> {
+    const robots = await this.repository.listRobots();
+    const result = await Promise.all(robots.map((robot) => this.转换响应(robot)));
+    return result.filter((robot): robot is RobotResponse => robot !== undefined);
   }
 
   /**
    * 获取机器人详情
    */
-  获取机器人(uuid: string): RobotResponse | undefined {
-    return this.转换响应(this.database.getRobot(uuid));
+  async 获取机器人(uuid: string): Promise<RobotResponse | undefined> {
+    return this.转换响应(await this.获取机器人记录(uuid));
   }
 
   /**
    * 获取所有分组
    */
-  获取分组(): string[] {
-    return this.database.getAllGroups();
+  获取分组(): Promise<string[]> {
+    return this.repository.listGroups();
   }
 
   /**
@@ -150,7 +154,7 @@ export class 机器人服务 {
 
     // 创建数据库记录
     const finalUuid = uuid || uuidv7();
-    this.database.upsertRobot({
+    await this.repository.upsertRobot({
       uuid: finalUuid,
       name: data.name || null,
       model: data.model || null,
@@ -162,7 +166,7 @@ export class 机器人服务 {
       registered_at: new Date().toISOString(),
     });
 
-    const result = this.获取机器人(finalUuid);
+    const result = await this.获取机器人(finalUuid);
     if (!result) {
       throw new Error('创建机器人失败');
     }
@@ -172,13 +176,13 @@ export class 机器人服务 {
   /**
    * 更新机器人
    */
-  更新机器人(uuid: string, data: UpdateRobotDto): RobotResponse {
-    const existing = this.database.getRobot(uuid);
+  async 更新机器人(uuid: string, data: UpdateRobotDto): Promise<RobotResponse> {
+    const existing = await this.获取机器人记录(uuid);
     if (!existing) {
       throw new Error('机器人不存在');
     }
 
-    this.database.updateRobot(uuid, {
+    await this.repository.updateRobot(uuid, {
       name: data.name,
       model: data.model,
       ip: data.ip,
@@ -188,7 +192,7 @@ export class 机器人服务 {
       role_uuid: data.role_uuid,
     });
 
-    const result = this.获取机器人(uuid);
+    const result = await this.获取机器人(uuid);
     if (!result) {
       throw new Error('更新机器人失败');
     }
@@ -198,15 +202,15 @@ export class 机器人服务 {
   /**
    * 删除机器人
    */
-  删除机器人(uuid: string): void {
-    this.database.deleteRobot(uuid);
+  删除机器人(uuid: string): Promise<void> {
+    return this.repository.deleteRobot(uuid);
   }
 
   /**
    * 测试连接
    */
   async 测试连接(uuid: string): Promise<{ connected: boolean; message: string }> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -381,7 +385,7 @@ export class 机器人服务 {
    * 连接机器人
    */
   async 连接机器人(uuid: string): Promise<RobotResponse> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -397,8 +401,8 @@ export class 机器人服务 {
       throw new Error('连接失败');
     }
 
-    this.database.updateRobot(uuid, { status: 'online' });
-    const result = this.获取机器人(uuid);
+    await this.repository.updateRobot(uuid, { status: 'online' });
+    const result = await this.获取机器人(uuid);
     if (!result) {
       throw new Error('更新状态失败');
     }
@@ -409,7 +413,7 @@ export class 机器人服务 {
    * 推送安装包到机器人：通过 WebSocket 通道告知机器人从云端 HTTP 下载安装包
    */
   async 更新固件(uuid: string, channel: string = 'stable'): Promise<{ downloaded: string[] }> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -457,7 +461,7 @@ export class 机器人服务 {
   }
 
   async 写入日志标记(uuid: string, message: string): Promise<{ marker?: string }> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -481,7 +485,7 @@ export class 机器人服务 {
    * 获取机器人音量（通过WebSocket）
    */
   async 获取音量(uuid: string): Promise<{ volume: number; muted: boolean }> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -508,7 +512,7 @@ export class 机器人服务 {
    * 设置机器人音量（通过WebSocket）
    */
   async 设置音量(uuid: string, volume: number): Promise<void> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -537,7 +541,7 @@ export class 机器人服务 {
    * 设置机器人静音（通过WebSocket）
    */
   async 设置静音(uuid: string, mute: boolean): Promise<void> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -562,7 +566,7 @@ export class 机器人服务 {
    * 拍照并获取base64图片（通过WebSocket）
    */
   async 拍照(uuid: string): Promise<{ image: string; format: string }> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -592,7 +596,7 @@ export class 机器人服务 {
    * 获取机器人配置（通过WebSocket）
    */
   async 获取配置(uuid: string): Promise<any> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -619,7 +623,7 @@ export class 机器人服务 {
    * 更新机器人配置（通过WebSocket）
    */
   async 更新配置(uuid: string, config: any): Promise<any> {
-    const robot = this.database.getRobot(uuid);
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -645,8 +649,8 @@ export class 机器人服务 {
   /**
    * 获取音频路由配置（数据库持久化）
    */
-  获取音频路由配置(uuid: string): 音频路由配置 {
-    const robot = this.database.getRobot(uuid);
+  async 获取音频路由配置(uuid: string): Promise<音频路由配置> {
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
@@ -673,13 +677,13 @@ export class 机器人服务 {
   /**
    * 更新音频路由配置（数据库持久化）
    */
-  更新音频路由配置(uuid: string, input: Partial<音频路由配置>): 音频路由配置 {
-    const robot = this.database.getRobot(uuid);
+  async 更新音频路由配置(uuid: string, input: Partial<音频路由配置>): Promise<音频路由配置> {
+    const robot = await this.获取机器人记录(uuid);
     if (!robot) {
       throw new Error('机器人不存在');
     }
 
-    const current = this.获取音频路由配置(uuid);
+    const current = await this.获取音频路由配置(uuid);
     const next: 音频路由配置 = {
       mode: input.mode === 'phone' || input.mode === 'mute' || input.mode === 'robot' ? input.mode : current.mode,
       targetPhoneDeviceId: input.targetPhoneDeviceId === null
@@ -695,7 +699,7 @@ export class 机器人服务 {
       throw new Error('phone 模式下必须指定 targetPhoneDeviceId');
     }
 
-    this.database.updateRobot(uuid, {
+    await this.repository.updateRobot(uuid, {
       audio_route_config: JSON.stringify(next),
     });
 

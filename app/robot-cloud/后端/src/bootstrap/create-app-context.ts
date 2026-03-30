@@ -15,8 +15,10 @@ import { 对话控制器 } from '../modules/大模型交互/controller';
 import { 大模型管理控制器 } from '../modules/大模型管理/controller';
 import { 大模型配置服务 } from '../modules/大模型管理/service';
 import { 更新控制器 } from '../modules/更新管理/controller';
+import { PostgresAppVersionRepository } from '../modules/更新管理/repository';
 import { 更新服务 } from '../modules/更新管理/service';
 import { 机器人包控制器 } from '../modules/机器人包管理/controller';
+import { PostgresRobotPackageRepository } from '../modules/机器人包管理/repository';
 import { 机器人包服务 } from '../modules/机器人包管理/service';
 import { 机器人控制器 } from '../modules/机器人管理/controller';
 import { 机器人服务 } from '../modules/机器人管理/service';
@@ -65,6 +67,8 @@ export function createAppContext(): 应用上下文 {
   const 数据库 = new DatabaseService();
   const 异步数据库 = new PostgreSQL数据库客户端();
   const 设置仓库 = new PostgresSettingsRepository(异步数据库);
+  const 应用版本仓库 = new PostgresAppVersionRepository(异步数据库);
+  const 机器人包仓库 = new PostgresRobotPackageRepository(异步数据库);
 
   数据库.resetAllRobotsStatusToOffline();
 
@@ -79,8 +83,8 @@ export function createAppContext(): 应用上下文 {
       new PostgresRoleRepository(异步数据库),
     ),
     编舞服务: new ChoreoService(数据库),
-    更新服务: new 更新服务(数据库),
-    机器人包服务: new 机器人包服务(数据库),
+    更新服务: new 更新服务(应用版本仓库),
+    机器人包服务: new 机器人包服务(机器人包仓库),
     账号服务: new AccountService(
       new PostgresAccountRepository(异步数据库),
     ),

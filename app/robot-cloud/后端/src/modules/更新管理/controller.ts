@@ -7,7 +7,7 @@ export class 更新控制器 {
   constructor(private service: 更新服务) {}
 
   /** POST /updates/upload — 上传 APK */
-  upload = (req: Request, res: Response): void => {
+  upload = async (req: Request, res: Response): Promise<void> => {
     try {
       const file = req.file;
       if (!file) {
@@ -40,7 +40,7 @@ export class 更新控制器 {
         return;
       }
 
-      const info = this.service.uploadApk(
+      const info = await this.service.uploadApk(
         { buffer: file.buffer, size: file.size },
         normalizedVersionCode,
         channel as ReleaseChannel,
@@ -55,7 +55,7 @@ export class 更新控制器 {
   };
 
   /** GET /updates/check — 检查更新 */
-  check = (req: Request, res: Response): void => {
+  check = async (req: Request, res: Response): Promise<void> => {
     try {
       const currentVersionCode = Number(req.query.currentVersionCode) || 0;
       const channel = (req.query.channel as ReleaseChannel) || 'stable';
@@ -65,7 +65,7 @@ export class 更新控制器 {
         return;
       }
 
-      const result = this.service.checkUpdate(currentVersionCode, channel);
+      const result = await this.service.checkUpdate(currentVersionCode, channel);
       res.json({ success: true, data: result });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -73,10 +73,10 @@ export class 更新控制器 {
   };
 
   /** GET /updates/download/:id — 下载 APK */
-  download = (req: Request, res: Response): void => {
+  download = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = Number(req.params.id);
-      const result = this.service.getApkPath(id);
+      const result = await this.service.getApkPath(id);
       if (!result) {
         res.status(404).json({ success: false, error: '版本不存在或文件丢失' });
         return;
@@ -89,7 +89,7 @@ export class 更新控制器 {
   };
 
   /** GET /updates/versions — 版本列表 */
-  list = (req: Request, res: Response): void => {
+  list = async (req: Request, res: Response): Promise<void> => {
     try {
       const channel = req.query.channel as ReleaseChannel | undefined;
       if (channel && !['stable', 'beta'].includes(channel)) {
@@ -97,7 +97,7 @@ export class 更新控制器 {
         return;
       }
 
-      const versions = this.service.listVersions(channel);
+      const versions = await this.service.listVersions(channel);
       res.json({ success: true, data: versions });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -105,10 +105,10 @@ export class 更新控制器 {
   };
 
   /** POST /updates/rollback/:id — 回滚 */
-  rollback = (req: Request, res: Response): void => {
+  rollback = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = Number(req.params.id);
-      const result = this.service.rollback(id);
+      const result = await this.service.rollback(id);
       if (!result) {
         res.status(404).json({ success: false, error: '版本不存在或文件丢失' });
         return;
@@ -121,10 +121,10 @@ export class 更新控制器 {
   };
 
   /** DELETE /updates/versions/:id — 删除版本 */
-  delete = (req: Request, res: Response): void => {
+  delete = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = Number(req.params.id);
-      const ok = this.service.deleteVersion(id);
+      const ok = await this.service.deleteVersion(id);
       if (!ok) {
         res.status(404).json({ success: false, error: '版本不存在' });
         return;

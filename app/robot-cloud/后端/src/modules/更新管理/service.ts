@@ -1,8 +1,6 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import type DatabaseService from '../../core/database';
-import type { 同步数据库实例 } from '../../core/database/types';
 import { logger } from '../../core/logger';
 import type {
     AppVersionInfo,
@@ -10,6 +8,7 @@ import type {
     ReleaseChannel,
     UpdateCheckResult,
 } from './types';
+import type { AppVersionRepository } from './repository';
 
 /** APK 存储根目录 */
 const APK_DIR = path.resolve(process.cwd(), 'data', 'apps', 'apk');
@@ -55,11 +54,7 @@ function toVersionInfo(record: AppVersionRecord): AppVersionInfo {
 }
 
 export class 更新服务 {
-  private db: 同步数据库实例;
-
-  constructor(database: DatabaseService) {
-    this.db = database.getDb();
-
+  constructor(private repository: AppVersionRepository) {
     // 确保 APK 目录存在
     if (!fs.existsSync(APK_DIR)) {
       fs.mkdirSync(APK_DIR, { recursive: true });
@@ -70,13 +65,13 @@ export class 更新服务 {
   /*  上传 APK                                                          */
   /* ------------------------------------------------------------------ */
 
-  uploadApk(
+  async uploadApk(
     file: { buffer: Buffer; size: number },
     versionCode: number,
     channel: ReleaseChannel,
     fileHash: string,
     changelog?: string
-  ): AppVersionInfo {
+  ): Promise<AppVersionInfo> {
     const normalizedClientHash = fileHash.trim().toLowerCase();
     const hash = crypto.createHash('sha256').update(new Uint8Array(file.buffer)).digest('hex').toLowerCase();
 
@@ -96,20 +91,19 @@ export class 更新服务 {
     fs.writeFileSync(filePath, new Uint8Array(file.buffer));
     logger.info(`APK 已保存: ${fileName} (${file.size} bytes)`);
 
-    // 将同渠道其他版本设为非活跃
-    this.db.prepare(`UPDATE app_versions SET is_active = 0 WHERE channel = ?`).run(channel);
-
-    // 插入记录并设为活跃
-    const result = this.db
-      .prepare(
-        `INSERT INTO app_versions (version_name, version_code, channel, file_name, file_size, file_hash, changelog, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
-      )
-      .run(versionName, versionCode, channel, fileName, file.size, normalizedClientHash, changelog || null);
-
-    const record = this.db
-      .prepare(`SELECT * FROM app_versions WHERE id = ?`)
-      .get(result.lastInsertRowid) as AppVersionRecord;
+    const record = await this.repository.withTransaction(async (repository) => {
+      await repository.deactivateChannel(channel);
+      return repository.createVersion({
+        version_name: versionName,
+        version_code: versionCode,
+        channel,
+        file_name: fileName,
+        file_size: file.size,
+        file_hash: normalizedClientHash,
+        changelog: changelog || null,
+        is_active: 1,
+      });
+    });
 
     return toVersionInfo(record);
   }
@@ -118,12 +112,11 @@ export class 更新服务 {
   /*  检查更新                                                          */
   /* ------------------------------------------------------------------ */
 
-  checkUpdate(currentVersionCode: number, channel: ReleaseChannel = 'stable'): UpdateCheckResult {
-    const latest = this.db
-      .prepare(
-        `SELECT * FROM app_versions WHERE channel = ? AND is_active = 1 ORDER BY version_code DESC LIMIT 1`
-      )
-      .get(channel) as AppVersionRecord | undefined;
+  async checkUpdate(
+    currentVersionCode: number,
+    channel: ReleaseChannel = 'stable',
+  ): Promise<UpdateCheckResult> {
+    const latest = await this.repository.getActiveVersion(channel);
 
     if (!latest) {
       return {
@@ -157,10 +150,8 @@ export class 更新服务 {
   /*  下载 APK                                                          */
   /* ------------------------------------------------------------------ */
 
-  getApkPath(id: number): { filePath: string; fileName: string } | null {
-    const record = this.db
-      .prepare(`SELECT * FROM app_versions WHERE id = ?`)
-      .get(id) as AppVersionRecord | undefined;
+  async getApkPath(id: number): Promise<{ filePath: string; fileName: string } | null> {
+    const record = await this.repository.getVersionById(id);
     if (!record) return null;
 
     const filePath = path.join(APK_DIR, record.file_name);
@@ -179,19 +170,8 @@ export class 更新服务 {
   /*  版本列表                                                          */
   /* ------------------------------------------------------------------ */
 
-  listVersions(channel?: ReleaseChannel): AppVersionInfo[] {
-    let rows: AppVersionRecord[];
-    if (channel) {
-      rows = this.db
-        .prepare(
-          `SELECT * FROM app_versions WHERE channel = ? ORDER BY version_code DESC, uploaded_at DESC`
-        )
-        .all(channel) as AppVersionRecord[];
-    } else {
-      rows = this.db
-        .prepare(`SELECT * FROM app_versions ORDER BY version_code DESC, uploaded_at DESC`)
-        .all() as AppVersionRecord[];
-    }
+  async listVersions(channel?: ReleaseChannel): Promise<AppVersionInfo[]> {
+    const rows = await this.repository.listVersions(channel);
     return rows.map(toVersionInfo);
   }
 
@@ -199,10 +179,8 @@ export class 更新服务 {
   /*  回滚                                                              */
   /* ------------------------------------------------------------------ */
 
-  rollback(id: number): AppVersionInfo | null {
-    const record = this.db
-      .prepare(`SELECT * FROM app_versions WHERE id = ?`)
-      .get(id) as AppVersionRecord | undefined;
+  async rollback(id: number): Promise<AppVersionInfo | null> {
+    const record = await this.repository.getVersionById(id);
     if (!record) return null;
 
     const filePath = path.join(APK_DIR, record.file_name);
@@ -211,21 +189,25 @@ export class 更新服务 {
       return null;
     }
 
-    this.db.prepare(`UPDATE app_versions SET is_active = 0 WHERE channel = ?`).run(record.channel);
-    this.db.prepare(`UPDATE app_versions SET is_active = 1 WHERE id = ?`).run(id);
+    const updated = await this.repository.withTransaction(async (repository) => {
+      await repository.deactivateChannel(record.channel);
+      await repository.activateVersion(id);
+      return repository.getVersionById(id);
+    });
 
     logger.info(`已回滚到版本 ${record.version_name} (${record.channel})`);
-    return toVersionInfo({ ...record, is_active: 1 });
+    if (!updated) {
+      return null;
+    }
+    return toVersionInfo(updated);
   }
 
   /* ------------------------------------------------------------------ */
   /*  删除版本                                                          */
   /* ------------------------------------------------------------------ */
 
-  deleteVersion(id: number): boolean {
-    const record = this.db
-      .prepare(`SELECT * FROM app_versions WHERE id = ?`)
-      .get(id) as AppVersionRecord | undefined;
+  async deleteVersion(id: number): Promise<boolean> {
+    const record = await this.repository.getVersionById(id);
     if (!record) return false;
 
     const filePath = path.join(APK_DIR, record.file_name);
@@ -233,18 +215,16 @@ export class 更新服务 {
       fs.unlinkSync(filePath);
     }
 
-    this.db.prepare(`DELETE FROM app_versions WHERE id = ?`).run(id);
+    await this.repository.withTransaction(async (repository) => {
+      await repository.deleteVersion(id);
 
-    if (record.is_active === 1) {
-      const newest = this.db
-        .prepare(
-          `SELECT * FROM app_versions WHERE channel = ? ORDER BY version_code DESC LIMIT 1`
-        )
-        .get(record.channel) as AppVersionRecord | undefined;
-      if (newest) {
-        this.db.prepare(`UPDATE app_versions SET is_active = 1 WHERE id = ?`).run(newest.id);
+      if (record.is_active === 1) {
+        const newest = await repository.getLatestVersion(record.channel);
+        if (newest) {
+          await repository.activateVersion(newest.id);
+        }
       }
-    }
+    });
 
     logger.info(`已删除版本 ${record.version_name} (${record.channel})`);
     return true;

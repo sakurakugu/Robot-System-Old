@@ -18,7 +18,7 @@ export class 机器人包控制器 {
   constructor(private service: 机器人包服务) {}
 
   /** POST /robot-packages/upload — 上传机器人包 */
-  upload = (req: Request, res: Response): void => {
+  upload = async (req: Request, res: Response): Promise<void> => {
     try {
       const files = req.files as Record<string, Express.Multer.File[]> | undefined;
       if (!files || Object.keys(files).length === 0) {
@@ -67,7 +67,7 @@ export class 机器人包控制器 {
         return;
       }
 
-      const info = this.service.uploadPackages(
+      const info = await this.service.uploadPackages(
         items,
         normalizedVersionCode,
         channel as ReleaseChannel,
@@ -81,14 +81,14 @@ export class 机器人包控制器 {
   };
 
   /** GET /robot-packages/versions — 版本列表 */
-  list = (req: Request, res: Response): void => {
+  list = async (req: Request, res: Response): Promise<void> => {
     try {
       const channel = req.query.channel as ReleaseChannel | undefined;
       if (channel && !['stable', 'beta'].includes(channel)) {
         res.status(400).json({ success: false, error: 'channel 必须是 stable 或 beta' });
         return;
       }
-      const versions = this.service.listVersions(channel);
+      const versions = await this.service.listVersions(channel);
       res.json({ success: true, data: versions });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -96,36 +96,38 @@ export class 机器人包控制器 {
   };
 
   /** POST /robot-packages/rollback/:id — 回滚到指定版本 */
-  rollback = (req: Request, res: Response): void => {
+  rollback = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = Number(req.params.id);
-      const info = this.service.rollback(id);
+      const info = await this.service.rollback(id);
       res.json({ success: true, data: info });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      const status = error.message.includes('不存在') ? 404 : 500;
+      res.status(status).json({ success: false, error: error.message });
     }
   };
 
   /** DELETE /robot-packages/versions/:id — 删除版本 */
-  delete = (req: Request, res: Response): void => {
+  delete = async (req: Request, res: Response): Promise<void> => {
     try {
       const id = Number(req.params.id);
-      this.service.deleteVersion(id);
+      await this.service.deleteVersion(id);
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      const status = error.message.includes('不存在') ? 404 : 500;
+      res.status(status).json({ success: false, error: error.message });
     }
   };
 
   /** GET /robot-packages/active?channel=stable — 获取当前活跃版本信息 */
-  getActive = (req: Request, res: Response): void => {
+  getActive = async (req: Request, res: Response): Promise<void> => {
     try {
       const channel = (req.query.channel as ReleaseChannel) || 'stable';
       if (!['stable', 'beta'].includes(channel)) {
         res.status(400).json({ success: false, error: 'channel 必须是 stable 或 beta' });
         return;
       }
-      const info = this.service.getActive(channel);
+      const info = await this.service.getActive(channel);
       if (!info) {
         res.status(404).json({ success: false, error: '没有可用的安装包' });
         return;
@@ -137,7 +139,7 @@ export class 机器人包控制器 {
   };
 
   /** GET /robot-packages/download/:type?channel=stable — 下载指定类型的安装包 */
-  download = (req: Request, res: Response): void => {
+  download = async (req: Request, res: Response): Promise<void> => {
     try {
       const type = req.params.type as PackageType;
       if (!['agent', 'server', 'common'].includes(type)) {
@@ -149,7 +151,7 @@ export class 机器人包控制器 {
         res.status(400).json({ success: false, error: 'channel 必须是 stable 或 beta' });
         return;
       }
-      const filePath = this.service.getPackageFilePath(type, channel);
+      const filePath = await this.service.getPackageFilePath(type, channel);
       if (!filePath || !fs.existsSync(filePath)) {
         res.status(404).json({ success: false, error: '找不到安装包文件，请先上传安装包' });
         return;

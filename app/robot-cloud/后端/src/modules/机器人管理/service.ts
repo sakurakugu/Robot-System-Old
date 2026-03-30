@@ -423,7 +423,7 @@ export class 机器人服务 {
     }
 
     const releaseChannel = channel as 'stable' | 'beta';
-    const pkgInfo = this.packageService.getActive(releaseChannel);
+    const pkgInfo = await this.packageService.getActive(releaseChannel);
     if (!pkgInfo) {
       throw new Error(`没有可用的安装包（channel: ${channel}），请先在包管理页面上传安装包`);
     }

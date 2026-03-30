@@ -188,7 +188,6 @@
 import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
 import { getConversationHistory, sendCommand } from '@/modules/conversation/api'
 import {
-  buildAudioUrl,
   buildTargetBoxStyle,
   buildVisionImageUrl,
   formatMessageTime as formatTime,
@@ -197,6 +196,7 @@ import {
   type ChatMessage,
   type VisionStatus,
 } from '@/modules/conversation/chat'
+import { useChatAudio } from '@/modules/conversation/composables/useChatAudio'
 import { useWebSocket } from '@/composables/useWebSocket'
 import {
   ChatDotSquare,
@@ -250,8 +250,19 @@ const ttsVolume = ref(0)
 //   { label: '云扬(男)', value: 'zh-CN-YunyangNeural' },
 // ]
 
-const pendingTTS = ref<string[]>([])
-const playRequestId = ref<string | null>(null)
+const getTTSOptions = () => ({
+  voice: ttsVoice.value,
+  speed: ttsSpeed.value,
+  pitch: ttsPitch.value,
+  volume: ttsVolume.value,
+})
+
+const { handleAudioResponse, handlePlayClick, requestTTS } = useChatAudio({
+  messages,
+  isConnected,
+  sendTTS,
+  getTTSOptions,
+})
 
 const disconnect = () => {
   wsDisconnect()
@@ -330,13 +341,7 @@ const sendMessage = (target: 'ai' | 'robot') => {
     userMessage.sendingToRobot = true
     messages.value.push(userMessage)
     if (isConnected.value) {
-      pendingTTS.value.push(userMessage.id)
-      sendTTS(text, {
-        voice: ttsVoice.value,
-        speed: ttsSpeed.value,
-        pitch: ttsPitch.value,
-        volume: ttsVolume.value,
-      })
+      requestTTS(userMessage.id, text)
     }
 
     sendToRobot(text).then(success => {
@@ -349,12 +354,7 @@ const sendMessage = (target: 'ai' | 'robot') => {
     userMessage.sendingToRobot = false
     messages.value.push(userMessage)
     requestTimestamps.set(timestamp, Date.now())
-    sendTextWithTTS(text, {
-      voice: ttsVoice.value,
-      speed: ttsSpeed.value,
-      pitch: ttsPitch.value,
-      volume: ttsVolume.value,
-    })
+    sendTextWithTTS(text, getTTSOptions())
   }
 
   inputText.value = ''
@@ -381,7 +381,7 @@ const scrollToBottom = async () => {
   }
 }
 
-onMessage((data) => {
+const removeMessageHandler = onMessage((data) => {
   if (data.type === 'vision_status') {
     const status = data.data?.status as VisionStatus['status']
     const alertTypeMap: Record<VisionStatus['status'], VisionStatus['alertType']> = {
@@ -452,44 +452,12 @@ onMessage((data) => {
     if (!data.data?.noTTS && !data.data?.ttsDone) {
       const m = messages.value.find(mm => mm.id === aiMessage.id)
       if (m && !m.audioUrl) {
-        pendingTTS.value.push(m.id)
-        sendTTS(m.text, {
-          voice: ttsVoice.value,
-          speed: ttsSpeed.value,
-          pitch: ttsPitch.value,
-          volume: ttsVolume.value,
-        })
+        requestTTS(m.id, m.text)
       }
     }
   } else if (data.type === 'audio_response') {
     try {
-      const b64 = data.data.buffer || ''
-      const url = buildAudioUrl(b64, data.data.format || 'opus')
-      lastAudioUrl.value = url
-      let assignedId: string | null = null
-      const nextId = pendingTTS.value.shift() || null
-      if (nextId) {
-        const m = messages.value.find(mm => mm.id === nextId)
-        if (m && !m.audioUrl) {
-          m.audioUrl = url
-          m.audioDuration = data.data.duration || 0
-          assignedId = m.id
-        }
-      } else {
-        for (let i = messages.value.length - 1; i >= 0; i--) {
-          const m = messages.value[i]
-          if (!m.audioUrl) {
-            m.audioUrl = url
-            m.audioDuration = data.data.duration || 0
-            assignedId = m.id
-            break
-          }
-        }
-      }
-      if (assignedId && playRequestId.value === assignedId) {
-        playRequestId.value = null
-        playAudio(url)
-      }
+      handleAudioResponse(data.data || {})
     } catch (error) {
       console.error('处理音频响应失败:', error)
     }
@@ -510,33 +478,7 @@ onMessage((data) => {
     messages.value.push(aiMessage)
     scrollToBottom()
   }
-});
-
-const playAudio = (url: string) => {
-  const audio = new Audio(url)
-  audio.play()
-}
-
-const handlePlayClick = (msg: ChatMessage) => {
-  if (msg.audioUrl) {
-    playAudio(msg.audioUrl)
-    return
-  }
-  if (!isConnected.value) {
-    ElMessage.warning('未连接，无法生成语音')
-    return
-  }
-  pendingTTS.value.push(msg.id)
-  playRequestId.value = msg.id
-  sendTTS(msg.text, {
-    voice: ttsVoice.value,
-    speed: ttsSpeed.value,
-    pitch: ttsPitch.value,
-    volume: ttsVolume.value,
-  })
-}
-
-const lastAudioUrl = ref<string | null>(null)
+})
 
 const loadHistoryMessages = async (uuid?: string) => {
   if (!uuid) {
@@ -561,6 +503,7 @@ onMounted(() => {
   }
 })
 onUnmounted(() => {
+  removeMessageHandler()
   disconnect()
 })
 

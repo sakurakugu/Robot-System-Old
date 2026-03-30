@@ -719,7 +719,7 @@ const isRobotOnline = (uuid: string): boolean => {
 }
 
 // WebSocket Message Handling
-onMessage((data) => {
+const removeMessageHandler = onMessage((data) => {
   if (data.type === 'battery_status') {
     robotBattery.value = data.data.level
   } else if (data.type === 'status_update') {
@@ -809,6 +809,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timeInterval) clearInterval(timeInterval)
+  removeMessageHandler()
   wsDisconnect()
 })
 

@@ -119,11 +119,18 @@ function connectSocket(
 }
 
 export function useWebSocket() {
-  const dispatchMessage = (data: any) => messageHandlers.forEach(h => h(data))
+  const dispatchMessage = (data: any) => messageHandlers.slice().forEach(h => h(data))
 
   const onMessage = (handler: MessageHandler) => {
     if (!messageHandlers.includes(handler)) {
       messageHandlers.push(handler)
+    }
+
+    return () => {
+      const index = messageHandlers.indexOf(handler)
+      if (index !== -1) {
+        messageHandlers.splice(index, 1)
+      }
     }
   }
 

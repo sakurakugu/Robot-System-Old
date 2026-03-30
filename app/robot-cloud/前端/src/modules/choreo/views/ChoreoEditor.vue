@@ -842,9 +842,10 @@ const handleChoreoMessage = (message: ChoreoWSMessage) => {
 
 // WebSocket 消息监听
 const { onMessage, connect: wsConnect, disconnect: wsDisconnect } = useWebSocket()
+let removeMessageHandler: (() => void) | null = null
 
 const setupWSListener = () => {
-  onMessage((message: any) => {
+  removeMessageHandler = onMessage((message: any) => {
     if (typeof message.type === 'string' && message.type.startsWith('choreo_')) {
       handleChoreoMessage(message as ChoreoWSMessage)
     }
@@ -853,6 +854,8 @@ const setupWSListener = () => {
 }
 
 const cleanupWSListener = () => {
+  removeMessageHandler?.()
+  removeMessageHandler = null
   wsDisconnect()
 }
 

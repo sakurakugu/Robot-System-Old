@@ -3,7 +3,18 @@
     <PageHeader
       title="个人资料"
       :icon="User"
-    />
+      @back="goHome"
+    >
+      <template #extra>
+        <el-button
+          type="primary"
+          :icon="HomeFilled"
+          @click="goHome"
+        >
+          首页
+        </el-button>
+      </template>
+    </PageHeader>
 
     <el-row :gutter="20">
       <el-col
@@ -84,11 +95,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/modules/auth/store'
 import { formatDate, formatDateTime } from '@/utils/date'
 import PageHeader from '@/components/PageHeader.vue'
-import { User } from '@element-plus/icons-vue'
+import { HomeFilled, User } from '@element-plus/icons-vue'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const userInfo = computed(() => authStore.user)
 
@@ -119,6 +132,10 @@ const roleType = computed(() => {
       return 'info'
   }
 })
+
+const goHome = () => {
+  router.push('/home')
+}
 </script>
 
 <style scoped>

@@ -162,7 +162,7 @@ const doRegister = async () => {
 
 const enterGuest = () => {
   authStore.enterGuestMode()
-  router.replace('/robots')
+  router.replace('/home')
 }
 </script>
 

@@ -4,6 +4,7 @@ import { authLayoutRoutes, authRoutes } from '@/modules/auth/router'
 import { useAuthStore } from '@/modules/auth/store'
 import { choreoRoutes } from '@/modules/choreo/router'
 import { conversationRoutes } from '@/modules/conversation/router'
+import { homeRoutes } from '@/modules/home/router'
 import { knowledgeBase } from '@/modules/knowledge/router'
 import MainLayout from '@/modules/layouts/views/MainLayout.vue'
 import { robotRoutes } from '@/modules/robot/router'
@@ -13,10 +14,11 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   ...authRoutes,
+  ...homeRoutes,
   {
     path: '/',
     component: MainLayout,
-    redirect: '/robots',
+    redirect: '/home',
     children: [
       ...robotRoutes,
       ...roleRoutes,
@@ -30,7 +32,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    redirect: '/robots',
+    redirect: '/home',
   },
 ]
 
@@ -43,19 +45,26 @@ export const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   const isAuthPage = to.path === '/auth'
+  const isHomePage = to.path === '/home'
 
   // 设置页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - 机器狗对话系统`
   }
 
-  if (!isAuthPage && !authStore.isAuthenticated) {
+  // 首页和认证页不需要登录
+  if (isHomePage || isAuthPage) {
+    next()
+    return
+  }
+
+  if (!authStore.isAuthenticated) {
     next('/auth')
     return
   }
 
   if (isAuthPage && authStore.isAuthenticated) {
-    next('/robots')
+    next('/home')
     return
   }
 
@@ -63,7 +72,7 @@ router.beforeEach((to, _from, next) => {
   if (allowRoles.length > 0) {
     const role = authStore.user?.role || 'guest'
     if (!allowRoles.includes(role)) {
-      next('/robots')
+      next('/home')
       return
     }
   }

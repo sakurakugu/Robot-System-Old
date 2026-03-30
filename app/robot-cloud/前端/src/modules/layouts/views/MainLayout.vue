@@ -11,32 +11,59 @@
         <h1>机器狗管理应用</h1>
       </div>
       <div class="header-actions">
-        <el-tag
-          v-if="authStore.isAuthenticated && authStore.user"
-          type="success"
-        >
-          {{ authStore.user.username }} / {{ roleName }}
-        </el-tag>
-        <el-tag
-          v-else
-          type="info"
-        >
-          游客模式
-        </el-tag>
+        <!-- 首页按钮 -->
         <el-button
-          v-if="authStore.isAuthenticated"
           text
-          @click="logout"
+          class="home-btn"
+          @click="goHome"
         >
-          退出
+          <el-icon><HomeFilled /></el-icon>
+          <span>首页</span>
         </el-button>
-        <el-button
-          v-else
-          text
-          @click="goAuth"
+        
+        <el-divider direction="vertical" />
+        
+        <!-- 用户头像下拉菜单 -->
+        <el-dropdown
+          trigger="click"
+          @command="handleCommand"
         >
-          登录/注册
-        </el-button>
+          <div class="avatar-wrapper">
+            <el-avatar
+              :size="32"
+              class="header-avatar"
+            >
+              {{ displayName }}
+            </el-avatar>
+            <span class="username-text">{{ userName }}</span>
+            <el-icon class="dropdown-icon">
+              <ArrowDown />
+            </el-icon>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="controlPanel">
+                <el-icon><User /></el-icon>
+                <span>控制面板</span>
+              </el-dropdown-item>
+              <el-dropdown-item
+                v-if="!authStore.isAuthenticated"
+                command="login"
+              >
+                <el-icon><Key /></el-icon>
+                <span>登录 / 注册</span>
+              </el-dropdown-item>
+              <el-dropdown-item
+                v-if="authStore.isAuthenticated"
+                command="logout"
+                divided
+              >
+                <el-icon><SwitchButton /></el-icon>
+                <span>退出登录</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </el-header>
     <el-container class="main-container">
@@ -52,6 +79,12 @@
           :collapse-transition="false"
           router
         >
+          <el-menu-item index="/home">
+            <el-icon><HomeFilled /></el-icon>
+            <template #title>
+              首页
+            </template>
+          </el-menu-item>
           <el-menu-item index="/robots">
             <el-icon><List /></el-icon>
             <template #title>
@@ -161,35 +194,31 @@
 </template>
 
 <script setup lang="ts">
-import { ChatDotRound, Collection, DArrowLeft, DArrowRight, Film, List, Monitor, Setting, Tools, UploadFilled, User, UserFilled, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowDown, ChatDotRound, Collection, DArrowLeft, DArrowRight, Film, HomeFilled, Key, List, Monitor, Setting, SwitchButton, Tools, UploadFilled, User, UserFilled, VideoPlay } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/modules/auth/store'
 import { Bot } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
-const route = useRoute()      // 获取当前路由信息
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const isCollapse = ref(false) // 是否折叠侧边栏
-const asideWidth = computed(() => isCollapse.value ? 64 : 200) // 侧边栏宽度
+const isCollapse = ref(false)
+const asideWidth = computed(() => isCollapse.value ? 64 : 200)
 
-const roleName = computed(() => {
-  const role = authStore.user?.role
-  switch (role) {
-    case 'super_admin':
-      return '超级管理员'
-    case 'admin':
-      return '管理员'
-    case 'user':
-      return '普通用户'
-    default:
-      return role
+const userName = computed(() => authStore.user?.username || '游客')
+const displayName = computed(() => {
+  if (authStore.user?.username) {
+    return authStore.user.username.charAt(0).toUpperCase()
   }
+  return '客'
 })
 
 // 计算当前激活的菜单项
 const activeMenu = computed(() => {
   const path = route.path
+  if (path.startsWith('/home')) return '/home'
   if (path.startsWith('/robots')) return '/robots'
   if (path.startsWith('/roles')) return '/roles'
   if (path.startsWith('/operation')) return '/operation'
@@ -205,16 +234,37 @@ const activeMenu = computed(() => {
   return path
 })
 
-// 切换侧边栏折叠状态
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
 }
 
-const goAuth = () => router.push('/auth')
+const goHome = () => {
+  router.push('/home')
+}
 
-const logout = async () => {
-  await authStore.logout()
-  router.push('/auth')
+const handleCommand = async (command: string) => {
+  switch (command) {
+    case 'controlPanel':
+      router.push('/personal')
+      break
+    case 'login':
+      router.push('/auth')
+      break
+    case 'logout':
+      try {
+        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        })
+        await authStore.logout()
+        ElMessage.success('已退出登录')
+        router.push('/auth')
+      } catch {
+        // 用户取消
+      }
+      break
+  }
 }
 </script>
 
@@ -256,7 +306,53 @@ const logout = async () => {
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+/* 首页按钮样式 */
+.home-btn {
+  color: rgba(255, 255, 255, 0.9) !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.home-btn:hover {
+  color: white !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 头像下拉样式 */
+.avatar-wrapper {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 20px;
+  transition: background-color 0.3s;
+}
+
+.avatar-wrapper:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.header-avatar {
+  background-color: white;
+  color: #667eea;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.username-text {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dropdown-icon {
+  color: white;
+  font-size: 12px;
 }
 
 .main-container {
@@ -326,20 +422,8 @@ const logout = async () => {
   overflow: auto;
 }
 
-/* 头部按钮和标签在深色渐变背景上的显示样式 */
-.header-actions :deep(.el-button) {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.header-actions :deep(.el-button:hover) {
-  color: white;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.header-actions :deep(.el-tag) {
-  background: rgba(255, 255, 255, 0.15);
+/* 分隔线样式 */
+.header-actions :deep(.el-divider--vertical) {
   border-color: rgba(255, 255, 255, 0.3);
-  color: white;
-  font-weight: 500;
 }
 </style>

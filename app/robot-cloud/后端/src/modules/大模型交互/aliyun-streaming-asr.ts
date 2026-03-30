@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import WebSocket from 'ws';
 import 配置 from '../../config';
 import { apiKeyManager } from '../../core/config/apikey-manager';
@@ -72,7 +72,7 @@ export class AliyunStreamingASR {
   }
 
   constructor(options?: StreamingASROptions) {
-    this.taskId = crypto.randomUUID();
+    this.taskId = uuidv7();
     this.options = {
       model: options?.model || 配置.asr.aliyun?.model || 'fun-asr-realtime',
       sampleRate: options?.sampleRate || 16000,

@@ -40,7 +40,7 @@ export class AccountController {
 
   register = async (req: Request, res: Response) => {
     try {
-      const data = this.accountService.register(req.body || {}, {
+      const data = await this.accountService.register(req.body || {}, {
         clientType: resolveClientType(req),
         deviceName: resolveDeviceName(req),
         ipAddress: req.ip,
@@ -54,7 +54,7 @@ export class AccountController {
 
   login = async (req: Request, res: Response) => {
     try {
-      const data = this.accountService.login(req.body || {}, {
+      const data = await this.accountService.login(req.body || {}, {
         clientType: resolveClientType(req),
         deviceName: resolveDeviceName(req),
         ipAddress: req.ip,
@@ -81,7 +81,7 @@ export class AccountController {
       return res.status(401).json({ success: false, error: '未登录' });
     }
 
-    const user = this.accountService.getProfile(req.authContext.user.id);
+    const user = await this.accountService.getProfile(req.authContext.user.id);
     res.json({ success: true, data: user });
   };
 
@@ -90,7 +90,7 @@ export class AccountController {
       return res.status(401).json({ success: false, error: '未登录' });
     }
 
-    const sessions = this.accountService.listMySessions(req.authContext.user.id, req.authContext.sessionId);
+    const sessions = await this.accountService.listMySessions(req.authContext.user.id, req.authContext.sessionId);
     res.json({ success: true, data: sessions });
   };
 
@@ -100,7 +100,7 @@ export class AccountController {
     }
 
     try {
-      this.accountService.revokeMySession(req.authContext.user.id, resolveParam(req.params.id));
+      await this.accountService.revokeMySession(req.authContext.user.id, resolveParam(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       res.status(404).json({ success: false, error: error.message });
@@ -108,7 +108,7 @@ export class AccountController {
   };
 
   logout = async (req: Request, res: Response) => {
-    this.accountService.logoutCurrent(req.authContext?.sessionId || null);
+    await this.accountService.logoutCurrent(req.authContext?.sessionId || null);
     res.json({ success: true });
   };
 
@@ -117,7 +117,7 @@ export class AccountController {
       return res.status(401).json({ success: false, error: '未登录' });
     }
 
-    res.json({ success: true, data: this.accountService.listUsers() });
+    res.json({ success: true, data: await this.accountService.listUsers() });
   };
 
   updateRole = async (req: Request, res: Response) => {
@@ -130,7 +130,7 @@ export class AccountController {
       if (!['user', 'admin', 'super_admin'].includes(role)) {
         return res.status(400).json({ success: false, error: '角色无效' });
       }
-      const data = this.accountService.updateUserRole(
+      const data = await this.accountService.updateUserRole(
         req.authContext.user.role,
         resolveParam(req.params.id),
         role
@@ -145,7 +145,7 @@ export class AccountController {
   // 允许前端通过 token 预检
   resolveContext = async (req: Request, res: Response) => {
     const token = resolveToken(req);
-    const context = this.accountService.buildUserContext(token);
+    const context = await this.accountService.buildUserContext(token);
     res.json({ success: true, data: context });
   };
 }

@@ -1,7 +1,7 @@
 import { v7 as uuidv7 } from 'uuid';
-import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { createSessionToken, hashPassword, hashSessionToken, verifyPassword } from './password';
+import type { AccountRepository } from './repository';
 import type {
   AccountRole,
   AuthContext,
@@ -13,6 +13,10 @@ import type {
 } from './types';
 
 const SESSION_EXPIRE_DAYS = 30;
+
+type PostgresError = Error & {
+  code?: string;
+};
 
 type RegisterInput = {
   username: string;
@@ -29,7 +33,7 @@ type LoginMeta = {
 };
 
 export class AccountService {
-  constructor(private database: DatabaseService) {}
+  constructor(private repository: AccountRepository) {}
 
   private toSafeUser(user: UserRecord): SafeUser {
     return {
@@ -65,13 +69,17 @@ export class AccountService {
     };
   }
 
-  private createUserSession(userId: string, meta: LoginMeta): { token: string; session: UserSessionRecord } {
+  private async createUserSession(
+    repository: AccountRepository,
+    userId: string,
+    meta: LoginMeta,
+  ): Promise<{ token: string; session: UserSessionRecord }> {
     const token = createSessionToken();
     const tokenHash = hashSessionToken(token);
     const sessionId = uuidv7();
     const expiresAt = new Date(Date.now() + SESSION_EXPIRE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-    this.database.createUserSession({
+    await repository.createUserSession({
       id: sessionId,
       user_id: userId,
       token_hash: tokenHash,
@@ -82,7 +90,7 @@ export class AccountService {
       expires_at: expiresAt,
     });
 
-    const session = this.database.getUserSessionById(sessionId);
+    const session = await repository.getUserSessionById(sessionId);
     if (!session) {
       throw new Error('创建会话失败');
     }
@@ -90,55 +98,66 @@ export class AccountService {
     return { token, session };
   }
 
-  register(input: RegisterInput, meta: LoginMeta) {
+  async register(input: RegisterInput, meta: LoginMeta) {
     const username = input.username.trim();
     this.validateCredentials(username, input.password);
 
-    const existing = this.database.getUserByUsername(username);
-    if (existing) {
-      throw new Error('用户名已存在');
+    try {
+      return await this.repository.withTransaction(async (repository) => {
+        await repository.lockUsersTable();
+
+        const existing = await repository.getUserByUsername(username);
+        if (existing) {
+          throw new Error('用户名已存在');
+        }
+
+        const isFirstUser = (await repository.countUsers()) === 0;
+        const role: AccountRole = isFirstUser ? 'super_admin' : 'user';
+        const userId = uuidv7();
+        const passwordHash = hashPassword(input.password);
+
+        await repository.createUser({
+          id: userId,
+          username,
+          password_hash: passwordHash,
+          role,
+        });
+
+        const createdUser = await repository.getUserById(userId);
+        if (!createdUser) {
+          throw new Error('创建用户失败');
+        }
+
+        const { token, session } = await this.createUserSession(repository, userId, meta);
+        await repository.touchUserLogin(userId);
+
+        logger.info('用户注册成功', { username, role, userId });
+
+        return {
+          token,
+          user: this.toSafeUser(createdUser),
+          session: this.buildSessionView(session, session.id),
+        };
+      });
+    } catch (error) {
+      if ((error as PostgresError).code === '23505') {
+        throw new Error('用户名已存在');
+      }
+      throw error;
     }
-
-    const isFirstUser = this.database.countUsers() === 0;
-    const role: AccountRole = isFirstUser ? 'super_admin' : 'user';
-    const userId = uuidv7();
-    const passwordHash = hashPassword(input.password);
-
-    this.database.createUser({
-      id: userId,
-      username,
-      password_hash: passwordHash,
-      role,
-    });
-
-    const createdUser = this.database.getUserById(userId);
-    if (!createdUser) {
-      throw new Error('创建用户失败');
-    }
-
-    const { token, session } = this.createUserSession(userId, meta);
-    this.database.touchUserLogin(userId);
-
-    logger.info('用户注册成功', { username, role, userId });
-
-    return {
-      token,
-      user: this.toSafeUser(createdUser),
-      session: this.buildSessionView(session, session.id),
-    };
   }
 
-  login(input: LoginInput, meta: LoginMeta) {
+  async login(input: LoginInput, meta: LoginMeta) {
     const username = input.username.trim();
     this.validateCredentials(username, input.password);
 
-    const user = this.database.getUserByUsername(username);
+    const user = await this.repository.getUserByUsername(username);
     if (!user || !verifyPassword(input.password, user.password_hash)) {
       throw new Error('用户名或密码错误');
     }
 
-    const { token, session } = this.createUserSession(user.id, meta);
-    this.database.touchUserLogin(user.id);
+    const { token, session } = await this.createUserSession(this.repository, user.id, meta);
+    await this.repository.touchUserLogin(user.id);
 
     logger.info('用户登录成功', { username: user.username, userId: user.id });
 
@@ -149,14 +168,14 @@ export class AccountService {
     };
   }
 
-  authenticateByToken(token: string): { user: SafeUser; sessionId: string } | null {
+  async authenticateByToken(token: string): Promise<{ user: SafeUser; sessionId: string } | null> {
     const normalized = token.trim();
     if (!normalized) {
       return null;
     }
 
     const tokenHash = hashSessionToken(normalized);
-    const session = this.database.getUserSessionByTokenHash(tokenHash);
+    const session = await this.repository.getUserSessionByTokenHash(tokenHash);
     if (!session) {
       return null;
     }
@@ -166,12 +185,12 @@ export class AccountService {
       return null;
     }
 
-    const user = this.database.getUserById(session.user_id);
+    const user = await this.repository.getUserById(session.user_id);
     if (!user) {
       return null;
     }
 
-    this.database.touchUserSession(session.id);
+    await this.repository.touchUserSession(session.id);
     return {
       user: this.toSafeUser(user),
       sessionId: session.id,
@@ -186,12 +205,12 @@ export class AccountService {
     };
   }
 
-  buildUserContext(token: string | null | undefined): AuthContext {
+  async buildUserContext(token: string | null | undefined): Promise<AuthContext> {
     if (!token) {
       return this.buildGuestContext();
     }
 
-    const auth = this.authenticateByToken(token);
+    const auth = await this.authenticateByToken(token);
     if (!auth) {
       return this.buildGuestContext();
     }
@@ -203,60 +222,64 @@ export class AccountService {
     };
   }
 
-  getProfile(userId: string): SafeUser {
-    const user = this.database.getUserById(userId);
+  async getProfile(userId: string): Promise<SafeUser> {
+    const user = await this.repository.getUserById(userId);
     if (!user) {
       throw new Error('用户不存在');
     }
     return this.toSafeUser(user);
   }
 
-  listMySessions(userId: string, currentSessionId: string | null): LoginSessionView[] {
-    const sessions = this.database.listUserSessions(userId);
+  async listMySessions(userId: string, currentSessionId: string | null): Promise<LoginSessionView[]> {
+    const sessions = await this.repository.listUserSessions(userId);
     return sessions.map((session) => this.buildSessionView(session, currentSessionId));
   }
 
-  revokeMySession(userId: string, sessionId: string): void {
-    const session = this.database.getUserSessionById(sessionId);
+  async revokeMySession(userId: string, sessionId: string): Promise<void> {
+    const session = await this.repository.getUserSessionById(sessionId);
     if (!session || session.user_id !== userId) {
       throw new Error('会话不存在');
     }
-    this.database.revokeUserSession(sessionId);
+    await this.repository.revokeUserSession(sessionId);
   }
 
-  logoutCurrent(sessionId: string | null): void {
+  async logoutCurrent(sessionId: string | null): Promise<void> {
     if (!sessionId) {
       return;
     }
-    this.database.revokeUserSession(sessionId);
+    await this.repository.revokeUserSession(sessionId);
   }
 
-  listUsers(): SafeUser[] {
-    return this.database.listUsers().map((user) => this.toSafeUser(user));
+  async listUsers(): Promise<SafeUser[]> {
+    return (await this.repository.listUsers()).map((user) => this.toSafeUser(user));
   }
 
-  updateUserRole(operatorRole: AccountRole, userId: string, role: AccountRole): SafeUser {
+  async updateUserRole(operatorRole: AccountRole, userId: string, role: AccountRole): Promise<SafeUser> {
     if (operatorRole !== 'super_admin') {
       throw new Error('仅主管理员可修改用户权限');
     }
 
-    const user = this.database.getUserById(userId);
-    if (!user) {
-      throw new Error('用户不存在');
-    }
+    return this.repository.withTransaction(async (repository) => {
+      await repository.lockUsersTable();
 
-    if (user.role === 'super_admin' && role !== 'super_admin') {
-      const superAdminCount = this.database.countUsersByRole('super_admin');
-      if (superAdminCount <= 1) {
-        throw new Error('至少保留一个主管理员');
+      const user = await repository.getUserById(userId);
+      if (!user) {
+        throw new Error('用户不存在');
       }
-    }
 
-    this.database.updateUserRole(userId, role);
-    const updated = this.database.getUserById(userId);
-    if (!updated) {
-      throw new Error('更新失败');
-    }
-    return this.toSafeUser(updated);
+      if (user.role === 'super_admin' && role !== 'super_admin') {
+        const superAdminCount = await repository.countUsersByRole('super_admin');
+        if (superAdminCount <= 1) {
+          throw new Error('至少保留一个主管理员');
+        }
+      }
+
+      await repository.updateUserRole(userId, role);
+      const updated = await repository.getUserById(userId);
+      if (!updated) {
+        throw new Error('更新失败');
+      }
+      return this.toSafeUser(updated);
+    });
   }
 }

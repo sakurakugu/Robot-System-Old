@@ -1,6 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import FormData from 'form-data';
+import { v7 as uuidv7 } from 'uuid';
 import WebSocket from 'ws';
 import 配置 from '../../config';
 import { apiKeyManager } from '../../core/config/apikey-manager';
@@ -250,7 +251,7 @@ class 语音识别服务 {
     // });
 
     return new Promise<string>((resolve, reject) => {
-      const taskId = crypto.randomUUID();
+      const taskId = uuidv7();
       const timeoutMs = 9_0000;
       const ws = new WebSocket(wsUrl, {
         headers: {

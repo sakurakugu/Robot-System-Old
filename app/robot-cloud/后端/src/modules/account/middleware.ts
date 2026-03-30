@@ -11,10 +11,14 @@ function resolveToken(req: Request): string | null {
 }
 
 export function withAuthContext(accountService: AccountService) {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    const token = resolveToken(req);
-    req.authContext = accountService.buildUserContext(token);
-    next();
+  return async (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      const token = resolveToken(req);
+      req.authContext = await accountService.buildUserContext(token);
+      next();
+    } catch (error) {
+      next(error);
+    }
   };
 }
 

@@ -1,5 +1,6 @@
 import { Server } from 'http';
 import OpusScript from 'opusscript';
+import type { Duplex } from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import 配置 from '../../config';
 import type DatabaseService from '../../core/database';
@@ -134,12 +135,49 @@ class WebSocket服务 {
     return pathname.startsWith(配置.ws.webPath) || pathname.startsWith(配置.ws.phonePath);
   }
 
-  private UI连接已认证(req: any): boolean {
+  private async UI连接已认证(req: any): Promise<boolean> {
     if (!this.账号服务) {
       return false;
     }
     const token = this.从请求解析Token(req);
-    return this.账号服务.buildUserContext(token).mode === 'authenticated';
+    return (await this.账号服务.buildUserContext(token)).mode === 'authenticated';
+  }
+
+  private async 处理Upgrade请求(request: any, socket: Duplex, head: Buffer): Promise<void> {
+    try {
+      const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
+      const targetChannel = this.pathToChannelMap.get(pathname);
+
+      if (!targetChannel) {
+        socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      if (this.是否需要校验UI连接(pathname) && !(await this.UI连接已认证(request))) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      const targetWss = this.wssMap.get(targetChannel);
+      if (!targetWss) {
+        socket.destroy();
+        return;
+      }
+
+      targetWss.handleUpgrade(request, socket, head, (ws) => {
+        targetWss.emit('connection', ws, request);
+      });
+    } catch (error) {
+      logger.error('处理 WebSocket upgrade 失败', error as Error);
+      try {
+        socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+      } catch {
+        // 忽略写回失败
+      }
+      socket.destroy();
+    }
   }
 
   /**
@@ -162,28 +200,7 @@ class WebSocket服务 {
     if (!this.upgradeHandlerInstalled) {
       this.upgradeHandlerInstalled = true;
       server.on('upgrade', (request, socket, head) => {
-        const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
-        const targetChannel = this.pathToChannelMap.get(pathname);
-
-        if (targetChannel) {
-          if (this.是否需要校验UI连接(pathname) && !this.UI连接已认证(request)) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-          }
-          const targetWss = this.wssMap.get(targetChannel);
-          if (targetWss) {
-            targetWss.handleUpgrade(request, socket, head, (ws) => {
-              targetWss.emit('connection', ws, request);
-            });
-          } else {
-            socket.destroy();
-          }
-        } else {
-          // 路径不匹配，拒绝连接
-          socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-          socket.destroy();
-        }
+        void this.处理Upgrade请求(request, socket, head);
       });
     }
 

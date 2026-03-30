@@ -265,7 +265,7 @@ describe('WebSocket服务', () => {
       frameDurationMs: 20,
     });
 
-    const 会话 = (service as any).audioSessions.get('session-1');
+    const 会话 = (service as any).音频会话管理器.获取会话('session-1');
     expect(角色仓库.getRole).toHaveBeenCalledWith('role-1');
     expect(会话?.asrOptions).toEqual({
       provider: 'custom-asr',
@@ -356,9 +356,14 @@ describe('WebSocket服务', () => {
 
     const service = new WebSocket服务();
     service.set机器人仓库(repository);
-    (service as any).robotConnections.set('robot-1', new Map([
+    service.getConnections().set('robot-1', new Map([
       ['business', {
+        robotId: 'robot-1',
         websocket: ws,
+        connectedAt: new Date(),
+        lastActiveAt: new Date(),
+        metadata: {},
+        channel: 'business',
       }],
     ]));
 

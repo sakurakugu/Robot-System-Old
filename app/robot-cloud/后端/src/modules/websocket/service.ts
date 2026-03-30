@@ -1,5 +1,4 @@
 import { Server } from 'http';
-import OpusScript from 'opusscript';
 import type { Duplex } from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import 配置 from '../../config';
@@ -8,7 +7,6 @@ import { hasVisionTag, isValidRobotId, parseNormalizedTargetPosition, RateLimite
 import { LLM供应商列表 } from '../../modules/大模型管理/types';
 import type { ClientMessage, RobotConnection, ServerMessage } from '../../types';
 import type { AccountService } from '../account/service';
-import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import 语音识别服务 from '../大模型交互/asr-service';
 import 对话服务 from '../大模型交互/chat-service';
 import type { ConversationRepository } from '../大模型交互/repository';
@@ -18,76 +16,39 @@ import type { RoleRecord } from '../角色管理/types';
 import type { RobotRepository } from '../机器人管理/repository';
 import type { 机器人服务 } from '../机器人管理/service';
 import type { RobotRecord, 音频路由配置 } from '../机器人管理/types';
-import { WebSocket请求响应跟踪器 } from './request-response-tracker';
+import { 音频路由网关 } from './audio-route-gateway';
+import { 音频会话管理器 } from './audio-session-manager';
+import {
+  机器人命令网关,
+  type 机器人命令通用结果,
+  type 机器人安装包推送结果,
+  type 机器人SDK模式结果,
+  type 机器人日志标记结果,
+  type 机器人拍照结果,
+  type 机器人音量结果,
+} from './robot-command-gateway';
+import { WebSocket连接注册表 } from './connection-registry';
+import { WebSocketUI鉴权器 } from './ui-auth';
 
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
-
-type AudioSession = {
-  robotId: string;
-  sessionId: string;
-  format: 'opus' | 'pcm';
-  sampleRate: number;
-  channels: number;
-  frameDurationMs: number;
-  chunks: Buffer[];
-  startedAt: number;
-  lastChunkAt: number;
-  // 流式 ASR 相关
-  streamingASR?: AliyunStreamingASR;
-  opusDecoder?: any;
-  asrOptions?: any;
-  // PCM 缓冲区（用于累积多帧再发送）
-  pcmBuffer?: Buffer[];
-  pcmBufferSize?: number;
-};
-
-type UISocketMeta = {
-  robotId: string;
-  channel: Channel;
-  phoneSessionId?: string;
-  phoneDeviceId?: string;
-  lastActiveAt: number;
-};
-
-type 机器人请求等待选项 = {
-  请求类型: string;
-  响应类型: string;
-  数据?: Record<string, unknown>;
-  发送失败消息: string;
-  超时毫秒: number;
-  超时消息: string;
-};
-
-const 默认音频路由配置: 音频路由配置 = {
-  mode: 'robot',
-  targetPhoneDeviceId: null,
-  fallback: 'robot',
-  updatedAt: '',
-};
 
 class WebSocket服务 {
   private wssMap: Map<Channel, WebSocketServer> = new Map();
   private pathToChannelMap: Map<string, Channel> = new Map();
   private upgradeHandlerInstalled = false;
-  // 机器人客户端连接（按通道）
-  private robotConnections: Map<string, Map<Channel, RobotConnection>> = new Map();
-  // UI 控制端连接（按通道，可多）
-  private uiConnections: Map<string, Map<Channel, Set<WebSocket>>> = new Map();
-  // 每个 UI socket 的元数据（用于定向路由）
-  private uiSocketMeta: WeakMap<WebSocket, UISocketMeta> = new WeakMap();
-  // robotId -> phoneDeviceId -> phoneSessionId -> lastActiveAt
-  private phoneSessionIndex: Map<string, Map<string, Map<string, number>>> = new Map();
   private 账号服务?: AccountService;
   private 对话服务?: 对话服务;
   private 对话仓库?: ConversationRepository;
   private 角色仓库?: RoleRepository;
   private 机器人仓库?: RobotRepository;
   private 机器人服务?: 机器人服务;
+  private 连接注册表: WebSocket连接注册表;
+  private 机器人命令网关: 机器人命令网关;
+  private UI鉴权器: WebSocketUI鉴权器;
+  private 音频路由网关: 音频路由网关;
+  private 音频会话管理器: 音频会话管理器;
   private ttsService: TTSService;
-  private asrService: 语音识别服务;
-  private 请求响应跟踪器: WebSocket请求响应跟踪器;
-  private audioSessions: Map<string, AudioSession> = new Map();
   private 机器人初始化任务: Map<string, Promise<void>> = new Map();
   private inputMergeTimers: Map<string, NodeJS.Timeout> = new Map();
   private pendingInputs: Map<
@@ -106,8 +67,25 @@ class WebSocket服务 {
 
   constructor() {
     this.ttsService = new TTSService();
-    this.asrService = new 语音识别服务();
-    this.请求响应跟踪器 = new WebSocket请求响应跟踪器();
+    this.连接注册表 = new WebSocket连接注册表();
+    this.机器人命令网关 = new 机器人命令网关({
+      获取业务连接: (robotId) => this.获取业务连接(robotId),
+      发送消息: (robotId, message) => this.sendToRobot(robotId, message as any, 'business'),
+    });
+    this.UI鉴权器 = new WebSocketUI鉴权器(() => this.账号服务);
+    this.音频路由网关 = new 音频路由网关({
+      获取机器人记录: (robotId) => this.获取机器人记录(robotId),
+      解析活跃手机会话: (robotId, phoneDeviceId) => this.连接注册表.解析活跃手机会话(robotId, phoneDeviceId),
+      发送到机器人: (robotId, message, channel) => this.sendToRobot(robotId, message, channel),
+      定向发送到UI: (robotId, phoneSessionId, message, channel) => this.连接注册表.定向发送到UI(robotId, phoneSessionId, message, channel),
+    });
+    this.音频会话管理器 = new 音频会话管理器({
+      获取机器人记录: (robotId) => this.获取机器人记录(robotId),
+      获取角色记录: (roleId) => this.获取角色记录(roleId),
+      asrService: new 语音识别服务(),
+      发送错误: (robotId, code, message) => this.sendError(robotId, code, message, 'business'),
+      处理音频转写结果: (robotId, text, meta) => this.handleAudioTranscript(robotId, text, meta),
+    });
   }
 
   /**
@@ -227,29 +205,6 @@ class WebSocket服务 {
     }
   }
 
-  private 从请求解析Token(req: any): string | null {
-    const authHeader = String(req.headers.authorization || '');
-    if (authHeader.startsWith('Bearer ')) {
-      return authHeader.slice(7).trim();
-    }
-
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-    const token = String(url.searchParams.get('token') || '').trim();
-    return token || null;
-  }
-
-  private 是否需要校验UI连接(pathname: string): boolean {
-    return pathname.startsWith(配置.ws.webPath) || pathname.startsWith(配置.ws.phonePath);
-  }
-
-  private async UI连接已认证(req: any): Promise<boolean> {
-    if (!this.账号服务) {
-      return false;
-    }
-    const token = this.从请求解析Token(req);
-    return (await this.账号服务.buildUserContext(token)).mode === 'authenticated';
-  }
-
   private async 处理Upgrade请求(request: any, socket: Duplex, head: Buffer): Promise<void> {
     try {
       const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
@@ -261,7 +216,7 @@ class WebSocket服务 {
         return;
       }
 
-      if (this.是否需要校验UI连接(pathname) && !(await this.UI连接已认证(request))) {
+      if (this.UI鉴权器.需要校验连接(pathname) && !(await this.UI鉴权器.已认证(request))) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
@@ -346,35 +301,20 @@ class WebSocket服务 {
 
     // UI 连接：不占用机器人连接槽位，加入 UI 订阅集合
     if (role === 'ui') {
-      if (!this.uiConnections.has(robotId)) {
-        this.uiConnections.set(robotId, new Map());
-      }
-      const byChannel = this.uiConnections.get(robotId)!;
-      if (!byChannel.has(channel)) {
-        byChannel.set(channel, new Set());
-      }
-      byChannel.get(channel)!.add(ws);
-      this.uiSocketMeta.set(ws, {
-        robotId,
-        channel,
+      const uiCount = this.连接注册表.注册UI连接(robotId, channel, ws, {
         phoneSessionId,
         phoneDeviceId,
-        lastActiveAt: Date.now(),
       });
-      if (!isPhoneSession && phoneSessionId && phoneDeviceId) {
-        this.upsertPhoneSessionIndex(robotId, phoneDeviceId, phoneSessionId);
-      }
       logger.info('UI连接建立', {
         robotId,
         channel,
-        uiCount: byChannel.get(channel)!.size,
+        uiCount,
         phoneSessionId,
         phoneDeviceId,
       });
     } else {
       // 机器人连接：唯一，先关闭旧连接
-      const existingConnections = this.robotConnections.get(robotId);
-      const existingConnection = existingConnections?.get(channel);
+      const existingConnection = this.连接注册表.获取机器人连接(robotId, channel);
       if (existingConnection && existingConnection.websocket !== ws) {
         logger.info('关闭旧的机器人连接', { robotId, channel });
         try {
@@ -392,10 +332,7 @@ class WebSocket服务 {
         metadata: {},
         channel,
       };
-      if (!this.robotConnections.has(robotId)) {
-        this.robotConnections.set(robotId, new Map());
-      }
-      this.robotConnections.get(robotId)!.set(channel, connection);
+      this.连接注册表.替换机器人连接(robotId, channel, connection);
     }
 
     // 仅机器人连接才需要更新数据库状态；UI 会话不写入机器人在线状态
@@ -440,20 +377,7 @@ class WebSocket服务 {
     // 设置关闭处理器
     ws.on('close', () => {
       if (role === 'ui') {
-        this.removePhoneSessionBySocket(ws);
-        const byChannel = this.uiConnections.get(robotId);
-        if (byChannel) {
-          const set = byChannel.get(channel);
-          if (set) {
-            set.delete(ws);
-            if (set.size === 0) {
-              byChannel.delete(channel);
-            }
-          }
-          if (byChannel.size === 0) {
-            this.uiConnections.delete(robotId);
-          }
-        }
+        this.连接注册表.移除UI连接(robotId, channel, ws);
         logger.info('UI连接关闭', { robotId, channel });
       } else {
         this.handleDisconnection(robotId, channel, ws);
@@ -478,7 +402,7 @@ class WebSocket服务 {
         await this.等待机器人初始化完成(robotId);
       }
       if (role === 'ui' && ws) {
-        this.touchPhoneSessionBySocket(ws);
+        this.连接注册表.刷新UI会话活跃时间(ws);
       }
       const message: ClientMessage = JSON.parse(data.toString());
 
@@ -489,10 +413,7 @@ class WebSocket服务 {
       }
 
       // 更新最后活跃时间
-      const rconn = this.robotConnections.get(robotId)?.get(channel);
-      if (rconn) {
-        rconn.lastActiveAt = new Date();
-      }
+      this.连接注册表.更新机器人活跃时间(robotId, channel);
 
       switch (message.type) {
         case 'text_input':
@@ -1200,462 +1121,21 @@ class WebSocket服务 {
    * 处理音频开始
    */
   private async handleAudioStart(robotId: string, audioData: any): Promise<void> {
-    const sessionId = String(audioData?.sessionId || '');
-    if (!sessionId) {
-      logger.warn('音频开始缺少sessionId', { robotId });
-      return;
-    }
-    const format = audioData?.format === 'pcm' ? 'pcm' : 'opus';
-    const sampleRate = Number(audioData?.sampleRate || 16000);
-    const channels = Number(audioData?.channels || 1);
-    const frameDurationMs = Number(audioData?.frameDurationMs || 20);
-
-    // 获取机器人的角色配置，确定是否使用流式 ASR
-    const robot = await this.获取机器人记录(robotId);
-    let asrOptions: any = {};
-    let useStreamingASR = false;
-
-    if (robot?.role_uuid) {
-      const role = await this.获取角色记录(robot.role_uuid);
-      if (role?.asr_provider) {
-        asrOptions.provider = role.asr_provider;
-        if (role.asr_model) {
-          asrOptions.model = role.asr_model;
-        }
-        // 只有阿里云 ASR 支持流式处理
-        useStreamingASR = role.asr_provider === 'aliyun';
-      }
-    } else if (配置.asr.provider === 'aliyun') {
-      asrOptions.provider = 'aliyun';
-      useStreamingASR = true;
-    }
-
-    const session: AudioSession = {
-      robotId,
-      sessionId,
-      format,
-      sampleRate,
-      channels,
-      frameDurationMs,
-      chunks: [],
-      startedAt: Date.now(),
-      lastChunkAt: Date.now(),
-      asrOptions,
-    };
-
-    // 如果使用流式 ASR，立即启动连接
-    if (useStreamingASR) {
-      try {
-        logger.info('启动流式 ASR 服务', { robotId, sessionId, asrOptions });
-
-        // 创建流式 ASR 实例
-        const streamingASR = new AliyunStreamingASR({
-          model: asrOptions.model,
-          sampleRate,
-          channels,
-          format: 'pcm',
-        });
-
-        // 启动连接（异步，但不阻塞）
-        streamingASR.start().catch((error) => {
-          logger.error('流式 ASR 启动失败', error, { robotId, sessionId });
-          this.sendError(robotId, 'ASR_START_ERROR', error.message || '流式 ASR 启动失败', 'business');
-        });
-
-        session.streamingASR = streamingASR;
-
-        // 初始化 PCM 缓冲区（仅 Opus 解码场景使用）
-        session.pcmBuffer = [];
-        session.pcmBufferSize = 0;
-
-        // 仅 Opus 需要解码器
-        if (session.format === 'opus') {
-          const sr = sampleRate === 16000 || sampleRate === 48000 ? sampleRate : 16000;
-          const ch = channels === 2 ? 2 : 1;
-          try {
-            session.opusDecoder = new (OpusScript as any)(
-              sr,
-              ch,
-              (OpusScript as any).Application.VOIP
-            );
-            logger.debug('Opus 解码器初始化成功', { robotId, sessionId, sampleRate: sr, channels: ch });
-          } catch (error) {
-            logger.error('Opus 解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
-              robotId,
-              sessionId,
-              sampleRate: sr,
-              channels: ch,
-            });
-          }
-        }
-      } catch (error: any) {
-        logger.error('流式 ASR 初始化失败', error, { robotId, sessionId });
-      }
-    }
-
-    this.audioSessions.set(sessionId, session);
-    logger.debug('音频会话开始', {
-      robotId,
-      sessionId,
-      format,
-      sampleRate,
-      channels,
-      frameDurationMs,
-      useStreamingASR,
-    });
+    await this.音频会话管理器.handleAudioStart(robotId, audioData);
   }
 
   /**
    * 处理音频数据块
    */
   private async handleAudioChunk(robotId: string, audioData: any): Promise<void> {
-    const sessionId = String(audioData?.sessionId || '');
-    const buffer = audioData?.buffer;
-    if (!buffer) {
-      logger.debug('音频块数据为空', { robotId, sessionId });
-      return;
-    }
-    let session = sessionId ? this.audioSessions.get(sessionId) : undefined;
-    if (!session) {
-      const fallbackSessionId = sessionId || `${robotId}-${Date.now()}`;
-      session = {
-        robotId,
-        sessionId: fallbackSessionId,
-        format: audioData?.format === 'pcm' ? 'pcm' : 'opus',
-        sampleRate: Number(audioData?.sampleRate || 16000),
-        channels: Number(audioData?.channels || 1),
-        frameDurationMs: Number(audioData?.frameDurationMs || 20),
-        chunks: [],
-        startedAt: Date.now(),
-        lastChunkAt: Date.now(),
-      };
-      this.audioSessions.set(fallbackSessionId, session);
-    }
-
-    try {
-      const chunk = Buffer.from(buffer, 'base64');
-      if (chunk.length > 0) {
-        logger.debug('接收音频块', {
-          robotId,
-          sessionId,
-          chunkLength: chunk.length,
-          base64Length: buffer.length,
-          totalChunks: session.chunks.length + 1,
-          hasStreamingASR: !!session.streamingASR,
-        });
-
-        // 保存原始音频块（用于降级处理）
-        session.chunks.push(chunk);
-        session.lastChunkAt = Date.now();
-
-        // 如果启用了流式 ASR，实时推送 PCM 数据
-        if (session.streamingASR) {
-          try {
-            const sr = session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000;
-            if (session.format === 'pcm') {
-              // PCM 模式实时直推，不再做二次缓冲
-              session.streamingASR.pushAudio(chunk);
-            } else if (session.opusDecoder) {
-              const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
-              const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
-              const frameSize = Math.floor((sr * fd) / 1000);
-
-              // 解码 Opus 为 PCM（Int16Array）
-              const pcmData = session.opusDecoder.decode(chunk, frameSize);
-              if (pcmData && pcmData.length > 0) {
-                const pcmBuffer = Buffer.from(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
-                session.pcmBuffer = session.pcmBuffer || [];
-                session.pcmBuffer.push(pcmBuffer);
-                session.pcmBufferSize = (session.pcmBufferSize || 0) + pcmBuffer.length;
-              }
-            }
-
-            if (session.format !== 'pcm' && (session.pcmBufferSize || 0) > 0) {
-              const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
-              session.streamingASR.pushAudio(mergedBuffer);
-              session.pcmBuffer = [];
-              session.pcmBufferSize = 0;
-
-              logger.debug('实时推送 PCM 到流式 ASR', {
-                robotId,
-                sessionId,
-                format: session.format,
-                pcmSize: mergedBuffer.length,
-                asrStatus: session.streamingASR.getStatus(),
-              });
-            }
-          } catch (error) {
-            logger.warn('实时处理音频块失败', {
-              robotId,
-              sessionId,
-              format: session.format,
-              chunkLength: chunk.length,
-              error: String(error),
-            });
-            // 实时处理失败不影响整体流程，会在 handleAudioEnd 时使用降级方案
-          }
-        }
-      } else {
-        logger.debug('音频块长度为0', { robotId, sessionId });
-      }
-    } catch (e) {
-      logger.warn('音频块解码失败', { robotId, sessionId, error: String(e), bufferType: typeof buffer });
-    }
+    await this.音频会话管理器.handleAudioChunk(robotId, audioData);
   }
 
   /**
    * 处理音频结束
    */
   private async handleAudioEnd(robotId: string, audioData: any): Promise<void> {
-    const sessionId = String(audioData?.sessionId || '');
-    if (!sessionId) {
-      logger.warn('音频结束缺少sessionId', { robotId });
-      return;
-    }
-    const session = this.audioSessions.get(sessionId);
-    if (!session) {
-      logger.warn('音频会话不存在', { robotId, sessionId });
-      return;
-    }
-    this.audioSessions.delete(sessionId);
-
-    if (!session.chunks || session.chunks.length === 0) {
-      logger.warn('音频会话无有效数据', { robotId, sessionId });
-      return;
-    }
-
-    // 检查是否所有 chunks 都是空的
-    const validChunks = session.chunks.filter(chunk => chunk && chunk.length > 0);
-    if (validChunks.length === 0) {
-      logger.warn('音频会话所有数据块都为空', { robotId, sessionId, totalChunks: session.chunks.length });
-      return;
-    }
-
-    const durationMs = session.frameDurationMs * session.chunks.length;
-    const asrStart = Date.now();
-
-    try {
-      let text = '';
-
-      // 优先使用流式 ASR 结果
-      if (session.streamingASR) {
-        try {
-          // 发送缓冲区中剩余的 PCM 数据
-          if (session.pcmBuffer && session.pcmBuffer.length > 0) {
-            const mergedBuffer = Buffer.concat(session.pcmBuffer as any);
-            session.streamingASR.pushAudio(mergedBuffer);
-            logger.debug('发送剩余 PCM 数据', {
-              robotId,
-              sessionId,
-              pcmSize: mergedBuffer.length,
-            });
-            session.pcmBuffer = [];
-            session.pcmBufferSize = 0;
-          }
-
-          text = await session.streamingASR.finish();
-
-          logger.info('流式 ASR 识别完成', {
-            robotId,
-            sessionId,
-            text,
-            chunks: session.chunks.length,
-            durationMs,
-          });
-        } catch (error: any) {
-          logger.error('流式 ASR 识别失败，降级到批量处理', error, { robotId, sessionId });
-          // 流式 ASR 失败，降级到原来的批量处理方式
-          text = '';
-        }
-      }
-
-      // 如果流式 ASR 没有结果（未启用或失败），使用原来的批量处理方式
-      if (!text.trim()) {
-        logger.info('使用批量 ASR 处理', { robotId, sessionId });
-        const wavBuffer = session.format === 'pcm'
-          ? this.buildWavBuffer(
-            Buffer.concat(validChunks as any),
-            session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000,
-            session.channels === 2 ? 2 : 1,
-          )
-          : this.decodeOpusChunksToWav(session);
-
-        // 使用配置好的 ASR 选项
-        const asrOptions = session.asrOptions || {};
-
-        text = (await this.asrService.转录Wav(wavBuffer, asrOptions)) || '';
-      }
-
-      const asrTime = Date.now() - asrStart;
-
-      if (!text.trim()) {
-        logger.info('ASR结果为空', { robotId, sessionId });
-        return;
-      }
-
-      await this.handleAudioTranscript(robotId, text.trim(), {
-        asrTime,
-        durationMs,
-        sessionId,
-      });
-    } catch (error: any) {
-      const message = error?.message || '语音识别失败';
-      if (String(message).includes('Opus解码失败')) {
-        logger.warn('Opus解码失败', {
-          robotId,
-          sessionId,
-          chunks: session.chunks.length,
-          sampleRate: session.sampleRate,
-          channels: session.channels,
-          frameDurationMs: session.frameDurationMs
-        });
-        return;
-      }
-      logger.error('音频处理失败', error, { robotId, sessionId });
-      this.sendError(robotId, 'ASR_ERROR', message, 'business');
-    } finally {
-      // 清理资源
-      if (session.opusDecoder) {
-        try {
-          session.opusDecoder.delete?.();
-        } catch {
-          // 忽略清理错误
-        }
-      }
-    }
-  }
-
-  private decodeOpusChunksToWav(session: AudioSession): Buffer {
-    const sr = session.sampleRate === 16000 || session.sampleRate === 48000 ? session.sampleRate : 16000;
-    const ch = session.channels === 2 ? 2 : 1;
-    const allowed = new Set([2.5, 5, 10, 20, 40, 60]);
-    const fd = allowed.has(session.frameDurationMs) ? session.frameDurationMs : 20;
-    const frameSize = Math.floor((sr * fd) / 1000);
-
-    let decoder: any;
-    try {
-      decoder = new (OpusScript as any)(
-        sr,
-        ch,
-        (OpusScript as any).Application.VOIP
-      );
-    } catch (error) {
-      logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
-        sampleRate: sr,
-        channels: ch,
-        sessionId: session.sessionId
-      });
-      throw new Error('Opus解码失败');
-    }
-
-    try {
-      const pcmBuffers: Uint8Array[] = [];
-      const toUint8Array = (value: any): Uint8Array => {
-        if (value instanceof Uint8Array) return value;
-        if (value?.buffer) return new Uint8Array(value.buffer);
-        return new Uint8Array(value);
-      };
-
-      let successCount = 0;
-      let failCount = 0;
-      for (let i = 0; i < session.chunks.length; i++) {
-        const chunk = session.chunks[i];
-        if (!chunk || chunk.length === 0) {
-          logger.debug('跳过空音频块', { sessionId: session.sessionId, index: i });
-          continue;
-        }
-        try {
-          // 记录音频块的详细信息
-          logger.debug('尝试解码音频块', {
-            sessionId: session.sessionId,
-            index: i,
-            chunkLength: chunk.length,
-            expectedFrameSize: frameSize,
-            // 前16字节的十六进制，用于诊断
-            hexPreview: chunk.slice(0, Math.min(16, chunk.length)).toString('hex')
-          });
-
-          const decoded = decoder.decode(chunk, frameSize);
-          if (decoded && decoded.length > 0) {
-            pcmBuffers.push(toUint8Array(decoded));
-            successCount++;
-            logger.debug('音频块解码成功', {
-              sessionId: session.sessionId,
-              index: i,
-              decodedLength: decoded.length
-            });
-          }
-        } catch (error) {
-          failCount++;
-          logger.warn('音频块解码失败', {
-            sessionId: session.sessionId,
-            index: i,
-            chunkLength: chunk.length,
-            expectedFrameSize: frameSize,
-            error: String(error),
-            errorStack: error instanceof Error ? error.stack : undefined
-          });
-        }
-      }
-
-      if (pcmBuffers.length === 0) {
-        logger.warn('Opus解码失败：所有音频块解码失败', {
-          sessionId: session.sessionId,
-          totalChunks: session.chunks.length,
-          failCount,
-          sampleRate: sr,
-          channels: ch,
-          frameDurationMs: fd,
-          frameSize
-        });
-        throw new Error('Opus解码失败');
-      }
-
-      if (failCount > 0) {
-        logger.debug('部分音频块解码失败', {
-          sessionId: session.sessionId,
-          successCount,
-          failCount,
-          totalChunks: session.chunks.length
-        });
-      }
-
-      const pcmData = Buffer.concat(pcmBuffers);
-      return this.buildWavBuffer(pcmData, sr, ch);
-    } finally {
-      if (decoder) {
-        try {
-          decoder.delete();
-        } catch (e) {
-          logger.error('Opus解码器释放失败', e instanceof Error ? e : new Error(String(e)));
-        }
-      }
-    }
-  }
-
-  private buildWavBuffer(pcmData: Buffer, sampleRate: number, channels: number): Buffer {
-    const bitsPerSample = 16;
-    const byteRate = (sampleRate * channels * bitsPerSample) / 8;
-    const blockAlign = (channels * bitsPerSample) / 8;
-    const dataSize = pcmData.length;
-    const buffer = Buffer.alloc(44 + dataSize);
-
-    buffer.write('RIFF', 0);
-    buffer.writeUInt32LE(36 + dataSize, 4);
-    buffer.write('WAVE', 8);
-    buffer.write('fmt ', 12);
-    buffer.writeUInt32LE(16, 16);
-    buffer.writeUInt16LE(1, 20);
-    buffer.writeUInt16LE(channels, 22);
-    buffer.writeUInt32LE(sampleRate, 24);
-    buffer.writeUInt32LE(byteRate, 28);
-    buffer.writeUInt16LE(blockAlign, 32);
-    buffer.writeUInt16LE(bitsPerSample, 34);
-    buffer.write('data', 36);
-    buffer.writeUInt32LE(dataSize, 40);
-    buffer.set(pcmData, 44);
-
-    return buffer;
+    await this.音频会话管理器.handleAudioEnd(robotId, audioData);
   }
 
   private sanitizeTtsText(text: string): string {
@@ -1825,7 +1305,7 @@ class WebSocket服务 {
       });
 
       // 更新连接元数据
-      const connection = this.robotConnections.get(robotId)?.get('business');
+      const connection = this.连接注册表.获取机器人连接(robotId, 'business');
       if (connection) {
         connection.metadata = {
           name: name || connection.metadata.name,
@@ -1874,234 +1354,47 @@ class WebSocket服务 {
    * 处理断开连接
    */
   private handleDisconnection(robotId: string, channel: Channel, ws: WebSocket): void {
-    const connections = this.robotConnections.get(robotId);
-    if (connections) {
-      const current = connections.get(channel);
-      if (!current || current.websocket !== ws) {
-        return;
-      }
-      connections.delete(channel);
-      if (connections.size === 0) {
-        this.robotConnections.delete(robotId);
-        void this.标记机器人离线(robotId);
-        logger.info('机器人连接断开', { robotId, channel });
-      }
-    }
-  }
-
-  /**
-   * 写入或刷新手机会话索引（用于按设备定向音频）
-   */
-  private upsertPhoneSessionIndex(robotId: string, phoneDeviceId: string, phoneSessionId: string): void {
-    if (!this.phoneSessionIndex.has(robotId)) {
-      this.phoneSessionIndex.set(robotId, new Map());
-    }
-    const deviceMap = this.phoneSessionIndex.get(robotId)!;
-    if (!deviceMap.has(phoneDeviceId)) {
-      deviceMap.set(phoneDeviceId, new Map());
-    }
-    deviceMap.get(phoneDeviceId)!.set(phoneSessionId, Date.now());
-  }
-
-  /**
-   * 刷新 socket 对应会话的活跃时间
-   */
-  private touchPhoneSessionBySocket(ws: WebSocket): void {
-    const meta = this.uiSocketMeta.get(ws);
-    if (!meta) {
-      return;
-    }
-    meta.lastActiveAt = Date.now();
-    this.uiSocketMeta.set(ws, meta);
-    if (meta.phoneDeviceId && meta.phoneSessionId) {
-      this.upsertPhoneSessionIndex(meta.robotId, meta.phoneDeviceId, meta.phoneSessionId);
-    }
-  }
-
-  /**
-   * UI 断开时清理会话索引
-   */
-  private removePhoneSessionBySocket(ws: WebSocket): void {
-    const meta = this.uiSocketMeta.get(ws);
-    if (!meta?.phoneDeviceId || !meta.phoneSessionId) {
+    const 结果 = this.连接注册表.移除机器人连接(robotId, channel, ws);
+    if (!结果.已移除) {
       return;
     }
 
-    const deviceMap = this.phoneSessionIndex.get(meta.robotId);
-    const sessionMap = deviceMap?.get(meta.phoneDeviceId);
-    if (sessionMap) {
-      sessionMap.delete(meta.phoneSessionId);
-      if (sessionMap.size === 0) {
-        deviceMap!.delete(meta.phoneDeviceId);
-      }
+    if (结果.已完全断开) {
+      void this.标记机器人离线(robotId);
+      logger.info('机器人连接断开', { robotId, channel });
     }
-    if (deviceMap && deviceMap.size === 0) {
-      this.phoneSessionIndex.delete(meta.robotId);
-    }
-  }
-
-  /**
-   * 解析某个手机设备在当前 robot 下最活跃的会话
-   */
-  private resolveActivePhoneSession(robotId: string, phoneDeviceId: string): string | undefined {
-    const deviceMap = this.phoneSessionIndex.get(robotId)?.get(phoneDeviceId);
-    if (!deviceMap || deviceMap.size === 0) {
-      return undefined;
-    }
-    let latestSessionId: string | undefined;
-    let latestTs = -1;
-    for (const [sessionId, ts] of deviceMap.entries()) {
-      if (ts > latestTs) {
-        latestTs = ts;
-        latestSessionId = sessionId;
-      }
-    }
-    return latestSessionId;
   }
 
   /**
    * 获取机器人音频路由配置
    */
   private async getAudioRouteConfig(robotId: string): Promise<音频路由配置> {
-    const robot = await this.获取机器人记录(robotId);
-    const raw = robot?.audio_route_config;
-    if (!raw) {
-      return 默认音频路由配置;
-    }
-    try {
-      const parsed = JSON.parse(raw) as Partial<音频路由配置>;
-      return {
-        mode: parsed.mode === 'phone' || parsed.mode === 'mute' ? parsed.mode : 'robot',
-        targetPhoneDeviceId: typeof parsed.targetPhoneDeviceId === 'string' && parsed.targetPhoneDeviceId.trim()
-          ? parsed.targetPhoneDeviceId.trim()
-          : null,
-        fallback: parsed.fallback === 'drop' ? 'drop' : 'robot',
-        updatedAt: parsed.updatedAt || '',
-      };
-    } catch {
-      return 默认音频路由配置;
-    }
+    return this.音频路由网关.getAudioRouteConfig(robotId);
   }
 
   /**
    * 按路由策略发送 audio_download 消息
    */
   private sendAudioMessageByRoute(robotId: string, route: 音频路由配置, message: ServerMessage): void {
-    if (route.mode === 'mute') {
-      return;
-    }
-
-    if (route.mode === 'robot') {
-      this.sendToRobot(robotId, message, 'audio_download');
-      return;
-    }
-
-    const phoneDeviceId = route.targetPhoneDeviceId;
-    if (!phoneDeviceId) {
-      this.sendAudioFallback(robotId, message, route.fallback, '未配置目标手机');
-      return;
-    }
-
-    const sessionId = this.resolveActivePhoneSession(robotId, phoneDeviceId);
-    if (!sessionId) {
-      this.sendAudioFallback(robotId, message, route.fallback, '目标手机不在线');
-      return;
-    }
-
-    const sent = this.sendToSpecificUI(robotId, sessionId, message, 'audio_download');
-    if (!sent) {
-      this.sendAudioFallback(robotId, message, route.fallback, '目标会话无可用连接');
-    }
+    this.音频路由网关.sendAudioMessageByRoute(robotId, route, message);
   }
 
   private shouldSendFinalAudioResponse(robotId: string, route: 音频路由配置): boolean {
-    if (route.mode !== 'phone') {
-      return true;
-    }
-    const phoneDeviceId = route.targetPhoneDeviceId;
-    if (!phoneDeviceId) {
-      return route.fallback === 'robot';
-    }
-    const activeSession = this.resolveActivePhoneSession(robotId, phoneDeviceId);
-    if (activeSession) {
-      return false;
-    }
-    return route.fallback === 'robot';
-  }
-
-  /**
-   * 音频路由回退策略
-   */
-  private sendAudioFallback(robotId: string, message: ServerMessage, fallback: 'drop' | 'robot', reason: string): void {
-    if (fallback === 'robot') {
-      logger.info('音频路由回退到机器狗', { robotId, reason });
-      this.sendToRobot(robotId, message, 'audio_download');
-      return;
-    }
-    logger.info('音频路由丢弃', { robotId, reason });
+    return this.音频路由网关.shouldSendFinalAudioResponse(robotId, route);
   }
 
   /**
    * 广播消息到机器人和对应的所有UI
    */
   private broadcastMessage(robotId: string, message: ServerMessage, channel: Channel = 'business'): void {
-    // 机器人客户端
-    this.sendToRobot(robotId, message, channel);
-    // 所有UI订阅者
-    const uis = this.uiConnections.get(robotId);
-    const byChannel = uis?.get(channel);
-    if (byChannel && byChannel.size > 0) {
-      for (const uiWs of byChannel.values()) {
-        try {
-          uiWs.send(JSON.stringify(message));
-        } catch (error: any) {
-          logger.error('发送消息到UI失败', error, { robotId });
-        }
-      }
-    }
+    this.连接注册表.广播到机器人和UI(robotId, message, channel);
   }
 
   /**
    * 发送消息到UI客户端（不包括机器人）
    */
   private sendToUI(robotId: string, message: ServerMessage, channel: Channel = 'business'): void {
-    const uis = this.uiConnections.get(robotId);
-    const byChannel = uis?.get(channel);
-    if (byChannel && byChannel.size > 0) {
-      for (const uiWs of byChannel.values()) {
-        try {
-          uiWs.send(JSON.stringify(message));
-        } catch (error: any) {
-          logger.error('发送消息到UI失败', error, { robotId });
-        }
-      }
-    }
-  }
-
-  /**
-   * 按 phoneSessionId 定向发送给单个 UI 会话
-   */
-  private sendToSpecificUI(robotId: string, phoneSessionId: string, message: ServerMessage, channel: Channel = 'business'): boolean {
-    const uis = this.uiConnections.get(robotId);
-    const byChannel = uis?.get(channel);
-    if (!byChannel || byChannel.size === 0) {
-      return false;
-    }
-
-    let sent = false;
-    for (const uiWs of byChannel.values()) {
-      const meta = this.uiSocketMeta.get(uiWs);
-      if (!meta || meta.phoneSessionId !== phoneSessionId) {
-        continue;
-      }
-      try {
-        uiWs.send(JSON.stringify(message));
-        sent = true;
-      } catch (error: any) {
-        logger.error('定向发送消息到UI失败', error, { robotId, phoneSessionId });
-      }
-    }
-    return sent;
+    this.连接注册表.发送到UI(robotId, message, channel);
   }
 
   /**
@@ -2124,7 +1417,7 @@ class WebSocket服务 {
    */
   private setupHeartbeat(robotId: string, channel: Channel): void {
     const interval = setInterval(() => {
-      const connection = this.robotConnections.get(robotId)?.get(channel);
+      const connection = this.连接注册表.获取机器人连接(robotId, channel);
       if (!connection) {
         clearInterval(interval);
         return;
@@ -2145,20 +1438,14 @@ class WebSocket服务 {
    * 获取机器人连接
    */
   getConnections(): Map<string, Map<Channel, RobotConnection>> {
-    return this.robotConnections;
+    return this.连接注册表.获取连接映射();
   }
 
   /**
    * 获取在线机器人数量
    */
   getOnlineCount(): number {
-    let count = 0;
-    for (const connections of this.robotConnections.values()) {
-      if (connections.size > 0) {
-        count += 1;
-      }
-    }
-    return count;
+    return this.连接注册表.获取在线机器人数量();
   }
 
   /**
@@ -2175,169 +1462,64 @@ class WebSocket服务 {
    * 对外暴露：发送消息到机器人客户端
    */
   sendToRobot(robotId: string, message: ServerMessage, channel: Channel = 'business'): boolean {
-    const connection = this.robotConnections.get(robotId)?.get(channel);
-    if (!connection) {
-      logger.warn('机器人未连接，无法发送', { robotId, channel });
-      return false;
-    }
-    try {
-      connection.websocket.send(JSON.stringify(message));
-      return true;
-    } catch (error: any) {
-      logger.error('发送到机器人失败', error, { robotId });
-      return false;
-    }
+    return this.连接注册表.发送到机器人(robotId, message, channel);
   }
 
   /**
    * 对外暴露：广播消息到所有 UI 客户端
    */
   broadcast(message: ServerMessage, channel: Channel = 'business'): void {
-    for (const [robotId, channelMap] of this.uiConnections) {
-      const uiSet = channelMap.get(channel);
-      if (uiSet && uiSet.size > 0) {
-        for (const uiWs of uiSet) {
-          try {
-            uiWs.send(JSON.stringify(message));
-          } catch (error: any) {
-            logger.error('广播消息到UI失败', error, { robotId });
-          }
-        }
-      }
-    }
+    this.连接注册表.广播到全部UI(message, channel);
   }
 
   private 获取业务连接(robotId: string): RobotConnection {
-    const connection = this.robotConnections.get(robotId)?.get('business');
+    const connection = this.连接注册表.获取机器人连接(robotId, 'business');
     if (!connection) {
       throw new Error('机器人未连接');
     }
     return connection;
   }
 
-  private async 发送请求并等待机器人响应<T响应>(
-    robotId: string,
-    选项: 机器人请求等待选项,
-  ): Promise<T响应> {
-    const connection = this.获取业务连接(robotId);
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 选项.请求类型,
-      robotId,
-      timestamp: Date.now(),
-      data: {
-        requestId,
-        ...(选项.数据 || {}),
-      },
-    } as any, 'business');
-
-    if (!success) {
-      throw new Error(选项.发送失败消息);
-    }
-
-    return this.请求响应跟踪器.等待响应<T响应>(connection.websocket, {
-      超时毫秒: 选项.超时毫秒,
-      超时消息: 选项.超时消息,
-      连接关闭消息: '机器人连接已关闭',
-      匹配器: (message) => {
-        if (message.type !== 选项.响应类型) {
-          return undefined;
-        }
-
-        const data = message.data;
-        if (!data || typeof data !== 'object' || Array.isArray(data)) {
-          return undefined;
-        }
-
-        if ((data as Record<string, unknown>).requestId !== requestId) {
-          return undefined;
-        }
-
-        return data as T响应;
-      },
-    });
-  }
-
   /**
    * 请求机器人拍照（用于API调用）
    */
-  async 请求机器人拍照(robotId: string): Promise<{ success: boolean; image?: string; format?: string; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'camera_capture',
-      响应类型: 'camera_response',
-      发送失败消息: '发送拍照命令失败',
-      超时毫秒: 30000,
-      超时消息: '拍照请求超时',
-    });
+  请求机器人拍照(robotId: string): Promise<机器人拍照结果> {
+    return this.机器人命令网关.请求机器人拍照(robotId);
   }
 
   /**
    * 请求获取机器人音量（用于API调用）
    */
-  async 请求获取机器人音量(robotId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'volume_get',
-      响应类型: 'volume_response',
-      发送失败消息: '发送获取音量命令失败',
-      超时毫秒: 30000,
-      超时消息: '获取音量请求超时',
-    });
+  请求获取机器人音量(robotId: string): Promise<机器人音量结果> {
+    return this.机器人命令网关.请求获取机器人音量(robotId);
   }
 
   /**
    * 请求设置机器人音量（用于API调用）
    */
-  async 请求设置机器人音量(robotId: string, volume: number): Promise<{ success: boolean; data?: any; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'volume_set',
-      响应类型: 'volume_response',
-      数据: { volume },
-      发送失败消息: '发送设置音量命令失败',
-      超时毫秒: 30000,
-      超时消息: '设置音量请求超时',
-    });
+  请求设置机器人音量(robotId: string, volume: number): Promise<机器人命令通用结果> {
+    return this.机器人命令网关.请求设置机器人音量(robotId, volume);
   }
 
   /**
    * 请求设置机器人静音（用于API调用）
    */
-  async 请求设置机器人静音(robotId: string, mute: boolean): Promise<{ success: boolean; data?: any; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'volume_mute',
-      响应类型: 'volume_response',
-      数据: { mute },
-      发送失败消息: '发送设置静音命令失败',
-      超时毫秒: 30000,
-      超时消息: '设置静音请求超时',
-    });
+  请求设置机器人静音(robotId: string, mute: boolean): Promise<机器人命令通用结果> {
+    return this.机器人命令网关.请求设置机器人静音(robotId, mute);
   }
 
   /**
    * 请求获取机器人配置（用于API调用）
    */
-  async 请求获取机器人配置(robotId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'config_get',
-      响应类型: 'config_response',
-      发送失败消息: '发送获取配置命令失败',
-      超时毫秒: 30000,
-      超时消息: '获取配置请求超时',
-    });
+  请求获取机器人配置(robotId: string): Promise<机器人命令通用结果> {
+    return this.机器人命令网关.请求获取机器人配置(robotId);
   }
 
   /**
    * 请求更新机器人配置（用于API调用）
    */
-  async 请求更新机器人配置(robotId: string, config: any): Promise<{ success: boolean; data?: any; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'config_update',
-      响应类型: 'config_response',
-      数据: { config },
-      发送失败消息: '发送更新配置命令失败',
-      超时毫秒: 30000,
-      超时消息: '更新配置请求超时',
-    });
+  请求更新机器人配置(robotId: string, config: unknown): Promise<机器人命令通用结果> {
+    return this.机器人命令网关.请求更新机器人配置(robotId, config);
   }
 
   /**
@@ -2413,60 +1595,33 @@ class WebSocket服务 {
   /**
    * 请求设置SDK模式（用于API调用）
    */
-  async 请求设置SDK模式(robotId: string, sdkMode: boolean): Promise<{ success: boolean; sdkMode?: boolean; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'sdk_mode_set',
-      响应类型: 'sdk_mode_response',
-      数据: { sdkMode },
-      发送失败消息: '发送设置SDK模式命令失败',
-      超时毫秒: 30000,
-      超时消息: '设置SDK模式请求超时',
-    });
+  请求设置SDK模式(robotId: string, sdkMode: boolean): Promise<机器人SDK模式结果> {
+    return this.机器人命令网关.请求设置SDK模式(robotId, sdkMode);
   }
 
   /**
    * 请求获取SDK模式（用于API调用）
    */
-  async 请求获取SDK模式(robotId: string): Promise<{ success: boolean; sdkMode?: boolean; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'sdk_mode_get',
-      响应类型: 'sdk_mode_response',
-      发送失败消息: '发送获取SDK模式命令失败',
-      超时毫秒: 30000,
-      超时消息: '获取SDK模式请求超时',
-    });
+  请求获取SDK模式(robotId: string): Promise<机器人SDK模式结果> {
+    return this.机器人命令网关.请求获取SDK模式(robotId);
   }
 
   /**
    * 请求写入日志标记（用于API调用）
    */
-  async 请求日志标记(robotId: string, message: string = ''): Promise<{ success: boolean; marker?: string; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'log_mark',
-      响应类型: 'log_mark_response',
-      数据: { message },
-      发送失败消息: '发送日志标记命令失败',
-      超时毫秒: 10000,
-      超时消息: '日志标记请求超时',
-    });
+  请求日志标记(robotId: string, message: string = ''): Promise<机器人日志标记结果> {
+    return this.机器人命令网关.请求日志标记(robotId, message);
   }
 
   /**
    * 请求机器人通过 HTTP 下载安装包（用于API调用）
    */
-  async 请求推送安装包(
+  请求推送安装包(
     robotId: string,
     downloadPaths: { agent?: string; server?: string; common?: string },
     hashes: { agent?: string; server?: string; common?: string },
-  ): Promise<{ success: boolean; downloaded?: string[]; error?: string }> {
-    return this.发送请求并等待机器人响应(robotId, {
-      请求类型: 'package_download',
-      响应类型: 'package_download_response',
-      数据: { downloadPaths, hashes },
-      发送失败消息: '发送推送安装包命令失败',
-      超时毫秒: 300000,
-      超时消息: '推送安装包请求超时',
-    });
+  ): Promise<机器人安装包推送结果> {
+    return this.机器人命令网关.请求推送安装包(robotId, downloadPaths, hashes);
   }
 }
 

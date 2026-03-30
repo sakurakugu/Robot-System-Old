@@ -85,7 +85,9 @@ export async function createAppContext(): Promise<应用上下文> {
     大模型配置服务: new 大模型配置服务(设置仓库),
     设置服务: new 设置服务(设置仓库),
     角色服务: new 角色服务(角色仓库),
-    编舞服务: new ChoreoService(机器人仓库),
+    编舞服务: new ChoreoService({
+      机器人仓库,
+    }),
     更新服务: new 更新服务(应用版本仓库),
     机器人包服务: new 机器人包服务(机器人包仓库),
     账号服务: new AccountService(

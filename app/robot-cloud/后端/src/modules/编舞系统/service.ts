@@ -3,15 +3,16 @@
  * 负责项目管理、时间轴数据存储和动作执行
  */
 
-import { v7 as uuidv7 } from 'uuid';
 import { logger } from '../../core/logger';
 import type WebSocketService from '../websocket/service';
 import type { RobotRepository } from '../机器人管理/repository';
 import { 编舞机器人控制桥接 } from './bridges/robot-control-bridge';
 import { 编舞执行服务 } from './execution-service';
 import { 编舞项目文件资源服务 } from './project-file-resource-service';
+import { 编舞项目管理服务 } from './project-management-service';
 import { 编舞项目机器人服务 } from './project-robot-service';
 import { 编舞项目存储 } from './storage/project-storage';
+import { 编舞时间轴内容服务 } from './timeline-content-service';
 import { 编舞时间轴编译器 } from './timeline-compiler';
 import type {
   AddProjectRobotDirectDto,
@@ -65,56 +66,85 @@ type 编舞项目文件资源服务接口 = Pick<
   | 'exportProject'
   | 'importProject'
 >;
+type 编舞项目管理服务接口 = Pick<
+  编舞项目管理服务,
+  | '初始化'
+  | 'getAllProjects'
+  | 'getProject'
+  | '获取项目记录'
+  | '保存项目索引'
+  | '注册项目'
+  | 'createProject'
+  | 'updateProject'
+  | 'deleteProject'
+  | 'openProject'
+>;
+type 编舞时间轴内容服务接口 = Pick<
+  编舞时间轴内容服务,
+  | 'getTimeline'
+  | 'saveTimeline'
+  | 'getCustomActions'
+  | 'saveCustomAction'
+>;
 type 编舞时间轴编译器接口 = Pick<编舞时间轴编译器, 'compile'>;
 
-function 创建默认时间轴(): TimelineData {
-  return {
-    tracks: [],
-    config: {
-      duration: 60,
-      pixelsPerSecond: 100,
-      currentTime: 0,
-      snapToGrid: true,
-      gridSize: 0.5,
-    },
-  };
+export interface 编舞服务依赖 {
+  机器人仓库: 编舞机器人查询仓库;
+  存储?: 编舞项目存储;
+  机器人控制桥接?: 编舞机器人控制桥接接口;
+  执行服务?: 编舞执行服务;
+  时间轴编译器?: 编舞时间轴编译器接口;
+  项目机器人服务?: 编舞项目机器人服务接口;
+  项目文件资源服务?: 编舞项目文件资源服务接口;
+  项目管理服务?: 编舞项目管理服务接口;
+  时间轴内容服务?: 编舞时间轴内容服务接口;
 }
 
 export class 编舞服务 {
-  private projects: Map<string, ChoreoProject> = new Map();
+  private readonly 执行服务: 编舞执行服务;
+  private readonly 时间轴编译器: 编舞时间轴编译器接口;
+  private readonly 项目管理服务: 编舞项目管理服务接口;
   private readonly 项目机器人服务: 编舞项目机器人服务接口;
   private readonly 项目文件资源服务: 编舞项目文件资源服务接口;
+  private readonly 时间轴内容服务: 编舞时间轴内容服务接口;
 
-  constructor(
-    private readonly 机器人仓库: 编舞机器人查询仓库,
-    private readonly 存储: 编舞项目存储 = new 编舞项目存储(),
-    private readonly 机器人控制桥接: 编舞机器人控制桥接接口 = new 编舞机器人控制桥接(),
-    private readonly 执行服务: 编舞执行服务 = new 编舞执行服务(),
-    private readonly 时间轴编译器: 编舞时间轴编译器接口 = new 编舞时间轴编译器(),
-    项目机器人服务?: 编舞项目机器人服务接口,
-    项目文件资源服务?: 编舞项目文件资源服务接口,
-  ) {
+  constructor({
+    机器人仓库,
+    存储 = new 编舞项目存储(),
+    机器人控制桥接 = new 编舞机器人控制桥接(),
+    执行服务 = new 编舞执行服务(),
+    时间轴编译器 = new 编舞时间轴编译器(),
+    项目机器人服务,
+    项目文件资源服务,
+    项目管理服务,
+    时间轴内容服务,
+  }: 编舞服务依赖) {
+    this.执行服务 = 执行服务;
+    this.时间轴编译器 = 时间轴编译器;
+
+    const 管理服务 = 项目管理服务 ?? new 编舞项目管理服务(存储);
+    this.项目管理服务 = 管理服务;
     this.项目机器人服务 = 项目机器人服务 ?? new 编舞项目机器人服务(
-      (projectUuid) => this.获取项目记录(projectUuid),
-      this.存储,
-      this.机器人仓库,
-      this.机器人控制桥接,
+      (projectUuid) => 管理服务.获取项目记录(projectUuid),
+      存储,
+      机器人仓库,
+      机器人控制桥接,
     );
     this.项目文件资源服务 = 项目文件资源服务 ?? new 编舞项目文件资源服务(
-      (projectUuid) => this.获取项目记录(projectUuid),
-      this.存储,
-      () => this.保存项目索引(),
-      (project) => {
-        this.projects.set(project.uuid, project);
-      },
+      (projectUuid) => 管理服务.获取项目记录(projectUuid),
+      存储,
+      () => 管理服务.保存项目索引(),
+      (project) => 管理服务.注册项目(project),
+    );
+    this.时间轴内容服务 = 时间轴内容服务 ?? new 编舞时间轴内容服务(
+      (projectUuid) => 管理服务.获取项目记录(projectUuid),
+      存储,
+      () => 管理服务.保存项目索引(),
     );
   }
 
   async 初始化(): Promise<void> {
-    await this.存储.初始化();
-    const projects = await this.存储.加载项目索引();
-    this.projects.clear();
-    projects.forEach((project) => this.projects.set(project.uuid, project));
+    await this.项目管理服务.初始化();
   }
 
   /**
@@ -125,15 +155,11 @@ export class 编舞服务 {
   }
 
   private 获取项目记录(projectUuid: string): ChoreoProject {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
-    return project;
+    return this.项目管理服务.获取项目记录(projectUuid);
   }
 
   private async 保存项目索引(): Promise<void> {
-    await this.存储.保存项目索引(this.projects.values());
+    await this.项目管理服务.保存项目索引();
   }
 
   // ==================== 项目管理 ====================
@@ -142,85 +168,42 @@ export class 编舞服务 {
    * 获取所有项目
    */
   getAllProjects(): ChoreoProject[] {
-    return Array.from(this.projects.values()).sort((a, b) => {
-      const aTime = a.last_opened || a.created_at;
-      const bTime = b.last_opened || b.created_at;
-      return new Date(bTime).getTime() - new Date(aTime).getTime();
-    });
+    return this.项目管理服务.getAllProjects();
   }
 
   /**
    * 获取单个项目
    */
   getProject(uuid: string): ChoreoProject | undefined {
-    return this.projects.get(uuid);
+    return this.项目管理服务.getProject(uuid);
   }
 
   /**
    * 创建项目
    */
   async createProject(dto: CreateProjectDto): Promise<ChoreoProject> {
-    const uuid = uuidv7();
-    const folderPath = this.存储.生成项目目录路径(dto.name, uuid);
-
-    const now = new Date().toISOString();
-    const project: ChoreoProject = {
-      uuid,
-      name: dto.name,
-      description: dto.description,
-      folder_path: folderPath,
-      created_at: now,
-      updated_at: now,
-    };
-
-    const defaultTimeline = 创建默认时间轴();
-    await this.存储.创建项目目录(project, defaultTimeline);
-
-    // 保存到索引
-    this.projects.set(uuid, project);
-    await this.保存项目索引();
-
-    logger.info(`创建编舞项目: ${dto.name}`, { uuid });
-    return project;
+    return this.项目管理服务.createProject(dto);
   }
 
   /**
    * 更新项目
    */
   async updateProject(uuid: string, dto: UpdateProjectDto): Promise<ChoreoProject> {
-    const project = this.获取项目记录(uuid);
-
-    if (dto.name !== undefined) project.name = dto.name;
-    if (dto.description !== undefined) project.description = dto.description;
-    project.updated_at = new Date().toISOString();
-
-    await this.存储.保存项目元数据(project);
-    await this.保存项目索引();
-    return project;
+    return this.项目管理服务.updateProject(uuid, dto);
   }
 
   /**
    * 删除项目
    */
   async deleteProject(uuid: string): Promise<void> {
-    const project = this.获取项目记录(uuid);
-
-    this.projects.delete(uuid);
-    await this.存储.删除项目目录(project);
-    await this.保存项目索引();
-
-    logger.info(`删除编舞项目: ${project.name}`, { uuid });
+    await this.项目管理服务.deleteProject(uuid);
   }
 
   /**
    * 打开项目（更新最后打开时间）
    */
   async openProject(uuid: string): Promise<ChoreoProject> {
-    const project = this.获取项目记录(uuid);
-
-    project.last_opened = new Date().toISOString();
-    await this.保存项目索引();
-    return project;
+    return this.项目管理服务.openProject(uuid);
   }
 
   // ==================== 项目机器人管理 ====================
@@ -252,29 +235,14 @@ export class 编舞服务 {
    * 获取时间轴数据
    */
   async getTimeline(projectUuid: string): Promise<TimelineData> {
-    const project = this.获取项目记录(projectUuid);
-    return this.存储.读取时间轴(project, 创建默认时间轴());
+    return this.时间轴内容服务.getTimeline(projectUuid);
   }
 
   /**
    * 保存时间轴数据
    */
   async saveTimeline(projectUuid: string, dto: SaveTimelineDto): Promise<void> {
-    const project = this.获取项目记录(projectUuid);
-
-    const timelineData: TimelineData = {
-      tracks: dto.tracks,
-      config: dto.config,
-      updated_at: new Date().toISOString(),
-    };
-
-    await this.存储.保存时间轴(project, timelineData);
-
-    // 更新项目时间
-    project.updated_at = new Date().toISOString();
-    await this.保存项目索引();
-
-    logger.info(`保存时间轴数据`, { projectUuid, tracksCount: dto.tracks.length });
+    await this.时间轴内容服务.saveTimeline(projectUuid, dto);
   }
 
   // ==================== 自定义动作管理 ====================
@@ -283,8 +251,7 @@ export class 编舞服务 {
    * 获取自定义动作列表
    */
   async getCustomActions(projectUuid: string): Promise<CustomAction[]> {
-    const project = this.获取项目记录(projectUuid);
-    return this.存储.读取自定义动作(project);
+    return this.时间轴内容服务.getCustomActions(projectUuid);
   }
 
   /**
@@ -294,25 +261,7 @@ export class 编舞服务 {
     projectUuid: string,
     data: { name: string; description?: string; tracks: TimelineTrack[]; config: TimelineConfig }
   ): Promise<CustomAction> {
-    const project = this.获取项目记录(projectUuid);
-
-    const actions = await this.getCustomActions(projectUuid);
-    const now = new Date().toISOString();
-
-    const action: CustomAction = {
-      uuid: uuidv7(),
-      name: data.name,
-      description: data.description,
-      tracks: data.tracks,
-      config: data.config,
-      created_at: now,
-      updated_at: now,
-    };
-
-    actions.push(action);
-    await this.存储.保存自定义动作列表(project, actions);
-
-    return action;
+    return this.时间轴内容服务.saveCustomAction(projectUuid, data);
   }
 
   // ==================== 音频管理 ====================

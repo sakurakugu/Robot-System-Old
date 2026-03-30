@@ -28,6 +28,20 @@ const getQueryParam = (value: unknown): string => {
   return '';
 };
 
+const 清理临时文件 = async (filePath?: string): Promise<void> => {
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    await fs.promises.unlink(filePath);
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      logger.error('清理临时文件失败', error as Error, { filePath });
+    }
+  }
+};
+
 export class 编舞控制器 {
   constructor(private service: ChoreoService) {}
 
@@ -134,7 +148,7 @@ export class 编舞控制器 {
    */
   getProjectRobots = async (req: Request, res: Response): Promise<void> => {
     try {
-      const robots = this.service.getProjectRobots(getParam(req.params.uuid));
+      const robots = await this.service.getProjectRobots(getParam(req.params.uuid));
       res.json({ success: true, data: robots });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -155,7 +169,7 @@ export class 编舞控制器 {
         res.status(400).json({ success: false, error: '机器人 ID 是必需的' });
         return;
       }
-      const robot = this.service.addRobotToProject(getParam(req.params.uuid), dto);
+      const robot = await this.service.addRobotToProject(getParam(req.params.uuid), dto);
       res.json({ success: true, data: robot });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '机器人不存在') {
@@ -173,7 +187,7 @@ export class 编舞控制器 {
    */
   removeRobotFromProject = async (req: Request, res: Response): Promise<void> => {
     try {
-      this.service.removeRobotFromProject(getParam(req.params.uuid), getParam(req.params.robotUuid));
+      await this.service.removeRobotFromProject(getParam(req.params.uuid), getParam(req.params.robotUuid));
       res.json({ success: true, message: '机器人已移除' });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '机器人不在项目中') {
@@ -542,11 +556,9 @@ export class 编舞控制器 {
     try {
       const { exportPath, fileName } = await this.service.exportProject(getParam(req.params.uuid));
 
-      res.download(exportPath, fileName, (err) => {
+      res.download(exportPath, fileName, async (err) => {
         // 下载完成后删除临时文件
-        if (fs.existsSync(exportPath)) {
-          fs.unlinkSync(exportPath);
-        }
+        await 清理临时文件(exportPath);
         if (err) {
           logger.error('下载文件时出错', err as Error);
         }
@@ -573,16 +585,12 @@ export class 编舞控制器 {
       const project = await this.service.importProject(req.file.path, req.file.originalname);
 
       // 清理临时文件
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
+      await 清理临时文件(req.file.path);
 
       res.json({ success: true, data: project });
     } catch (error: any) {
       // 清理临时文件
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
+      await 清理临时文件(req.file?.path);
       res.status(500).json({ success: false, error: error.message });
     }
   };
@@ -599,7 +607,7 @@ export class 编舞控制器 {
         res.status(400).json({ success: false, error: '缺少必要参数' });
         return;
       }
-      const robot = this.service.addRobotToProjectDirect(getParam(req.params.uuid), dto);
+      const robot = await this.service.addRobotToProjectDirect(getParam(req.params.uuid), dto);
       res.json({ success: true, data: robot });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -615,7 +623,7 @@ export class 编舞控制器 {
    */
   getProjectRobotsConfig = async (req: Request, res: Response): Promise<void> => {
     try {
-      const robots = this.service.getProjectRobotsConfig(getParam(req.params.uuid));
+      const robots = await this.service.getProjectRobotsConfig(getParam(req.params.uuid));
       res.json({ success: true, data: robots });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -632,7 +640,7 @@ export class 编舞控制器 {
   updateProjectRobot = async (req: Request, res: Response): Promise<void> => {
     try {
       const dto: UpdateProjectRobotDto = req.body;
-      const robot = this.service.updateProjectRobot(getParam(req.params.uuid), getParam(req.params.robotUuid), dto);
+      const robot = await this.service.updateProjectRobot(getParam(req.params.uuid), getParam(req.params.robotUuid), dto);
       res.json({ success: true, data: robot });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '机器人不在项目中') {
@@ -648,7 +656,7 @@ export class 编舞控制器 {
    */
   deleteProjectRobot = async (req: Request, res: Response): Promise<void> => {
     try {
-      this.service.deleteProjectRobot(getParam(req.params.uuid), getParam(req.params.robotUuid));
+      await this.service.deleteProjectRobot(getParam(req.params.uuid), getParam(req.params.robotUuid));
       res.json({ success: true, message: '机器人已删除' });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '机器人不在项目中') {

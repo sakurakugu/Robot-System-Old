@@ -8,6 +8,16 @@ type 测试环境 = {
   项目目录: string;
 };
 
+type 机器人仓库Mock = {
+  getRobot: jest.Mock;
+};
+
+type 机器人控制桥接Mock = {
+  testRobotConnection: jest.Mock;
+  connectRobot: jest.Mock;
+  restartMotionControl: jest.Mock;
+};
+
 function 创建测试环境(): 测试环境 {
   const 临时目录 = fs.mkdtempSync(path.join(os.tmpdir(), 'choreo-service-'));
   return {
@@ -17,13 +27,38 @@ function 创建测试环境(): 测试环境 {
   };
 }
 
-async function 创建编舞服务(环境: 测试环境) {
+function 创建机器人仓库Mock(): 机器人仓库Mock {
+  return {
+    getRobot: jest.fn(),
+  };
+}
+
+function 创建机器人控制桥接Mock(): 机器人控制桥接Mock {
+  return {
+    testRobotConnection: jest.fn(),
+    connectRobot: jest.fn(),
+    restartMotionControl: jest.fn(),
+  };
+}
+
+async function 创建编舞服务(
+  环境: 测试环境,
+  机器人仓库: 机器人仓库Mock = 创建机器人仓库Mock(),
+  机器人控制桥接?: 机器人控制桥接Mock,
+) {
   process.env.CHOREO_DATA_DIR = 环境.数据目录;
   process.env.CHOREO_PROJECTS_DIR = 环境.项目目录;
 
   jest.resetModules();
+  const uuidValues = [
+    '12345678-1234-1234-1234-123456789abc',
+    '22345678-1234-1234-1234-123456789abc',
+    '32345678-1234-1234-1234-123456789abc',
+    '42345678-1234-1234-1234-123456789abc',
+    '52345678-1234-1234-1234-123456789abc',
+  ];
   jest.doMock('uuid', () => ({
-    v7: jest.fn(() => '12345678-1234-1234-1234-123456789abc'),
+    v7: jest.fn(() => uuidValues.shift() || '92345678-1234-1234-1234-123456789abc'),
   }));
   jest.doMock('../../core/services/python-executor', () => ({
     PythonExecutor: jest.fn().mockImplementation(() => ({})),
@@ -38,7 +73,10 @@ async function 创建编舞服务(环境: 测试环境) {
   }));
 
   const { 编舞服务 } = await import('./service');
-  return new 编舞服务({} as any);
+  if (机器人控制桥接) {
+    return new 编舞服务(机器人仓库 as any, undefined, 机器人控制桥接 as any);
+  }
+  return new 编舞服务(机器人仓库 as any);
 }
 
 describe('编舞服务', () => {
@@ -158,7 +196,7 @@ describe('编舞服务', () => {
       config: 已保存时间轴.config,
     });
     const 动作列表 = await 服务.getCustomActions(项目.uuid);
-    expect(动作.uuid).toBe('12345678-1234-1234-1234-123456789abc');
+    expect(动作.uuid).toBe('22345678-1234-1234-1234-123456789abc');
     expect(动作列表).toHaveLength(1);
     expect(动作列表[0].name).toBe('招手');
   });
@@ -235,5 +273,136 @@ describe('编舞服务', () => {
     await expect(
       服务.getAudioPath(项目.uuid, 文件名),
     ).rejects.toThrow('音频文件不存在');
+  });
+
+  it('项目机器人配置应异步保存更新删除', async () => {
+    const 机器人仓库 = 创建机器人仓库Mock();
+    机器人仓库.getRobot.mockResolvedValue({
+      uuid: 'robot-main-1',
+      name: '主机器人',
+    });
+    const 服务 = await 创建编舞服务(环境, 机器人仓库);
+    await 服务.初始化();
+    const 项目 = await 服务.createProject({
+      name: '机器人项目',
+    });
+
+    const 主机器人 = await 服务.addRobotToProject(项目.uuid, {
+      robot_id: 'robot-main-1',
+    });
+    expect(主机器人.name).toBe('主机器人');
+    expect(机器人仓库.getRobot).toHaveBeenCalledWith('robot-main-1');
+
+    const 直接机器人 = await 服务.addRobotToProjectDirect(项目.uuid, {
+      name: '直连机器人',
+      robot_ip: '192.168.1.20',
+      local_ip: '192.168.1.2',
+      local_port: 9000,
+      group_name: '测试组',
+    });
+    expect(直接机器人.uuid).toBe('32345678-1234-1234-1234-123456789abc');
+
+    const 配置列表 = await 服务.getProjectRobotsConfig(项目.uuid);
+    expect(配置列表).toHaveLength(2);
+
+    const 更新后 = await 服务.updateProjectRobot(项目.uuid, 直接机器人.uuid, {
+      status: 'online',
+      name: '已连接机器人',
+    });
+    expect(更新后.status).toBe('online');
+    expect(更新后.name).toBe('已连接机器人');
+
+    await 服务.deleteProjectRobot(项目.uuid, 直接机器人.uuid);
+    const 删除后列表 = await 服务.getProjectRobotsConfig(项目.uuid);
+    expect(删除后列表).toHaveLength(1);
+
+    await 服务.removeRobotFromProject(项目.uuid, 主机器人.uuid);
+    const 删除主机器人后 = await 服务.getProjectRobots(项目.uuid);
+    expect(删除主机器人后).toEqual([]);
+  });
+
+  it('导出并导入项目应通过异步文件接口完成', async () => {
+    const 服务 = await 创建编舞服务(环境);
+    await 服务.初始化();
+    const 项目 = await 服务.createProject({
+      name: '导出项目',
+      description: '导出说明',
+    });
+    await 服务.saveFileContent(项目.uuid, 'scripts/run.py', 'print("run")');
+
+    const { exportPath } = await 服务.exportProject(项目.uuid);
+    expect(fs.existsSync(exportPath)).toBe(true);
+
+    const 导入项目 = await 服务.importProject(exportPath, path.basename(exportPath));
+    expect(导入项目.uuid).toBe('22345678-1234-1234-1234-123456789abc');
+    expect(导入项目.name).toBe('导出项目');
+    expect(fs.existsSync(path.join(导入项目.folder_path, 'scripts', 'run.py'))).toBe(true);
+  });
+
+  it('连接机器人应通过桥接执行并更新在线状态', async () => {
+    const 机器人控制桥接 = 创建机器人控制桥接Mock();
+    机器人控制桥接.connectRobot.mockResolvedValue({
+      success: true,
+      connected: true,
+      message: 'SSH 连接成功；自动配置完成',
+      mode: 'wifi',
+    });
+
+    const 服务 = await 创建编舞服务(环境, 创建机器人仓库Mock(), 机器人控制桥接);
+    await 服务.初始化();
+    const 项目 = await 服务.createProject({
+      name: '连接项目',
+    });
+
+    const 机器人 = await 服务.addRobotToProjectDirect(项目.uuid, {
+      name: '待连接机器人',
+      robot_ip: '192.168.1.20',
+      local_ip: '192.168.1.2',
+      local_port: 9000,
+    });
+
+    const 结果 = await 服务.connectRobot(项目.uuid, 机器人.uuid);
+
+    expect(机器人控制桥接.connectRobot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uuid: 机器人.uuid,
+        name: '待连接机器人',
+        robot_ip: '192.168.1.20',
+      }),
+    );
+    expect(结果.mode).toBe('wifi');
+
+    const 配置列表 = await 服务.getProjectRobotsConfig(项目.uuid);
+    expect(配置列表[0].status).toBe('online');
+  });
+
+  it('连接失败时应通过桥接结果回写离线状态', async () => {
+    const 机器人控制桥接 = 创建机器人控制桥接Mock();
+    机器人控制桥接.connectRobot.mockResolvedValue({
+      success: false,
+      connected: false,
+      message: 'SSH 连接失败',
+    });
+
+    const 服务 = await 创建编舞服务(环境, 创建机器人仓库Mock(), 机器人控制桥接);
+    await 服务.初始化();
+    const 项目 = await 服务.createProject({
+      name: '连接失败项目',
+    });
+
+    const 机器人 = await 服务.addRobotToProjectDirect(项目.uuid, {
+      name: '待连接机器人',
+      robot_ip: '192.168.1.20',
+      local_ip: '192.168.1.2',
+      local_port: 9000,
+    });
+
+    await 服务.updateProjectRobot(项目.uuid, 机器人.uuid, { status: 'online' });
+
+    const 结果 = await 服务.connectRobot(项目.uuid, 机器人.uuid);
+    expect(结果.success).toBe(false);
+
+    const 配置列表 = await 服务.getProjectRobotsConfig(项目.uuid);
+    expect(配置列表[0].status).toBe('offline');
   });
 });

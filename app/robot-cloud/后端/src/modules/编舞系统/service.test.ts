@@ -18,6 +18,48 @@ type 机器人控制桥接Mock = {
   restartMotionControl: jest.Mock;
 };
 
+type 执行服务Mock = {
+  setWebSocketService: jest.Mock;
+  startExecution: jest.Mock;
+  pauseExecution: jest.Mock;
+  resumeExecution: jest.Mock;
+  stopExecution: jest.Mock;
+  getExecutionStatus: jest.Mock;
+  getRunningExecutions: jest.Mock;
+};
+
+type 时间轴编译器Mock = {
+  compile: jest.Mock;
+};
+
+type 项目机器人服务Mock = {
+  getProjectRobots: jest.Mock;
+  addRobotToProject: jest.Mock;
+  removeRobotFromProject: jest.Mock;
+  addRobotToProjectDirect: jest.Mock;
+  getProjectRobotsConfig: jest.Mock;
+  updateProjectRobot: jest.Mock;
+  deleteProjectRobot: jest.Mock;
+  testRobotConnection: jest.Mock;
+  connectRobot: jest.Mock;
+  restartMotionControl: jest.Mock;
+};
+
+type 项目文件资源服务Mock = {
+  getProjectFiles: jest.Mock;
+  getFileContent: jest.Mock;
+  saveFileContent: jest.Mock;
+  deleteFile: jest.Mock;
+  getProjectFolder: jest.Mock;
+  getAudioPath: jest.Mock;
+  saveAudioFile: jest.Mock;
+  listAudioFiles: jest.Mock;
+  deleteAudioFile: jest.Mock;
+  saveProject: jest.Mock;
+  exportProject: jest.Mock;
+  importProject: jest.Mock;
+};
+
 function 创建测试环境(): 测试环境 {
   const 临时目录 = fs.mkdtempSync(path.join(os.tmpdir(), 'choreo-service-'));
   return {
@@ -41,10 +83,64 @@ function 创建机器人控制桥接Mock(): 机器人控制桥接Mock {
   };
 }
 
+function 创建执行服务Mock(): 执行服务Mock {
+  return {
+    setWebSocketService: jest.fn(),
+    startExecution: jest.fn(),
+    pauseExecution: jest.fn(),
+    resumeExecution: jest.fn(),
+    stopExecution: jest.fn(),
+    getExecutionStatus: jest.fn(),
+    getRunningExecutions: jest.fn(),
+  };
+}
+
+function 创建时间轴编译器Mock(): 时间轴编译器Mock {
+  return {
+    compile: jest.fn(),
+  };
+}
+
+function 创建项目机器人服务Mock(): 项目机器人服务Mock {
+  return {
+    getProjectRobots: jest.fn(),
+    addRobotToProject: jest.fn(),
+    removeRobotFromProject: jest.fn(),
+    addRobotToProjectDirect: jest.fn(),
+    getProjectRobotsConfig: jest.fn(),
+    updateProjectRobot: jest.fn(),
+    deleteProjectRobot: jest.fn(),
+    testRobotConnection: jest.fn(),
+    connectRobot: jest.fn(),
+    restartMotionControl: jest.fn(),
+  };
+}
+
+function 创建项目文件资源服务Mock(): 项目文件资源服务Mock {
+  return {
+    getProjectFiles: jest.fn(),
+    getFileContent: jest.fn(),
+    saveFileContent: jest.fn(),
+    deleteFile: jest.fn(),
+    getProjectFolder: jest.fn(),
+    getAudioPath: jest.fn(),
+    saveAudioFile: jest.fn(),
+    listAudioFiles: jest.fn(),
+    deleteAudioFile: jest.fn(),
+    saveProject: jest.fn(),
+    exportProject: jest.fn(),
+    importProject: jest.fn(),
+  };
+}
+
 async function 创建编舞服务(
   环境: 测试环境,
   机器人仓库: 机器人仓库Mock = 创建机器人仓库Mock(),
   机器人控制桥接?: 机器人控制桥接Mock,
+  执行服务?: 执行服务Mock,
+  时间轴编译器?: 时间轴编译器Mock,
+  项目机器人服务?: 项目机器人服务Mock,
+  项目文件资源服务?: 项目文件资源服务Mock,
 ) {
   process.env.CHOREO_DATA_DIR = 环境.数据目录;
   process.env.CHOREO_PROJECTS_DIR = 环境.项目目录;
@@ -74,7 +170,59 @@ async function 创建编舞服务(
 
   const { 编舞服务 } = await import('./service');
   if (机器人控制桥接) {
-    return new 编舞服务(机器人仓库 as any, undefined, 机器人控制桥接 as any);
+    return new 编舞服务(
+      机器人仓库 as any,
+      undefined,
+      机器人控制桥接 as any,
+      执行服务 as any,
+      时间轴编译器 as any,
+      项目机器人服务 as any,
+      项目文件资源服务 as any,
+    );
+  }
+  if (执行服务) {
+    return new 编舞服务(
+      机器人仓库 as any,
+      undefined,
+      undefined,
+      执行服务 as any,
+      时间轴编译器 as any,
+      项目机器人服务 as any,
+      项目文件资源服务 as any,
+    );
+  }
+  if (时间轴编译器) {
+    return new 编舞服务(
+      机器人仓库 as any,
+      undefined,
+      undefined,
+      undefined,
+      时间轴编译器 as any,
+      项目机器人服务 as any,
+      项目文件资源服务 as any,
+    );
+  }
+  if (项目机器人服务) {
+    return new 编舞服务(
+      机器人仓库 as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      项目机器人服务 as any,
+      项目文件资源服务 as any,
+    );
+  }
+  if (项目文件资源服务) {
+    return new 编舞服务(
+      机器人仓库 as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      项目文件资源服务 as any,
+    );
   }
   return new 编舞服务(机器人仓库 as any);
 }
@@ -404,5 +552,217 @@ describe('编舞服务', () => {
 
     const 配置列表 = await 服务.getProjectRobotsConfig(项目.uuid);
     expect(配置列表[0].status).toBe('offline');
+  });
+
+  it('执行编舞应编译计划后委托执行服务', async () => {
+    const 执行服务 = 创建执行服务Mock();
+    执行服务.startExecution.mockReturnValue({
+      executionId: 'schedule-1',
+      scheduleId: 'schedule-1',
+      status: 'running',
+      currentTime: 0,
+      progress: 0,
+      startedAt: '2026-03-30T00:00:00.000Z',
+    });
+
+    const 服务 = await 创建编舞服务(
+      环境,
+      创建机器人仓库Mock(),
+      undefined,
+      执行服务,
+    );
+    await 服务.初始化();
+    const 项目 = await 服务.createProject({
+      name: '执行项目',
+    });
+
+    await 服务.saveTimeline(项目.uuid, {
+      tracks: [
+        {
+          id: 'track-1',
+          name: '轨道一',
+          type: 'action',
+          robotId: 'robot-1',
+          blocks: [
+            {
+              id: 'block-1',
+              name: '前进',
+              startTime: 1,
+              duration: 2,
+              actionType: 'forward',
+              actionParams: { speed: 1 },
+            },
+          ],
+        },
+      ],
+      config: {
+        duration: 8,
+        pixelsPerSecond: 100,
+        currentTime: 0,
+        snapToGrid: true,
+        gridSize: 0.5,
+      },
+    });
+
+    const 状态 = await 服务.executeChoreo(项目.uuid);
+
+    expect(执行服务.startExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectUuid: 项目.uuid,
+        totalDuration: 8000,
+        robotIds: ['robot-1'],
+        actions: [
+          expect.objectContaining({
+            robotId: 'robot-1',
+            action: 'forward',
+            executeAt: 1000,
+            duration: 2000,
+            parameters: { speed: 1 },
+          }),
+        ],
+      }),
+    );
+    expect(状态.status).toBe('running');
+  });
+
+  it('编译时间轴应委托独立编译器', async () => {
+    const 时间轴编译器 = 创建时间轴编译器Mock();
+    时间轴编译器.compile.mockReturnValue({
+      scheduleId: 'compiled-1',
+      projectUuid: 'ignored',
+      totalDuration: 6000,
+      robotIds: ['robot-1'],
+      actions: [
+        {
+          robotId: 'robot-1',
+          action: 'sit',
+          executeAt: 500,
+          duration: 1000,
+        },
+      ],
+    });
+
+    const 服务 = await 创建编舞服务(
+      环境,
+      创建机器人仓库Mock(),
+      undefined,
+      undefined,
+      时间轴编译器,
+    );
+    await 服务.初始化();
+    const 项目 = await 服务.createProject({
+      name: '编译项目',
+    });
+
+    await 服务.saveTimeline(项目.uuid, {
+      tracks: [
+        {
+          id: 'track-1',
+          name: '轨道一',
+          type: 'action',
+          robotId: 'robot-1',
+          blocks: [
+            {
+              id: 'block-1',
+              name: '坐下',
+              startTime: 0.5,
+              duration: 1,
+              actionType: 'sit',
+            },
+          ],
+        },
+      ],
+      config: {
+        duration: 6,
+        pixelsPerSecond: 100,
+        currentTime: 0,
+        snapToGrid: true,
+        gridSize: 0.5,
+      },
+    });
+
+    const 计划 = await 服务.compileTimeline(项目.uuid);
+
+    expect(时间轴编译器.compile).toHaveBeenCalledWith(
+      项目.uuid,
+      expect.objectContaining({
+        tracks: [
+          expect.objectContaining({
+            id: 'track-1',
+          }),
+        ],
+        config: expect.objectContaining({
+          duration: 6,
+        }),
+      }),
+    );
+    expect(计划.scheduleId).toBe('compiled-1');
+  });
+
+  it('设置 WebSocket 服务应委托执行服务', async () => {
+    const 执行服务 = 创建执行服务Mock();
+    const 服务 = await 创建编舞服务(
+      环境,
+      创建机器人仓库Mock(),
+      undefined,
+      执行服务,
+    );
+    const ws服务 = { broadcast: jest.fn() };
+
+    服务.setWebSocketService(ws服务 as any);
+
+    expect(执行服务.setWebSocketService).toHaveBeenCalledWith(ws服务);
+  });
+
+  it('项目机器人相关接口应委托独立项目机器人服务', async () => {
+    const 项目机器人服务 = 创建项目机器人服务Mock();
+    项目机器人服务.getProjectRobots.mockResolvedValue([{ uuid: 'robot-1' }]);
+    项目机器人服务.connectRobot.mockResolvedValue({
+      success: true,
+      connected: true,
+      message: 'ok',
+    });
+
+    const 服务 = await 创建编舞服务(
+      环境,
+      创建机器人仓库Mock(),
+      undefined,
+      undefined,
+      undefined,
+      项目机器人服务,
+    );
+
+    expect(await 服务.getProjectRobots('project-1')).toEqual([{ uuid: 'robot-1' }]);
+    expect(项目机器人服务.getProjectRobots).toHaveBeenCalledWith('project-1');
+
+    const 结果 = await 服务.connectRobot('project-1', 'robot-1');
+    expect(结果.success).toBe(true);
+    expect(项目机器人服务.connectRobot).toHaveBeenCalledWith('project-1', 'robot-1');
+  });
+
+  it('文件与资源相关接口应委托独立项目文件资源服务', async () => {
+    const 项目文件资源服务 = 创建项目文件资源服务Mock();
+    项目文件资源服务.getProjectFiles.mockResolvedValue([{ name: 'scripts' }]);
+    项目文件资源服务.exportProject.mockResolvedValue({
+      exportPath: 'D:/tmp/test.hhzip',
+      fileName: 'test.hhzip',
+    });
+
+    const 服务 = await 创建编舞服务(
+      环境,
+      创建机器人仓库Mock(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      项目文件资源服务,
+    );
+
+    expect(await 服务.getProjectFiles('project-1')).toEqual([{ name: 'scripts' }]);
+    expect(项目文件资源服务.getProjectFiles).toHaveBeenCalledWith('project-1');
+
+    const 导出结果 = await 服务.exportProject('project-1');
+    expect(导出结果.fileName).toBe('test.hhzip');
+    expect(项目文件资源服务.exportProject).toHaveBeenCalledWith('project-1');
   });
 });

@@ -17,7 +17,7 @@ export class 角色控制器 {
    */
   getAllRoles = async (_req: Request, res: Response) => {
     try {
-      const roles = this.角色服务.getAllRoles();
+      const roles = await this.角色服务.getAllRoles();
       res.json({ success: true, data: roles });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -30,7 +30,7 @@ export class 角色控制器 {
   getRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const role = this.角色服务.getRole(uuid);
+      const role = await this.角色服务.getRole(uuid);
 
       if (!role) {
         return res.status(404).json({ success: false, error: '角色不存在' });
@@ -52,7 +52,7 @@ export class 角色控制器 {
         return res.status(400).json({ success: false, error: '角色名称不能为空' });
       }
 
-      const role = this.角色服务.createRole(data);
+      const role = await this.角色服务.createRole(data);
       res.status(201).json({ success: true, data: role });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -65,7 +65,7 @@ export class 角色控制器 {
   updateRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const role = this.角色服务.updateRole(uuid, req.body);
+      const role = await this.角色服务.updateRole(uuid, req.body);
       res.json({ success: true, data: role });
     } catch (error: any) {
       const status = error.message === '角色不存在' ? 404 : 500;
@@ -79,7 +79,7 @@ export class 角色控制器 {
   deleteRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      this.角色服务.deleteRole(uuid);
+      await this.角色服务.deleteRole(uuid);
       res.json({ success: true, message: '角色删除成功' });
     } catch (error: any) {
       let status = 500;
@@ -96,7 +96,7 @@ export class 角色控制器 {
   getRobotsByRole = async (req: Request, res: Response) => {
     try {
       const uuid = this.获取参数(req, 'uuid');
-      const robots = this.角色服务.getRobotsByRole(uuid);
+      const robots = await this.角色服务.getRobotsByRole(uuid);
       res.json({ success: true, data: robots });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

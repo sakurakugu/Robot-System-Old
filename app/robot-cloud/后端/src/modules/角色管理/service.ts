@@ -1,35 +1,35 @@
 import { v7 as uuidv7 } from 'uuid';
-import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
+import type { RoleRepository } from './repository';
 import type { CreateRoleDto, RoleRecord, UpdateRoleDto } from './types';
 
 /**
  * 角色服务
  */
 export class 角色服务 {
-  constructor(private database: DatabaseService) {}
+  constructor(private repository: RoleRepository) {}
 
   /**
    * 获取所有角色
    */
-  getAllRoles(): RoleRecord[] {
-    return this.database.getAllRoles();
+  async getAllRoles(): Promise<RoleRecord[]> {
+    return this.repository.getAllRoles();
   }
 
   /**
    * 获取角色详情
    */
-  getRole(uuid: string): RoleRecord | undefined {
-    return this.database.getRole(uuid);
+  async getRole(uuid: string): Promise<RoleRecord | undefined> {
+    return this.repository.getRole(uuid);
   }
 
   /**
    * 创建角色
    */
-  createRole(data: CreateRoleDto): RoleRecord {
+  async createRole(data: CreateRoleDto): Promise<RoleRecord> {
     const uuid = uuidv7();
 
-    const role = this.database.createRole({
+    const role = await this.repository.createRole({
       uuid,
       name: data.name,
       description: data.description,
@@ -55,13 +55,13 @@ export class 角色服务 {
   /**
    * 更新角色
    */
-  updateRole(uuid: string, data: UpdateRoleDto): RoleRecord {
-    const 现存角色 = this.database.getRole(uuid);
+  async updateRole(uuid: string, data: UpdateRoleDto): Promise<RoleRecord> {
+    const 现存角色 = await this.repository.getRole(uuid);
     if (!现存角色) {
       throw new Error('角色不存在');
     }
 
-    const role = this.database.updateRole(uuid, {
+    const role = await this.repository.updateRole(uuid, {
       name: data.name,
       description: data.description,
       llm_provider: data.llm_provider,
@@ -86,9 +86,9 @@ export class 角色服务 {
   /**
    * 删除角色
    */
-  deleteRole(uuid: string): void {
+  async deleteRole(uuid: string): Promise<void> {
     // 检查是否为默认角色
-    const role = this.database.getRole(uuid);
+    const role = await this.repository.getRole(uuid);
     if (!role) {
       throw new Error('角色不存在');
     }
@@ -97,20 +97,20 @@ export class 角色服务 {
     }
 
     // 检查是否有机器人正在使用该角色（不自动解绑）
-    const robots = this.database.getRobotsByRole(uuid);
+    const robots = await this.repository.getRobotsByRole(uuid);
     if (robots.length > 0) {
       throw new Error(`有 ${robots.length} 个机器人正在使用此角色，无法删除`);
     }
 
-    this.database.deleteRole(uuid);
+    await this.repository.deleteRole(uuid);
     logger.info(`角色删除成功: ${uuid}`);
   }
 
   /**
    * 获取使用该角色的机器人列表
    */
-  getRobotsByRole(roleId: string): Array<{ uuid: string; name: string | null }> {
-    return this.database.getRobotsByRole(roleId);
+  async getRobotsByRole(roleId: string): Promise<Array<{ uuid: string; name: string | null }>> {
+    return this.repository.getRobotsByRole(roleId);
   }
 }
 

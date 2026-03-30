@@ -1,12 +1,12 @@
 import { v7 as uuidv7 } from 'uuid';
-import type DatabaseService from '../../core/database';
+import type { KnowledgeRepository } from './repository';
 import type { CreateKnowledgeInput, UpdateKnowledgeInput } from './types';
 
 export class KnowledgeService {
-  constructor(private database: DatabaseService) {}
+  constructor(private repository: KnowledgeRepository) {}
 
-  list() {
-    return this.database.listKnowledgeEntries().map((entry) => ({
+  async list() {
+    return (await this.repository.listKnowledgeEntries()).map((entry) => ({
       id: entry.id,
       title: entry.title,
       content: entry.content,
@@ -18,7 +18,7 @@ export class KnowledgeService {
     }));
   }
 
-  create(input: CreateKnowledgeInput, userId: string | null) {
+  async create(input: CreateKnowledgeInput, userId: string | null) {
     const title = String(input.title || '').trim();
     const content = String(input.content || '').trim();
     if (!title) {
@@ -29,7 +29,7 @@ export class KnowledgeService {
     }
 
     const id = uuidv7();
-    this.database.createKnowledgeEntry({
+    await this.repository.createKnowledgeEntry({
       id,
       title,
       content,
@@ -38,7 +38,7 @@ export class KnowledgeService {
       updated_by: userId,
     });
 
-    const created = this.database.getKnowledgeEntry(id);
+    const created = await this.repository.getKnowledgeEntry(id);
     if (!created) {
       throw new Error('创建失败');
     }
@@ -55,20 +55,20 @@ export class KnowledgeService {
     };
   }
 
-  update(id: string, input: UpdateKnowledgeInput, userId: string | null) {
-    const existing = this.database.getKnowledgeEntry(id);
+  async update(id: string, input: UpdateKnowledgeInput, userId: string | null) {
+    const existing = await this.repository.getKnowledgeEntry(id);
     if (!existing) {
       throw new Error('知识条目不存在');
     }
 
-    this.database.updateKnowledgeEntry(id, {
+    await this.repository.updateKnowledgeEntry(id, {
       title: input.title !== undefined ? String(input.title).trim() : undefined,
       content: input.content !== undefined ? String(input.content).trim() : undefined,
       tags: input.tags !== undefined ? JSON.stringify(input.tags) : undefined,
       updated_by: userId,
     });
 
-    const updated = this.database.getKnowledgeEntry(id);
+    const updated = await this.repository.getKnowledgeEntry(id);
     if (!updated) {
       throw new Error('更新失败');
     }
@@ -85,11 +85,11 @@ export class KnowledgeService {
     };
   }
 
-  remove(id: string): void {
-    const existing = this.database.getKnowledgeEntry(id);
+  async remove(id: string): Promise<void> {
+    const existing = await this.repository.getKnowledgeEntry(id);
     if (!existing) {
       throw new Error('知识条目不存在');
     }
-    this.database.deleteKnowledgeEntry(id);
+    await this.repository.deleteKnowledgeEntry(id);
   }
 }

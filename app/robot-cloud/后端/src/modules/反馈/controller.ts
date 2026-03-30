@@ -10,7 +10,7 @@ export class 反馈控制器 {
 
   submit = async (req: Request, res: Response) => {
     try {
-      const data = this.feedbackService.submit(req.body || {}, {
+      const data = await this.feedbackService.submit(req.body || {}, {
         clientType: String(req.header('x-client-type') || 'unknown'),
         deviceName: String(req.header('x-device-name') || ''),
         userId: req.authContext?.user?.id || null,
@@ -23,7 +23,7 @@ export class 反馈控制器 {
 
   list = async (req: Request, res: Response) => {
     try {
-      const data = this.feedbackService.list({
+      const data = await this.feedbackService.list({
         limit: Number(req.query.limit || 20),
         offset: Number(req.query.offset || 0),
         status: req.query.status as any,
@@ -36,7 +36,7 @@ export class 反馈控制器 {
 
   detail = async (req: Request, res: Response) => {
     try {
-      const data = this.feedbackService.detail(this.resolveParam(req.params.id));
+      const data = await this.feedbackService.detail(this.resolveParam(req.params.id));
       res.json({ success: true, data });
     } catch (error: any) {
       const status = error.message.includes('不存在') ? 404 : 400;
@@ -46,7 +46,7 @@ export class 反馈控制器 {
 
   updateStatus = async (req: Request, res: Response) => {
     try {
-      const data = this.feedbackService.updateStatus(
+      const data = await this.feedbackService.updateStatus(
         this.resolveParam(req.params.id),
         req.body || {},
         req.authContext?.user?.id || null

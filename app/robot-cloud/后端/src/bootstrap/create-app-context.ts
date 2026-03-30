@@ -4,8 +4,10 @@ import { AccountController } from '../modules/account/controller';
 import { PostgresAccountRepository } from '../modules/account/repository';
 import { AccountService } from '../modules/account/service';
 import { KnowledgeController } from '../modules/knowledge/controller';
+import { PostgresKnowledgeRepository } from '../modules/knowledge/repository';
 import { KnowledgeService } from '../modules/knowledge/service';
 import { 反馈控制器 } from '../modules/反馈/controller';
+import { PostgresFeedbackRepository } from '../modules/反馈/repository';
 import { 反馈服务 } from '../modules/反馈/service';
 import WebSocketService from '../modules/websocket/service';
 import { 对话服务 } from '../modules/大模型交互/chat-service';
@@ -21,6 +23,7 @@ import { 机器人服务 } from '../modules/机器人管理/service';
 import { ChoreoController } from '../modules/编舞系统/controller';
 import { ChoreoService } from '../modules/编舞系统/service';
 import { 角色控制器 } from '../modules/角色管理/controller';
+import { PostgresRoleRepository } from '../modules/角色管理/repository';
 import { 角色服务 } from '../modules/角色管理/service';
 import { 设置控制器 } from '../modules/设置/controller';
 import { 设置服务 } from '../modules/设置/service';
@@ -70,15 +73,21 @@ export function createAppContext(): 应用上下文 {
     对话服务: new 对话服务(数据库),
     大模型配置服务: new 大模型配置服务(数据库),
     设置服务: new 设置服务(数据库),
-    角色服务: new 角色服务(数据库),
+    角色服务: new 角色服务(
+      new PostgresRoleRepository(异步数据库),
+    ),
     编舞服务: new ChoreoService(数据库),
     更新服务: new 更新服务(数据库),
     机器人包服务: new 机器人包服务(数据库),
     账号服务: new AccountService(
       new PostgresAccountRepository(异步数据库),
     ),
-    知识库服务: new KnowledgeService(数据库),
-    反馈服务: new 反馈服务(数据库),
+    知识库服务: new KnowledgeService(
+      new PostgresKnowledgeRepository(异步数据库),
+    ),
+    反馈服务: new 反馈服务(
+      new PostgresFeedbackRepository(异步数据库),
+    ),
   };
 
   const 控制器 = {

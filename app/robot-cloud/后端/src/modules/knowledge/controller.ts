@@ -10,7 +10,7 @@ export class KnowledgeController {
 
   list = async (_req: Request, res: Response) => {
     try {
-      res.json({ success: true, data: this.knowledgeService.list() });
+      res.json({ success: true, data: await this.knowledgeService.list() });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -19,7 +19,7 @@ export class KnowledgeController {
   create = async (req: Request, res: Response) => {
     try {
       const userId = req.authContext?.user?.id || null;
-      const data = this.knowledgeService.create(req.body || {}, userId);
+      const data = await this.knowledgeService.create(req.body || {}, userId);
       res.status(201).json({ success: true, data });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
@@ -29,7 +29,7 @@ export class KnowledgeController {
   update = async (req: Request, res: Response) => {
     try {
       const userId = req.authContext?.user?.id || null;
-      const data = this.knowledgeService.update(this.resolveParam(req.params.id), req.body || {}, userId);
+      const data = await this.knowledgeService.update(this.resolveParam(req.params.id), req.body || {}, userId);
       res.json({ success: true, data });
     } catch (error: any) {
       const status = error.message.includes('不存在') ? 404 : 400;
@@ -39,7 +39,7 @@ export class KnowledgeController {
 
   remove = async (req: Request, res: Response) => {
     try {
-      this.knowledgeService.remove(this.resolveParam(req.params.id));
+      await this.knowledgeService.remove(this.resolveParam(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       const status = error.message.includes('不存在') ? 404 : 400;

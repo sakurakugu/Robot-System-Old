@@ -490,7 +490,7 @@ const saving = ref(false)
 const project = ref<ChoreoProject | null>(null)
 const projectRobots = ref<ChoreoRobot[]>([])
 const allRobots = ref<any[]>([])
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const tracks = ref<any[]>([])
 const selectedRobotId = ref<string | null>(null)
 const showAddRobotDialog = ref(false)
@@ -596,7 +596,7 @@ const updateCurrentTime = (time: number) => {
 }
 
 // 更新轨道
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const updateTracks = (newTracks: any[]) => {
   tracks.value = newTracks
 }

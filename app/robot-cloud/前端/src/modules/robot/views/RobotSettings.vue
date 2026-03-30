@@ -719,7 +719,7 @@ const loadData = async () => {
         await loadVolume()
       }
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
@@ -732,7 +732,9 @@ const loadData = async () => {
     if (rolesRes.ok && rolesJson.success) {
       roles.value = rolesJson.data || []
     }
-  } catch {}
+  } catch {
+    // 角色列表加载失败不影响当前页面编辑
+  }
 }
 
 // Auto Save
@@ -764,7 +766,7 @@ const autoSave = async (field: string) => {
     const json = await res.json().catch(() => ({}))
     if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
     ElMessage.success({ message: '保存成功', duration: 1000 })
-  } catch (e) {
+  } catch {
     ElMessage.error('保存失败')
   }
 }

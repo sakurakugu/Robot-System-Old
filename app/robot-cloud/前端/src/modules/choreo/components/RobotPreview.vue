@@ -79,11 +79,11 @@ const hasThreeJS = ref(false)
 const showInstallInfo = ref(false)
 
 // 动态导入 three.js 相关模块
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 let THREE: any = null
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 let GLTFLoader: any = null
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 let OrbitControls: any = null
 
 // 机器人预览组件
@@ -568,7 +568,7 @@ const loadThreeJS = async () => {
     hasThreeJS.value = true
     console.log('Three.js 加载成功')
     initScene()
-  } catch (error) {
+  } catch {
     console.log('Three.js 未安装或加载失败，使用占位预览')
     hasThreeJS.value = false
   }

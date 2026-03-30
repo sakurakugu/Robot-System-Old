@@ -501,7 +501,9 @@ const pasteApiKey = async (provider: string) => {
       else if (provider === 'deepseek') deepseekConfig.value.apiKey = text.trim()
       else if (provider === 'aliyun') aliyunConfig.value.apiKey = text.trim()
     }
-  } catch {}
+  } catch {
+    // 剪贴板读取失败时保持当前输入框内容
+  }
 }
 
 const enableEdit = (provider: string) => {
@@ -542,7 +544,9 @@ const pasteXunfeiField = async (field: 'appId' | 'apiKey' | 'apiSecret') => {
     if (field === 'appId') xunfeiAsrConfig.value.appId = value
     else if (field === 'apiKey') xunfeiAsrConfig.value.apiKey = value
     else if (field === 'apiSecret') xunfeiAsrConfig.value.apiSecret = value
-  } catch {}
+  } catch {
+    // 剪贴板读取失败时保持当前输入框内容
+  }
 }
 
 const enableXunfeiEdit = (field: 'appId' | 'apiKey' | 'apiSecret') => {
@@ -625,7 +629,9 @@ const saveLLMConfig = async () => {
       saved.value = true
       setTimeout(() => (saved.value = false), 1200)
     }
-  } catch {}
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
 

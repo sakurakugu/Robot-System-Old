@@ -118,6 +118,10 @@ import { Select, Tools } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 
+defineOptions({
+  name: 'SystemSettingsPage',
+})
+
 const formData = ref({})
 const theme = ref<'system' | 'dark' | 'light'>('system')
 const language = ref<'zh-CN' | 'en-US'>('zh-CN')

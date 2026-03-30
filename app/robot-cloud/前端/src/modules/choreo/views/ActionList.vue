@@ -170,7 +170,7 @@ const loadCustomActions = async () => {
     if (res.success) {
       customActions.value = res.data || []
     }
-  } catch (e) {
+  } catch {
     customActions.value = []
   }
 }

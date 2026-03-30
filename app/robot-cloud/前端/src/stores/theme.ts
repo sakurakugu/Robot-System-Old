@@ -39,6 +39,7 @@ export const useThemeStore = defineStore('theme', {
             }
           }
         } catch {
+          // 本地主题映射损坏时回退默认配置
         }
       }
       this.setupSystemListener()

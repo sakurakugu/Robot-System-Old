@@ -28,11 +28,12 @@ import type { Component } from 'vue'
 
 type Props = {
   title: string
-  icon?: Component
+  icon?: Component | null
   iconSize?: number
 }
 
 withDefaults(defineProps<Props>(), {
+  icon: null,
   iconSize: 24,
 })
 

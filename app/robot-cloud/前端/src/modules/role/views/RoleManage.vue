@@ -439,7 +439,9 @@ const loadProviders = async () => {
     if (json.success) {
       providers.value = json.data || []
     }
-  } catch {}
+  } catch {
+    // 服务商配置加载失败时，保留当前空列表
+  }
 }
 
 const loadRoles = async () => {
@@ -458,10 +460,12 @@ const loadRoles = async () => {
           if (robotJson.success) {
             role.robot_count = robotJson.data?.length || 0
           }
-        } catch {}
+        } catch {
+          // 单个角色绑定机器人数量加载失败时，忽略并继续
+        }
       }
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('加载角色列表失败')
   } finally {
     loading.value = false
@@ -541,7 +545,7 @@ const saveRole = async () => {
     } else {
       ElMessage.error(json.error || '操作失败')
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('操作失败')
   } finally {
     saving.value = false
@@ -573,8 +577,8 @@ const deleteRole = async (role: Role) => {
     } else {
       ElMessage.error(json.error || '删除失败')
     }
-  } catch (e: any) {
-    if (e !== 'cancel') {
+  } catch (error: unknown) {
+    if (error !== 'cancel') {
       ElMessage.error('删除失败')
     }
   }
@@ -591,7 +595,7 @@ const showRobots = async (role: Role) => {
     if (json.success) {
       boundRobots.value = json.data || []
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('加载机器人列表失败')
   } finally {
     loadingRobots.value = false
@@ -620,8 +624,8 @@ const unbindRobot = async (robot: any) => {
     } else {
       ElMessage.error(json.error || '解绑失败')
     }
-  } catch (e: any) {
-    if (e !== 'cancel') {
+  } catch (error: unknown) {
+    if (error !== 'cancel') {
       ElMessage.error('解绑失败')
     }
   }

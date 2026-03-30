@@ -277,7 +277,7 @@ const saveSettings = () => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     ElMessage.success('设置已保存')
-  } catch (e) {
+  } catch {
     ElMessage.error('保存设置失败')
   }
 }

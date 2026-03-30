@@ -85,7 +85,7 @@ const initWaveform = async () => {
     try {
       // @ts-ignore - wavesurfer.js 是可选依赖
       WaveSurferModule = (await import('wavesurfer.js')).default
-    } catch (e) {
+    } catch {
       console.warn('wavesurfer.js 未安装，音频波形功能将不可用')
       return
     }

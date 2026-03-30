@@ -4,6 +4,12 @@ import tsParser from '@typescript-eslint/parser'
 import vue from 'eslint-plugin-vue'
 import vueParser from 'vue-eslint-parser'
 
+const tsRules = {
+  'no-unused-vars': 'off',
+  'no-undef': 'off',
+  '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }]
+}
+
 export default [
   {
     ignores: ['dist/**', 'node_modules/**']
@@ -22,10 +28,7 @@ export default [
     plugins: {
       '@typescript-eslint': tseslint
     },
-    rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
-    }
+    rules: tsRules
   },
   {
     files: ['**/*.vue'],
@@ -36,6 +39,16 @@ export default [
         ecmaVersion: 'latest',
         sourceType: 'module'
       }
+    },
+    plugins: {
+      '@typescript-eslint': tseslint
+    },
+    rules: tsRules
+  },
+  {
+    files: ['vite.config.ts'],
+    rules: {
+      'no-undef': 'off'
     }
   }
 ]

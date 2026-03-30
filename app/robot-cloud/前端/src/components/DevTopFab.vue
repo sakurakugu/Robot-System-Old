@@ -96,7 +96,7 @@ const loadPosPct = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultPct
-    const parsed = JSON.parse(raw) as any
+    const parsed = JSON.parse(raw) as { unit?: string; x?: number; y?: number }
     if (parsed && parsed.unit === 'pct-1' && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
       return { x: clamp01(parsed.x), y: clamp01(parsed.y) }
     }
@@ -146,6 +146,7 @@ const onPointerUp = (e: PointerEvent) => {
     try {
       rootEl.value.releasePointerCapture(e.pointerId)
     } catch {
+      // 指针捕获可能已释放，忽略即可
     }
   }
 }
@@ -157,6 +158,7 @@ const onPointerCancel = (e: PointerEvent) => {
     try {
       rootEl.value.releasePointerCapture(e.pointerId)
     } catch {
+      // 指针捕获可能已释放，忽略即可
     }
   }
 }

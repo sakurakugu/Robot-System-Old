@@ -344,30 +344,23 @@ import PageHeader from '@/components/PageHeader.vue'
 import { UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, ref, watch } from 'vue'
-
-interface Role {
-  uuid: string
-  name: string
-  description?: string
-  llm_provider?: string
-  llm_model?: string
-  asr_provider?: string
-  asr_model?: string
-  temperature?: number
-  system_prompt?: string
-  voice?: string
-  intent_strategy?: string
-  max_history?: number
-  is_default?: number
-  robot_count?: number
-}
+import {
+  createRole,
+  deleteRole as deleteRoleById,
+  getLlmProviders,
+  getRoleRobots,
+  getRolesWithRobotCount,
+  unbindRobotRole,
+  updateRole,
+} from '../api'
+import type { BoundRobot, LlmProviderOption, Role, RoleFormData } from '../types'
 
 const loading = ref(false)
 const roles = ref<Role[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
-const providers = ref<any[]>([])
+const providers = ref<LlmProviderOption[]>([])
 const asrProviders = ref([
   { value: 'aliyun', label: '阿里云' },
   { value: 'xunfei', label: '讯飞' },
@@ -385,24 +378,28 @@ const asrModelsMap: Record<string, Array<{ value: string; label: string }>> = {
   ]
 }
 
-const roleForm = ref({
-  uuid: '',
-  name: '',
-  description: '',
-  llm_provider: '',
-  llm_model: '',
-  asr_provider: 'aliyun',
-  asr_model: 'fun-asr-realtime',
-  temperature: 0.7,
-  system_prompt: '',
-  voice: '',
-  intent_strategy: 'hybrid',
-  max_history: 10
-})
+function createDefaultRoleForm(): RoleFormData {
+  return {
+    uuid: '',
+    name: '',
+    description: '',
+    llm_provider: '',
+    llm_model: '',
+    asr_provider: 'aliyun',
+    asr_model: 'fun-asr-realtime',
+    temperature: 0.7,
+    system_prompt: '',
+    voice: '',
+    intent_strategy: 'hybrid',
+    max_history: 10,
+  }
+}
+
+const roleForm = ref<RoleFormData>(createDefaultRoleForm())
 
 const robotsDialogVisible = ref(false)
 const loadingRobots = ref(false)
-const boundRobots = ref<any[]>([])
+const boundRobots = ref<BoundRobot[]>([])
 const currentRole = ref<Role | null>(null)
 
 const availableModels = computed(() => {
@@ -415,13 +412,17 @@ const availableAsrModels = computed(() => {
   return asrModelsMap[provider] || asrModelsMap.aliyun
 })
 
+function isConfirmCancelled(error: unknown) {
+  return error === 'cancel' || error === 'close'
+}
+
 onMounted(async () => {
   loadRoles()
   loadProviders()
 })
 
 watch(() => roleForm.value.llm_provider, () => {
-  if (!availableModels.value.find((m: any) => m.value === roleForm.value.llm_model)) {
+  if (!availableModels.value.find(m => m.value === roleForm.value.llm_model)) {
     roleForm.value.llm_model = availableModels.value[0]?.value || ''
   }
 })
@@ -434,11 +435,7 @@ watch(() => roleForm.value.asr_provider, () => {
 
 const loadProviders = async () => {
   try {
-    const res = await fetch('/api/v1/config/llm/providers')
-    const json = await res.json()
-    if (json.success) {
-      providers.value = json.data || []
-    }
+    providers.value = await getLlmProviders()
   } catch {
     // 服务商配置加载失败时，保留当前空列表
   }
@@ -447,24 +444,7 @@ const loadProviders = async () => {
 const loadRoles = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/roles')
-    const json = await res.json()
-    if (json.success) {
-      roles.value = json.data || []
-      
-      // 获取每个角色绑定的机器人数量
-      for (const role of roles.value) {
-        try {
-          const robotRes = await fetch(`/api/v1/roles/${role.uuid}/robots`)
-          const robotJson = await robotRes.json()
-          if (robotJson.success) {
-            role.robot_count = robotJson.data?.length || 0
-          }
-        } catch {
-          // 单个角色绑定机器人数量加载失败时，忽略并继续
-        }
-      }
-    }
+    roles.value = await getRolesWithRobotCount()
   } catch {
     ElMessage.error('加载角色列表失败')
   } finally {
@@ -485,18 +465,9 @@ const getAsrProviderLabel = (value?: string) => {
 const showCreateDialog = () => {
   isEdit.value = false
   roleForm.value = {
-    uuid: '',
-    name: '',
-    description: '',
+    ...createDefaultRoleForm(),
     llm_provider: providers.value[0]?.value || '',
-    llm_model: '',
-    asr_provider: 'aliyun',
-    asr_model: 'fun-asr-realtime',
-    temperature: 0.7,
-    system_prompt: '',
     voice: 'female-soft',
-    intent_strategy: 'hybrid',
-    max_history: 10
   }
   dialogVisible.value = true
 }
@@ -528,23 +499,14 @@ const saveRole = async () => {
 
   saving.value = true
   try {
-    const url = isEdit.value ? `/api/v1/roles/${roleForm.value.uuid}` : '/api/v1/roles'
-    const method = isEdit.value ? 'PUT' : 'POST'
-    
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(roleForm.value)
-    })
-
-    const json = await res.json()
-    if (json.success) {
-      ElMessage.success(isEdit.value ? '角色更新成功' : '角色创建成功')
-      dialogVisible.value = false
-      loadRoles()
+    if (isEdit.value) {
+      await updateRole(roleForm.value.uuid, roleForm.value)
     } else {
-      ElMessage.error(json.error || '操作失败')
+      await createRole(roleForm.value)
     }
+    ElMessage.success(isEdit.value ? '角色更新成功' : '角色创建成功')
+    dialogVisible.value = false
+    await loadRoles()
   } catch {
     ElMessage.error('操作失败')
   } finally {
@@ -568,17 +530,11 @@ const deleteRole = async (role: Role) => {
       }
     )
 
-    const res = await fetch(`/api/v1/roles/${role.uuid}`, { method: 'DELETE' })
-    const json = await res.json()
-    
-    if (json.success) {
-      ElMessage.success('角色删除成功')
-      loadRoles()
-    } else {
-      ElMessage.error(json.error || '删除失败')
-    }
+    await deleteRoleById(role.uuid)
+    ElMessage.success('角色删除成功')
+    await loadRoles()
   } catch (error: unknown) {
-    if (error !== 'cancel') {
+    if (!isConfirmCancelled(error)) {
       ElMessage.error('删除失败')
     }
   }
@@ -590,11 +546,7 @@ const showRobots = async (role: Role) => {
   loadingRobots.value = true
   
   try {
-    const res = await fetch(`/api/v1/roles/${role.uuid}/robots`)
-    const json = await res.json()
-    if (json.success) {
-      boundRobots.value = json.data || []
-    }
+    boundRobots.value = await getRoleRobots(role.uuid)
   } catch {
     ElMessage.error('加载机器人列表失败')
   } finally {
@@ -602,7 +554,7 @@ const showRobots = async (role: Role) => {
   }
 }
 
-const unbindRobot = async (robot: any) => {
+const unbindRobot = async (robot: BoundRobot) => {
   try {
     await ElMessageBox.confirm(`确定要解绑机器人 "${robot.name}" 吗？`, '解绑确认', {
       confirmButtonText: '确定',
@@ -610,22 +562,14 @@ const unbindRobot = async (robot: any) => {
       type: 'warning'
     })
 
-    const res = await fetch(`/api/v1/robots/${robot.uuid}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_id: null })
-    })
-
-    const json = await res.json()
-    if (json.success) {
-      ElMessage.success('解绑成功')
-      showRobots(currentRole.value!)
-      loadRoles()
-    } else {
-      ElMessage.error(json.error || '解绑失败')
+    await unbindRobotRole(robot.uuid)
+    ElMessage.success('解绑成功')
+    if (currentRole.value) {
+      await showRobots(currentRole.value)
     }
+    await loadRoles()
   } catch (error: unknown) {
-    if (error !== 'cancel') {
+    if (!isConfirmCancelled(error)) {
       ElMessage.error('解绑失败')
     }
   }

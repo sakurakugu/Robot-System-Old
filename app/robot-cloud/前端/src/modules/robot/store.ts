@@ -4,7 +4,101 @@ import { ElMessage } from 'element-plus'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as robotApi from './api'
-import type { Robot } from './types'
+import type { CreateRobotDTO, Robot, RobotMetadata, RobotStatus, UpdateRobotDTO } from './types'
+
+type RawRobot = Partial<Robot> & {
+  uuid: string
+  status?: string | null
+}
+
+function parseRobotMetadata(metadata: RawRobot['metadata']): RobotMetadata {
+  if (!metadata) {
+    return {}
+  }
+
+  if (typeof metadata === 'string') {
+    try {
+      const parsed = JSON.parse(metadata) as Record<string, unknown>
+      if (parsed && typeof parsed === 'object') {
+        return parsed as RobotMetadata
+      }
+      return {}
+    } catch {
+      return {}
+    }
+  }
+
+  return metadata as RobotMetadata
+}
+
+function normalizeRobotTags(tags: RawRobot['tags']): string[] {
+  if (Array.isArray(tags)) {
+    return tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+  }
+
+  if (typeof tags === 'string' && tags.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(tags) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+      }
+    } catch {
+      return []
+    }
+  }
+
+  return []
+}
+
+function normalizeRobotStatus(status?: string | null): RobotStatus {
+  if (status === 'online' || status === 'connecting' || status === 'error') {
+    return status
+  }
+
+  if (status === 'connected') {
+    return 'online'
+  }
+
+  return 'offline'
+}
+
+function normalizeRobot(rawRobot: RawRobot): Robot {
+  const metadata = parseRobotMetadata(rawRobot.metadata)
+
+  return {
+    ...rawRobot,
+    name: rawRobot.name || '',
+    model: rawRobot.model || '',
+    version: rawRobot.version || '',
+    motion_control_version: rawRobot.motion_control_version || '',
+    server_version: rawRobot.server_version || '',
+    status: normalizeRobotStatus(rawRobot.status),
+    last_connected: rawRobot.last_connected_at || rawRobot.last_connected || null,
+    ip: rawRobot.ip ?? null,
+    robot_ip: rawRobot.robot_ip ?? metadata.robot_ip ?? null,
+    local_ip: rawRobot.local_ip ?? metadata.local_ip ?? null,
+    local_port:
+      typeof rawRobot.local_port === 'number'
+        ? rawRobot.local_port
+        : (typeof metadata.local_port === 'number' ? metadata.local_port : 10000),
+    group_name: rawRobot.group_name ?? metadata.group_name ?? null,
+    tags: normalizeRobotTags(rawRobot.tags),
+    battery:
+      typeof rawRobot.battery === 'number'
+        ? rawRobot.battery
+        : (typeof metadata.battery === 'number' ? metadata.battery : null),
+    metadata,
+  }
+}
+
+function replaceRobotInList(robots: Robot[], nextRobot: Robot) {
+  const index = robots.findIndex(robot => robot.uuid === nextRobot.uuid)
+  if (index === -1) {
+    robots.unshift(nextRobot)
+    return
+  }
+  robots[index] = nextRobot
+}
 
 export const useRobotStore = defineStore('robot', () => {
   // 状态
@@ -43,8 +137,12 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       const res = await robotApi.getRobotList()
-      robots.value = res.data.robots
-      return res.data
+      const normalizedRobots = res.data.robots.map(normalizeRobot)
+      robots.value = normalizedRobots
+      return {
+        ...res.data,
+        robots: normalizedRobots,
+      }
     } catch (error) {
       console.error('获取机器人列表失败:', error)
       throw error
@@ -68,15 +166,10 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       const res = await robotApi.getRobotDetail(uuid)
-      currentRobot.value = res.data
-
-      // 更新列表中的机器人
-      const index = robots.value.findIndex(r => r.uuid === uuid)
-      if (index !== -1) {
-        robots.value[index] = res.data
-      }
-
-      return res.data
+      const normalizedRobot = normalizeRobot(res.data)
+      currentRobot.value = normalizedRobot
+      replaceRobotInList(robots.value, normalizedRobot)
+      return normalizedRobot
     } catch (error) {
       console.error('获取机器人详情失败:', error)
       throw error
@@ -85,13 +178,14 @@ export const useRobotStore = defineStore('robot', () => {
     }
   }
 
-  async function createRobot(data: any) {
+  async function createRobot(data: CreateRobotDTO) {
     loading.value = true
     try {
       const res = await robotApi.createRobot(data)
-      robots.value.unshift(res.data)
+      const normalizedRobot = normalizeRobot(res.data)
+      replaceRobotInList(robots.value, normalizedRobot)
       ElMessage.success('创建成功')
-      return res.data
+      return normalizedRobot
     } catch (error) {
       console.error('创建机器人失败:', error)
       throw error
@@ -100,24 +194,20 @@ export const useRobotStore = defineStore('robot', () => {
     }
   }
 
-  async function updateRobot(uuid: string, data: any) {
+  async function updateRobot(uuid: string, data: UpdateRobotDTO) {
     loading.value = true
     try {
       const res = await robotApi.updateRobot(uuid, data)
-
-      // 更新列表中的机器人
-      const index = robots.value.findIndex(r => r.uuid === uuid)
-      if (index !== -1) {
-        robots.value[index] = res.data
-      }
+      const normalizedRobot = normalizeRobot(res.data)
+      replaceRobotInList(robots.value, normalizedRobot)
 
       // 更新当前机器人
       if (currentRobot.value?.uuid === uuid) {
-        currentRobot.value = res.data
+        currentRobot.value = normalizedRobot
       }
 
       ElMessage.success('更新成功')
-      return res.data
+      return normalizedRobot
     } catch (error) {
       console.error('更新机器人失败:', error)
       throw error
@@ -170,15 +260,11 @@ export const useRobotStore = defineStore('robot', () => {
     loading.value = true
     try {
       const res = await robotApi.connectRobot(uuid)
-
-      // 更新列表中的机器人状态
-      const index = robots.value.findIndex(r => r.uuid === uuid)
-      if (index !== -1) {
-        robots.value[index] = res.data
-      }
+      const normalizedRobot = normalizeRobot(res.data)
+      replaceRobotInList(robots.value, normalizedRobot)
 
       ElMessage.success('连接成功')
-      return res.data
+      return normalizedRobot
     } catch (error) {
       console.error('连接机器人失败:', error)
       throw error

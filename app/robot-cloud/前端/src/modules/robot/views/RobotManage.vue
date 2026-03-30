@@ -288,6 +288,7 @@
 
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
+import { storeToRefs } from 'pinia'
 import {
   ChatLineSquare,
   Delete,
@@ -297,40 +298,32 @@ import {
   Upload
 } from '@element-plus/icons-vue'
 import type { TagProps } from 'element-plus'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-
-type Robot = {
-  uuid: string
-  name?: string | null
-  model?: string | null
-  version?: string | null
-  motion_control_version?: string | null
-  server_version?: string | null
-  status: 'online' | 'offline' | 'connecting' | 'error'
-  last_connected?: string | null
-  ip?: string | null
-  robot_ip?: string | null
-  local_ip?: string | null
-  local_port?: number
-  group_name?: string | null
-  tags?: string[] | null
-  battery?: number | null
-}
+import { updateRobotFirmware } from '../api'
+import { useRobotStore } from '../store'
+import type { Robot } from '../types'
 
 const router = useRouter()
-
-const robots = ref<Robot[]>([])
+const robotStore = useRobotStore()
+const { loading, robots } = storeToRefs(robotStore)
 const viewMode = ref<'card' | 'list'>('card')
 const updating = ref<Record<string, boolean>>({})
 const error = ref('')
-const loading = ref(false)
 const hoveredLastConnectedUuid = ref<string | null>(null)
 
-function statusText(status: string): string {
-  const map: Record<string, string> = {
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '加载失败'
+}
+
+function isConfirmCancelled(error: unknown): boolean {
+  return error === 'cancel' || error === 'close'
+}
+
+function statusText(status: Robot['status']): string {
+  const map: Record<Robot['status'], string> = {
     online: '在线',
     offline: '离线',
     connecting: '连接中',
@@ -339,8 +332,8 @@ function statusText(status: string): string {
   return map[status] || status
 }
 
-function getStatusType(status: string): TagProps['type'] {
-  const map: Record<string, TagProps['type']> = {
+function getStatusType(status: Robot['status']): TagProps['type'] {
+  const map: Record<Robot['status'], TagProps['type']> = {
     online: 'success',
     offline: 'info',
     connecting: 'warning',
@@ -351,7 +344,7 @@ function getStatusType(status: string): TagProps['type'] {
 
 function formatTime(val?: string | null) {
   if (!val) return '-'
-  const d = new Date(val as any)
+  const d = new Date(val)
   const t = d.getTime()
   if (isNaN(t)) return typeof val === 'string' ? val : '-'
   return d.toLocaleString('zh-CN')
@@ -362,72 +355,17 @@ function formatBattery(val?: number | null) {
   return `${Math.round(val)}%`
 }
 
-function formatTags(tags?: string[] | null) {
+function formatTags(tags?: Robot['tags']) {
   if (!Array.isArray(tags) || tags.length === 0) return '-'
   return tags.join('、')
 }
 
 async function loadRobots() {
-  loading.value = true
   error.value = ''
   try {
-    const res = await fetch('/api/v1/robots')
-    if (!res.ok) {
-      const text = await res.text()
-      throw new Error(text || `HTTP ${res.status}`)
-    }
-    let json: any
-    try {
-      json = await res.json()
-    } catch {
-      const text = await res.text()
-      throw new Error(text || '接口返回空内容')
-    }
-    if (!json.success) throw new Error(json.error || '加载失败')
-    const list: any[] = json.data.robots || []
-    robots.value = list.map((r) => {
-      let meta: any = {}
-      let tags: string[] = []
-      try {
-        meta = r.metadata ? JSON.parse(r.metadata) : {}
-      } catch {
-        meta = {}
-      }
-      if (Array.isArray(r.tags)) {
-        tags = r.tags
-      } else if (typeof r.tags === 'string' && r.tags) {
-        try {
-          const parsed = JSON.parse(r.tags)
-          tags = Array.isArray(parsed) ? parsed : []
-        } catch {
-          tags = []
-        }
-      }
-      return {
-        uuid: r.uuid,
-        name: r.name || '',
-        model: r.model || '',
-        version: r.version || '',
-        motion_control_version: r.motion_control_version || '',
-        server_version: r.server_version || '',
-        status: r.status || 'offline',
-        last_connected: r.last_connected_at || r.last_connected || null,
-        ip: r.ip ?? null,
-        robot_ip: r.robot_ip ?? meta.robot_ip ?? '',
-        local_ip: r.local_ip ?? meta.local_ip ?? '',
-        local_port: r.local_port ?? meta.local_port ?? 10000,
-        group_name: r.group_name ?? meta.group_name ?? '',
-        tags,
-        battery: typeof r.battery === 'number'
-          ? r.battery
-          : (typeof meta.battery === 'number' ? meta.battery : null)
-      }
-    })
-  } catch (e: any) {
-    error.value = e?.message || '加载失败'
-    ElMessage.error(error.value)
-  } finally {
-    loading.value = false
+    await robotStore.fetchRobots()
+  } catch (err) {
+    error.value = getErrorMessage(err)
   }
 }
 
@@ -455,26 +393,10 @@ async function updateFirmware(robot: Robot) {
 
     updating.value[robot.uuid] = true
 
-    const res = await fetch(`/api/v1/robots/${robot.uuid}/update-firmware`, {
-      method: 'POST'
-    })
-
-    const json = await res.json().catch(() => ({}))
-
-    if (!res.ok || !json.success) {
-      throw new Error(json.error || `HTTP ${res.status}`)
-    }
-
-    ElMessage.success({
-      message: json.message || '客户端代码更新成功',
-      duration: 3000
-    })
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error({
-        message: e?.message || '更新失败',
-        duration: 5000
-      })
+    await updateRobotFirmware(robot.uuid)
+  } catch (err) {
+    if (isConfirmCancelled(err)) {
+      return
     }
   } finally {
     updating.value[robot.uuid] = false
@@ -485,14 +407,6 @@ function openChat(robot: Robot) {
   router.push(`/chat/${robot.uuid}`)
 }
 
-function notifyRobotsUpdated() {
-  try {
-    window.dispatchEvent(new CustomEvent('robots_updated'))
-  } catch (e: any) {
-    ElMessage.error(e?.message || '通知失败')
-  }
-}
-
 async function deleteRobotConfirm(robot: Robot) {
   try {
     await ElMessageBox.confirm(
@@ -500,15 +414,10 @@ async function deleteRobotConfirm(robot: Robot) {
       '提示',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
     )
-    const res = await fetch(`/api/v1/robots/${robot.uuid}`, { method: 'DELETE' })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
-    robots.value = robots.value.filter((r) => r.uuid !== robot.uuid)
-    notifyRobotsUpdated()
-    ElMessage.success('已删除')
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e?.message || '删除失败')
+    await robotStore.deleteRobot(robot.uuid)
+  } catch (err) {
+    if (isConfirmCancelled(err)) {
+      return
     }
   }
 }

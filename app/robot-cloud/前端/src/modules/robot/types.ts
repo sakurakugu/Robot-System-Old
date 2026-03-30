@@ -1,24 +1,41 @@
 // 机器人模块 - 类型定义
 
+export type RobotStatus = 'online' | 'offline' | 'connecting' | 'error'
+
+export interface RobotMetadata {
+  robot_ip?: string | null
+  local_ip?: string | null
+  local_port?: number | null
+  group_name?: string | null
+  battery?: number | null
+}
+
 export interface Robot {
   uuid: string
-  name?: string
-  model?: string
-  version?: string
-  motion_control_version?: string
-  server_version?: string
-  ip?: string
-  robot_ip?: string
+  name?: string | null
+  model?: string | null
+  version?: string | null
+  motion_control_version?: string | null
+  server_version?: string | null
+  ip?: string | null
+  robot_ip?: string | null
+  local_ip?: string | null
+  local_port?: number | null
   group_name?: string | null
-  tags?: string[]
+  tags?: string[] | string | null
   sn?: string | null
-  status: 'online' | 'offline' | 'error'
-  last_connected?: string
-  registered_at?: string
-  created_at?: string
-  updated_at?: string
-  metadata?: Record<string, any>
-  
+  role_id?: string | null
+  status: RobotStatus
+  last_connected?: string | null
+  last_connected_at?: string | null
+  registered_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  metadata?: RobotMetadata | Record<string, unknown> | string | null
+  battery?: number | null
+  connected?: boolean | null
+  is_connected?: boolean | null
+
   // AI配置
   ai_temperature?: number
   ai_system_prompt?: string

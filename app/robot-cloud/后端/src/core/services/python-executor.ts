@@ -9,6 +9,8 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from '../logger';
 
+const 异步文件系统 = fs.promises;
+
 export interface RobotConfig {
   name: string;
   robot_ip: string;
@@ -189,13 +191,12 @@ export class Python执行器 extends EventEmitter {
    * 执行动作序列
    */
   async executeActions(executionId: string, options: ExecutionOptions): Promise<void> {
+    const script = this.generateActionScript(options.robots, options.actions);
+    const scriptPath = path.join(this.robotControlPath, `temp_${executionId}.py`);
+
+    await 异步文件系统.writeFile(scriptPath, script);
+
     return new Promise((resolve, reject) => {
-      const script = this.generateActionScript(options.robots, options.actions);
-      const scriptPath = path.join(this.robotControlPath, `temp_${executionId}.py`);
-
-      // 写入临时脚本
-      fs.writeFileSync(scriptPath, script);
-
       const process = spawn(this.pythonPath, [scriptPath], {
         cwd: this.robotControlPath,
       });
@@ -236,10 +237,9 @@ export class Python执行器 extends EventEmitter {
         this.emit('error', { executionId, error });
       });
 
-      process.on('close', (code) => {
-        // 清理临时文件
+      process.on('close', async (code) => {
         try {
-          fs.unlinkSync(scriptPath);
+          await 异步文件系统.unlink(scriptPath);
         } catch (error) {
           logger.error('清理临时文件失败:', error);
         }

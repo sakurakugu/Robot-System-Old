@@ -1,13 +1,15 @@
 import type { Request, RequestHandler, Response } from 'express';
 import { Router } from 'express';
 import os from 'os';
-import type DatabaseService from '../../core/database';
 import { formatTimestamp } from '../../core/utils/datetime';
-import type WebSocketService from '../websocket/service';
+
+export interface 系统路由依赖 {
+  获取在线机器人数量(): number;
+  获取机器人总数(): Promise<number>;
+}
 
 export function createSystemRoutes(
-  database: DatabaseService,
-  websocketService: WebSocketService,
+  依赖: 系统路由依赖,
   guards?: { protectedRead?: RequestHandler }
 ): Router {
   const router = Router();
@@ -15,16 +17,16 @@ export function createSystemRoutes(
   /**
    * 获取系统状态
    */
-  const 状态处理器 = (_req: Request, res: Response) => {
+  const 状态处理器 = async (_req: Request, res: Response) => {
     try {
-      const onlineRobots = websocketService.getOnlineCount();
-      const allRobots = database.getAllRobots();
+      const onlineRobots = 依赖.获取在线机器人数量();
+      const totalRobots = await 依赖.获取机器人总数();
 
       res.json({
         success: true,
         data: {
           onlineRobots,
-          totalRobots: allRobots.length,
+          totalRobots,
           timestamp: formatTimestamp(),
         },
       });

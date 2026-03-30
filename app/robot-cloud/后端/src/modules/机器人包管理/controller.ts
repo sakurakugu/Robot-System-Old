@@ -152,7 +152,13 @@ export class 机器人包控制器 {
         return;
       }
       const filePath = await this.service.getPackageFilePath(type, channel);
-      if (!filePath || !fs.existsSync(filePath)) {
+      if (!filePath) {
+        res.status(404).json({ success: false, error: '找不到安装包文件，请先上传安装包' });
+        return;
+      }
+      try {
+        await fs.promises.access(filePath, fs.constants.F_OK);
+      } catch {
         res.status(404).json({ success: false, error: '找不到安装包文件，请先上传安装包' });
         return;
       }

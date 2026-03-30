@@ -2,6 +2,7 @@
  * 编舞系统路由
  */
 
+import fs from 'fs';
 import { Router } from 'express';
 import multer from 'multer';
 import os from 'os';
@@ -27,11 +28,9 @@ const audioUpload = multer({
 const importStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const tempDir = path.join(os.tmpdir(), 'robot-dog-imports');
-    const fs = require('fs');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    cb(null, tempDir);
+    void fs.promises.mkdir(tempDir, { recursive: true })
+      .then(() => cb(null, tempDir))
+      .catch((error) => cb(error as Error, tempDir));
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();

@@ -9,6 +9,7 @@ jest.mock('uuid', () => ({
 function 创建角色仓库Mock(): jest.Mocked<RoleRepository> {
   return {
     createRole: jest.fn(),
+    getDefaultRole: jest.fn(),
     getRole: jest.fn(),
     getAllRoles: jest.fn(),
     updateRole: jest.fn(),

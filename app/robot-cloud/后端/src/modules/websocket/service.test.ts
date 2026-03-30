@@ -69,12 +69,14 @@ class 假WebSocket extends EventEmitter {
 
 function 创建机器人仓库Mock(): jest.Mocked<RobotRepository> {
   return {
+    countRobots: jest.fn(),
     listRobots: jest.fn(),
     getRobot: jest.fn(),
     listGroups: jest.fn(),
     upsertRobot: jest.fn(),
     updateRobot: jest.fn(),
     deleteRobot: jest.fn(),
+    resetAllRobotsStatusToOffline: jest.fn(),
     getRoleById: jest.fn(),
   };
 }
@@ -82,6 +84,7 @@ function 创建机器人仓库Mock(): jest.Mocked<RobotRepository> {
 function 创建角色仓库Mock(): jest.Mocked<RoleRepository> {
   return {
     createRole: jest.fn(),
+    getDefaultRole: jest.fn(),
     getRole: jest.fn(),
     getAllRoles: jest.fn(),
     updateRole: jest.fn(),

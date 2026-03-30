@@ -1,5 +1,6 @@
 import { PostgreSQL数据库客户端 } from '../core/db/client';
-import DatabaseService from '../core/database';
+import { 默认系统提示词 } from '../core/const';
+import { logger } from '../core/logger';
 import { AccountController } from '../modules/account/controller';
 import { PostgresAccountRepository } from '../modules/account/repository';
 import { AccountService } from '../modules/account/service';
@@ -34,9 +35,13 @@ import { PostgresSettingsRepository } from '../modules/设置/repository';
 import { 设置服务 } from '../modules/设置/service';
 
 export interface 应用上下文 {
-  数据库: DatabaseService;
   异步数据库: PostgreSQL数据库客户端;
   WebSocket服务: WebSocketService;
+  依赖: {
+    机器人仓库: PostgresRobotRepository;
+    角色仓库: PostgresRoleRepository;
+    对话仓库: PostgresConversationRepository;
+  };
   服务: {
     机器人服务: 机器人服务;
     对话服务: 对话服务;
@@ -65,8 +70,31 @@ export interface 应用上下文 {
   };
 }
 
+async function 确保默认角色存在(角色仓库: PostgresRoleRepository): Promise<void> {
+  const 默认角色 = await 角色仓库.getDefaultRole();
+  if (默认角色) {
+    if (默认角色.is_default !== 1) {
+      await 角色仓库.updateRole(默认角色.uuid, { is_default: 1 });
+      logger.info('已修正默认角色标记', { roleId: 默认角色.uuid });
+    }
+    return;
+  }
+
+  await 角色仓库.createRole({
+    uuid: 'default-role',
+    name: '默认角色',
+    description: '系统默认的机器狗AI助手角色，无法删除和修改',
+    temperature: 0.7,
+    system_prompt: 默认系统提示词,
+    asr_provider: 'aliyun',
+    max_history: 10,
+    is_default: 1,
+  });
+
+  logger.info('已创建默认角色');
+}
+
 export async function createAppContext(): Promise<应用上下文> {
-  const 数据库 = new DatabaseService();
   const 异步数据库 = new PostgreSQL数据库客户端();
   const 设置仓库 = new PostgresSettingsRepository(异步数据库);
   const 应用版本仓库 = new PostgresAppVersionRepository(异步数据库);
@@ -75,7 +103,12 @@ export async function createAppContext(): Promise<应用上下文> {
   const 对话仓库 = new PostgresConversationRepository(异步数据库);
   const 角色仓库 = new PostgresRoleRepository(异步数据库);
 
-  数据库.resetAllRobotsStatusToOffline();
+  await Promise.all([
+    机器人仓库.resetAllRobotsStatusToOffline(),
+    确保默认角色存在(角色仓库),
+  ]);
+
+  logger.info('已重置所有机器人状态为离线');
 
   const WebSocket服务 = new WebSocketService();
 
@@ -127,9 +160,13 @@ export async function createAppContext(): Promise<应用上下文> {
   await 服务.编舞服务.初始化();
 
   return {
-    数据库,
     异步数据库,
     WebSocket服务,
+    依赖: {
+      机器人仓库,
+      角色仓库,
+      对话仓库,
+    },
     服务,
     控制器,
   };

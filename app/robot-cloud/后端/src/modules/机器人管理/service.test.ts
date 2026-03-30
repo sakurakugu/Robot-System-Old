@@ -10,12 +10,14 @@ jest.mock('uuid', () => ({
 
 function 创建机器人仓库Mock(): jest.Mocked<RobotRepository> {
   return {
+    countRobots: jest.fn(),
     listRobots: jest.fn(),
     getRobot: jest.fn(),
     listGroups: jest.fn(),
     upsertRobot: jest.fn(),
     updateRobot: jest.fn(),
     deleteRobot: jest.fn(),
+    resetAllRobotsStatusToOffline: jest.fn(),
     getRoleById: jest.fn(),
   };
 }

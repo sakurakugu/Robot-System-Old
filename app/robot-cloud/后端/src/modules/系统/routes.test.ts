@@ -1,21 +1,16 @@
 import express, { type RequestHandler } from 'express';
 import request from 'supertest';
-import type DatabaseService from '../../core/database';
-import type WebSocketService from '../websocket/service';
 import { createSystemRoutes } from './routes';
 
 describe('系统路由', () => {
   function 创建应用(protectedRead?: RequestHandler) {
-    const database = {
-      getAllRobots: jest.fn(() => [{ uuid: 'robot-1' }, { uuid: 'robot-2' }]),
-    } as unknown as DatabaseService;
-
-    const websocketService = {
-      getOnlineCount: jest.fn(() => 1),
-    } as unknown as WebSocketService;
+    const 依赖 = {
+      获取机器人总数: jest.fn(async () => 2),
+      获取在线机器人数量: jest.fn(() => 1),
+    };
 
     const app = express();
-    app.use(createSystemRoutes(database, websocketService, { protectedRead }));
+    app.use(createSystemRoutes(依赖, { protectedRead }));
     return app;
   }
 

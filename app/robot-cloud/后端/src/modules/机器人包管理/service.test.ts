@@ -48,10 +48,10 @@ function 计算哈希(buffer: Buffer): string {
 
 describe('机器人包服务', () => {
   beforeEach(() => {
-    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-    jest.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
-    jest.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined);
-    jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as unknown as string);
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined as unknown as string);
   });
 
   afterEach(() => {
@@ -105,7 +105,7 @@ describe('机器人包服务', () => {
         server_file_name: null,
       }),
     );
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(2);
+    expect(fs.promises.writeFile).toHaveBeenCalledTimes(2);
     expect(result.agent?.fileHash).toBe(计算哈希(agentBuffer));
     expect(result.common?.fileHash).toBe(计算哈希(commonBuffer));
   });
@@ -136,7 +136,7 @@ describe('机器人包服务', () => {
     const service = new 机器人包服务(repository);
     await service.deleteVersion(1);
 
-    expect(fs.unlinkSync).toHaveBeenCalledTimes(3);
+    expect(fs.promises.unlink).toHaveBeenCalledTimes(3);
     expect(repository.deleteVersion).toHaveBeenCalledWith(1);
   });
 

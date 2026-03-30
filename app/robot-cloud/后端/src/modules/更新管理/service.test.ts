@@ -40,10 +40,10 @@ function 创建版本记录(partial: Partial<AppVersionRecord> = {}): AppVersion
 
 describe('更新服务', () => {
   beforeEach(() => {
-    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-    jest.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
-    jest.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined);
-    jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as unknown as string);
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+    jest.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined as unknown as string);
   });
 
   afterEach(() => {
@@ -80,7 +80,7 @@ describe('更新服务', () => {
         is_active: 1,
       }),
     );
-    expect(fs.writeFileSync).toHaveBeenCalled();
+    expect(fs.promises.writeFile).toHaveBeenCalled();
     expect(result.versionCode).toBe(1_002_003);
     expect(result.fileHash).toBe(fileHash);
   });
@@ -121,7 +121,7 @@ describe('更新服务', () => {
     expect(result).toBe(true);
     expect(repository.deleteVersion).toHaveBeenCalledWith(1);
     expect(repository.activateVersion).toHaveBeenCalledWith(2);
-    expect(fs.unlinkSync).toHaveBeenCalled();
+    expect(fs.promises.unlink).toHaveBeenCalled();
   });
 
   it('版本工具函数应互相对应', () => {

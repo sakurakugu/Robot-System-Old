@@ -13,6 +13,16 @@ import type { RobotPackageRepository } from './repository';
 
 /** 机器人包存储根目录 */
 const PKG_DIR = path.resolve(process.cwd(), 'data', 'apps', 'robot-packages');
+const 异步文件系统 = fs.promises;
+
+async function 文件存在(filePath: string): Promise<boolean> {
+  try {
+    await 异步文件系统.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** 版本码转显示字符串（1002003 → "1.2.3"） */
 export function versionCodeToDisplay(versionCode: number): string {
@@ -88,14 +98,18 @@ export interface PackageUploadItem {
 }
 
 export class 机器人包服务 {
+  private readonly 初始化目录任务: Promise<void>;
+
   constructor(private repository: RobotPackageRepository) {
-    // 确保存储目录存在
-    for (const sub of ['agent', 'server', 'common'] as PackageType[]) {
-      const dir = path.join(PKG_DIR, sub);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-    }
+    this.初始化目录任务 = Promise.all(
+      (['agent', 'server', 'common'] as PackageType[]).map(async (sub) => {
+        await 异步文件系统.mkdir(path.join(PKG_DIR, sub), { recursive: true });
+      }),
+    ).then(() => undefined);
+  }
+
+  private async 确保存储目录(): Promise<void> {
+    await this.初始化目录任务;
   }
 
   /* ------------------------------------------------------------------ */
@@ -108,6 +122,8 @@ export class 机器人包服务 {
     channel: ReleaseChannel,
     changelog?: string
   ): Promise<RobotPackageInfo> {
+    await this.确保存储目录();
+
     if (items.length === 0) {
       throw new Error('至少需要上传一个包文件');
     }
@@ -118,7 +134,7 @@ export class 机器人包服务 {
       const hash = verifyHash(item.buffer, item.hash);
       const fileName = `${channel}_${versionCode}_${item.type}_${hash.slice(0, 8)}.tar.gz`;
       const filePath = path.join(PKG_DIR, item.type, fileName);
-      fs.writeFileSync(filePath, new Uint8Array(item.buffer));
+      await 异步文件系统.writeFile(filePath, new Uint8Array(item.buffer));
       logger.info(`机器人包已保存: ${fileName} (${item.size} bytes)`);
       saved[item.type] = { fileName, fileSize: item.size, fileHash: hash };
     }
@@ -183,6 +199,8 @@ export class 机器人包服务 {
   /* ------------------------------------------------------------------ */
 
   async deleteVersion(id: number): Promise<void> {
+    await this.确保存储目录();
+
     const record = await this.repository.getVersionById(id);
 
     if (!record) {
@@ -199,8 +217,8 @@ export class 机器人包服务 {
     for (const entry of fileEntries) {
       if (!entry.fileName) continue;
       const filePath = path.join(PKG_DIR, entry.type, entry.fileName);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      if (await 文件存在(filePath)) {
+        await 异步文件系统.unlink(filePath);
         logger.info(`已删除机器人包文件: ${filePath}`);
       }
     }
@@ -222,6 +240,8 @@ export class 机器人包服务 {
     type: PackageType,
     channel: ReleaseChannel = 'stable',
   ): Promise<string | null> {
+    await this.确保存储目录();
+
     const info = await this.getActive(channel);
     if (!info) return null;
     const fileInfo = info[type];

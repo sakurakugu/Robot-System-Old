@@ -66,7 +66,10 @@ export async function createApp(context: 应用上下文): Promise<express.Appli
     read: requireAuth,
     manage: requireRole('admin', 'super_admin'),
   }));
-  路由器.use('/', createSystemRoutes(context.数据库, context.WebSocket服务, {
+  路由器.use('/', createSystemRoutes({
+    获取在线机器人数量: () => context.WebSocket服务.getOnlineCount(),
+    获取机器人总数: () => context.依赖.机器人仓库.countRobots(),
+  }, {
     protectedRead: requireAuth,
   }));
 

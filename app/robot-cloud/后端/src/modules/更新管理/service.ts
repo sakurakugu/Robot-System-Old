@@ -12,6 +12,16 @@ import type { AppVersionRepository } from './repository';
 
 /** APK 存储根目录 */
 const APK_DIR = path.resolve(process.cwd(), 'data', 'apps', 'apk');
+const 异步文件系统 = fs.promises;
+
+async function 文件存在(filePath: string): Promise<boolean> {
+  try {
+    await 异步文件系统.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function versionCodeToDisplay(versionCode: number): string {
   const safeCode = Math.max(0, Math.floor(versionCode));
@@ -54,11 +64,14 @@ function toVersionInfo(record: AppVersionRecord): AppVersionInfo {
 }
 
 export class 更新服务 {
+  private readonly 初始化目录任务: Promise<void>;
+
   constructor(private repository: AppVersionRepository) {
-    // 确保 APK 目录存在
-    if (!fs.existsSync(APK_DIR)) {
-      fs.mkdirSync(APK_DIR, { recursive: true });
-    }
+    this.初始化目录任务 = 异步文件系统.mkdir(APK_DIR, { recursive: true }).then(() => undefined);
+  }
+
+  private async 确保存储目录(): Promise<void> {
+    await this.初始化目录任务;
   }
 
   /* ------------------------------------------------------------------ */
@@ -72,6 +85,8 @@ export class 更新服务 {
     fileHash: string,
     changelog?: string
   ): Promise<AppVersionInfo> {
+    await this.确保存储目录();
+
     const normalizedClientHash = fileHash.trim().toLowerCase();
     const hash = crypto.createHash('sha256').update(new Uint8Array(file.buffer)).digest('hex').toLowerCase();
 
@@ -88,7 +103,7 @@ export class 更新服务 {
     const fileName = `${channel}_${safeVersion}_${versionCode}_${hash.slice(0, 8)}.apk`;
     const filePath = path.join(APK_DIR, fileName);
 
-    fs.writeFileSync(filePath, new Uint8Array(file.buffer));
+    await 异步文件系统.writeFile(filePath, new Uint8Array(file.buffer));
     logger.info(`APK 已保存: ${fileName} (${file.size} bytes)`);
 
     const record = await this.repository.withTransaction(async (repository) => {
@@ -151,11 +166,13 @@ export class 更新服务 {
   /* ------------------------------------------------------------------ */
 
   async getApkPath(id: number): Promise<{ filePath: string; fileName: string } | null> {
+    await this.确保存储目录();
+
     const record = await this.repository.getVersionById(id);
     if (!record) return null;
 
     const filePath = path.join(APK_DIR, record.file_name);
-    if (!fs.existsSync(filePath)) {
+    if (!(await 文件存在(filePath))) {
       logger.error(`APK 文件不存在: ${filePath}`);
       return null;
     }
@@ -180,11 +197,13 @@ export class 更新服务 {
   /* ------------------------------------------------------------------ */
 
   async rollback(id: number): Promise<AppVersionInfo | null> {
+    await this.确保存储目录();
+
     const record = await this.repository.getVersionById(id);
     if (!record) return null;
 
     const filePath = path.join(APK_DIR, record.file_name);
-    if (!fs.existsSync(filePath)) {
+    if (!(await 文件存在(filePath))) {
       logger.error(`回滚失败，APK 文件不存在: ${filePath}`);
       return null;
     }
@@ -207,12 +226,14 @@ export class 更新服务 {
   /* ------------------------------------------------------------------ */
 
   async deleteVersion(id: number): Promise<boolean> {
+    await this.确保存储目录();
+
     const record = await this.repository.getVersionById(id);
     if (!record) return false;
 
     const filePath = path.join(APK_DIR, record.file_name);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    if (await 文件存在(filePath)) {
+      await 异步文件系统.unlink(filePath);
     }
 
     await this.repository.withTransaction(async (repository) => {

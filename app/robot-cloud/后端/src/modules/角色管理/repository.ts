@@ -23,6 +23,7 @@ export interface RoleRepository {
     max_history?: number;
     is_default?: number;
   }): Promise<RoleRecord | undefined>;
+  getDefaultRole(): Promise<RoleRecord | undefined>;
   getRole(uuid: string): Promise<RoleRecord | undefined>;
   getAllRoles(): Promise<RoleRecord[]>;
   updateRole(
@@ -77,6 +78,16 @@ export class PostgresRoleRepository implements RoleRepository {
 
   getRole(uuid: string): Promise<RoleRecord | undefined> {
     return this.queryOne<RoleRecord>('SELECT * FROM roles WHERE uuid = $1 LIMIT 1', [uuid]);
+  }
+
+  getDefaultRole(): Promise<RoleRecord | undefined> {
+    return this.queryOne<RoleRecord>(
+      `SELECT *
+       FROM roles
+       WHERE is_default = 1 OR uuid = 'default-role'
+       ORDER BY is_default DESC, created_at ASC
+       LIMIT 1`,
+    );
   }
 
   async getAllRoles(): Promise<RoleRecord[]> {

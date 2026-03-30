@@ -22,17 +22,26 @@ const 可更新字段: Array<keyof RobotRecord> = [
 ];
 
 export interface RobotRepository {
+  countRobots(): Promise<number>;
   listRobots(): Promise<RobotRecord[]>;
   getRobot(uuid: string): Promise<RobotRecord | undefined>;
   listGroups(): Promise<string[]>;
   upsertRobot(data: 机器人写入数据): Promise<void>;
   updateRobot(uuid: string, data: Partial<RobotRecord>): Promise<void>;
   deleteRobot(uuid: string): Promise<void>;
+  resetAllRobotsStatusToOffline(): Promise<void>;
   getRoleById(uuid: string): Promise<RoleRecord | undefined>;
 }
 
 export class PostgresRobotRepository implements RobotRepository {
   constructor(private readonly database: 可查询数据库) {}
+
+  async countRobots(): Promise<number> {
+    const row = await this.queryOne<{ count: number }>(
+      'SELECT COUNT(1)::int AS count FROM robots',
+    );
+    return Number(row?.count || 0);
+  }
 
   async listRobots(): Promise<RobotRecord[]> {
     const result = await this.database.query<RobotRecord>(
@@ -127,6 +136,13 @@ export class PostgresRobotRepository implements RobotRepository {
     await this.database.query(
       'DELETE FROM robots WHERE uuid = $1',
       [uuid],
+    );
+  }
+
+  async resetAllRobotsStatusToOffline(): Promise<void> {
+    await this.database.query(
+      `UPDATE robots
+       SET status = 'offline', updated_at = CURRENT_TIMESTAMP`,
     );
   }
 

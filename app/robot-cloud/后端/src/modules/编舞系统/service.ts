@@ -54,6 +54,20 @@ const getProjectsDir = (): string => {
 
 const DATA_DIR = process.env.CHOREO_DATA_DIR || getDataDir();
 const PROJECTS_DIR = process.env.CHOREO_PROJECTS_DIR || getProjectsDir();
+const 异步文件系统 = fs.promises;
+
+function 创建默认时间轴(): TimelineData {
+  return {
+    tracks: [],
+    config: {
+      duration: 60,
+      pixelsPerSecond: 100,
+      currentTime: 0,
+      snapToGrid: true,
+      gridSize: 0.5,
+    },
+  };
+}
 
 export class 编舞服务 {
   private projects: Map<string, ChoreoProject> = new Map();
@@ -65,13 +79,15 @@ export class 编舞服务 {
     private database: DatabaseService,
     private wsService?: WebSocketService
   ) {
-    this.ensureDirectories();
-    this.loadProjectIndex();
-
     // PythonExecutor 保留给 SSH 连接测试和运控重启用
     this.pythonExecutor = new PythonExecutor(
       path.join(__dirname, '../../../../../dance-choreo/robot-control')
     );
+  }
+
+  async 初始化(): Promise<void> {
+    await this.ensureDirectories();
+    await this.loadProjectIndex();
   }
 
   /**
@@ -81,38 +97,73 @@ export class 编舞服务 {
     this.wsService = wsService;
   }
 
+  private 获取项目记录(projectUuid: string): ChoreoProject {
+    const project = this.projects.get(projectUuid);
+    if (!project) {
+      throw new Error('项目不存在');
+    }
+    return project;
+  }
+
+  private 解析项目内路径(project: ChoreoProject, relativePath: string): string {
+    if (!relativePath) {
+      throw new Error('文件路径是必需的');
+    }
+
+    const 根目录 = path.resolve(project.folder_path);
+    const 目标路径 = path.resolve(根目录, relativePath);
+    const 允许前缀 = `${根目录}${path.sep}`;
+    if (目标路径 !== 根目录 && !目标路径.startsWith(允许前缀)) {
+      throw new Error('非法的文件路径');
+    }
+
+    return 目标路径;
+  }
+
   /**
    * 确保数据目录存在
    */
-  private ensureDirectories(): void {
-    [DATA_DIR, PROJECTS_DIR].forEach((dir) => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        logger.info(`创建目录: ${dir}`);
-      }
-    });
+  private async ensureDirectories(): Promise<void> {
+    await Promise.all(
+      [DATA_DIR, PROJECTS_DIR].map(async (dir) => {
+        await 异步文件系统.mkdir(dir, { recursive: true });
+        logger.info(`确保目录存在: ${dir}`);
+      }),
+    );
   }
 
   /**
    * 加载项目索引
    */
-  private loadProjectIndex(): void {
+  private async loadProjectIndex(): Promise<void> {
     const indexPath = path.join(DATA_DIR, 'project-index.json');
-    if (fs.existsSync(indexPath)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
-        if (Array.isArray(data)) {
-          data.forEach((p: ChoreoProject) => this.projects.set(p.uuid, p));
-        }
-        logger.info(`加载了 ${this.projects.size} 个编舞项目`);
-      } catch (e) {
-        logger.error('加载项目索引失败', e as Error);
+    try {
+      const raw = await 异步文件系统.readFile(indexPath, 'utf-8');
+      const data = JSON.parse(raw);
+      this.projects.clear();
+      if (Array.isArray(data)) {
+        data.forEach((p: ChoreoProject) => this.projects.set(p.uuid, p));
       }
+      logger.info(`加载了 ${this.projects.size} 个编舞项目`);
+    } catch (e: any) {
+      if (e?.code === 'ENOENT') {
+        return;
+      }
+      logger.error('加载项目索引失败', e as Error);
     }
   }
 
   /**
-   * 保存项目索引
+   * 异步保存项目索引
+   */
+  private async saveProjectIndexAsync(): Promise<void> {
+    const indexPath = path.join(DATA_DIR, 'project-index.json');
+    const data = Array.from(this.projects.values());
+    await 异步文件系统.writeFile(indexPath, JSON.stringify(data, null, 2));
+  }
+
+  /**
+   * 同步保存项目索引
    */
   private saveProjectIndex(): void {
     const indexPath = path.join(DATA_DIR, 'project-index.json');
@@ -143,16 +194,18 @@ export class 编舞服务 {
   /**
    * 创建项目
    */
-  createProject(dto: CreateProjectDto): ChoreoProject {
+  async createProject(dto: CreateProjectDto): Promise<ChoreoProject> {
     const uuid = uuidv7();
     const folderName = `${dto.name.replace(/[<>:"/\\|?*]/g, '_')}_${uuid.substring(0, 8)}`;
     const folderPath = path.join(PROJECTS_DIR, folderName);
 
     // 创建项目文件夹结构
-    fs.mkdirSync(folderPath, { recursive: true });
-    fs.mkdirSync(path.join(folderPath, 'audio'));
-    fs.mkdirSync(path.join(folderPath, 'exports'));
-    fs.mkdirSync(path.join(folderPath, 'backups'));
+    await Promise.all([
+      异步文件系统.mkdir(folderPath, { recursive: true }),
+      异步文件系统.mkdir(path.join(folderPath, 'audio'), { recursive: true }),
+      异步文件系统.mkdir(path.join(folderPath, 'exports'), { recursive: true }),
+      异步文件系统.mkdir(path.join(folderPath, 'backups'), { recursive: true }),
+    ]);
 
     const now = new Date().toISOString();
     const project: ChoreoProject = {
@@ -165,30 +218,21 @@ export class 编舞服务 {
     };
 
     // 创建项目元数据文件
-    fs.writeFileSync(
+    await 异步文件系统.writeFile(
       path.join(folderPath, 'project.json'),
-      JSON.stringify(project, null, 2)
+      JSON.stringify(project, null, 2),
     );
 
     // 创建默认时间轴
-    const defaultTimeline: TimelineData = {
-      tracks: [],
-      config: {
-        duration: 60,
-        pixelsPerSecond: 100,
-        currentTime: 0,
-        snapToGrid: true,
-        gridSize: 0.5,
-      },
-    };
-    fs.writeFileSync(
+    const defaultTimeline = 创建默认时间轴();
+    await 异步文件系统.writeFile(
       path.join(folderPath, 'timeline.json'),
-      JSON.stringify(defaultTimeline, null, 2)
+      JSON.stringify(defaultTimeline, null, 2),
     );
 
     // 保存到索引
     this.projects.set(uuid, project);
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
 
     logger.info(`创建编舞项目: ${dto.name}`, { uuid });
     return project;
@@ -197,7 +241,7 @@ export class 编舞服务 {
   /**
    * 更新项目
    */
-  updateProject(uuid: string, dto: UpdateProjectDto): ChoreoProject {
+  async updateProject(uuid: string, dto: UpdateProjectDto): Promise<ChoreoProject> {
     const project = this.projects.get(uuid);
     if (!project) {
       throw new Error('项目不存在');
@@ -208,31 +252,29 @@ export class 编舞服务 {
     project.updated_at = new Date().toISOString();
 
     // 更新元数据文件
-    fs.writeFileSync(
+    await 异步文件系统.writeFile(
       path.join(project.folder_path, 'project.json'),
-      JSON.stringify(project, null, 2)
+      JSON.stringify(project, null, 2),
     );
 
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
     return project;
   }
 
   /**
    * 删除项目
    */
-  deleteProject(uuid: string): void {
+  async deleteProject(uuid: string): Promise<void> {
     const project = this.projects.get(uuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
     // 删除项目文件夹
-    if (fs.existsSync(project.folder_path)) {
-      fs.rmSync(project.folder_path, { recursive: true, force: true });
-    }
+    await 异步文件系统.rm(project.folder_path, { recursive: true, force: true });
 
     this.projects.delete(uuid);
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
 
     logger.info(`删除编舞项目: ${project.name}`, { uuid });
   }
@@ -240,14 +282,14 @@ export class 编舞服务 {
   /**
    * 打开项目（更新最后打开时间）
    */
-  openProject(uuid: string): ChoreoProject {
+  async openProject(uuid: string): Promise<ChoreoProject> {
     const project = this.projects.get(uuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
     project.last_opened = new Date().toISOString();
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
     return project;
   }
 
@@ -343,29 +385,20 @@ export class 编舞服务 {
   /**
    * 获取时间轴数据
    */
-  getTimeline(projectUuid: string): TimelineData {
+  async getTimeline(projectUuid: string): Promise<TimelineData> {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
     const timelinePath = path.join(project.folder_path, 'timeline.json');
-    if (!fs.existsSync(timelinePath)) {
-      return {
-        tracks: [],
-        config: {
-          duration: 60,
-          pixelsPerSecond: 100,
-          currentTime: 0,
-          snapToGrid: true,
-          gridSize: 0.5,
-        },
-      };
-    }
-
     try {
-      return JSON.parse(fs.readFileSync(timelinePath, 'utf-8'));
-    } catch {
+      const raw = await 异步文件系统.readFile(timelinePath, 'utf-8');
+      return JSON.parse(raw);
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        return 创建默认时间轴();
+      }
       throw new Error('时间轴数据损坏');
     }
   }
@@ -373,7 +406,7 @@ export class 编舞服务 {
   /**
    * 保存时间轴数据
    */
-  saveTimeline(projectUuid: string, dto: SaveTimelineDto): void {
+  async saveTimeline(projectUuid: string, dto: SaveTimelineDto): Promise<void> {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
@@ -385,14 +418,14 @@ export class 编舞服务 {
       updated_at: new Date().toISOString(),
     };
 
-    fs.writeFileSync(
+    await 异步文件系统.writeFile(
       path.join(project.folder_path, 'timeline.json'),
-      JSON.stringify(timelineData, null, 2)
+      JSON.stringify(timelineData, null, 2),
     );
 
     // 更新项目时间
     project.updated_at = new Date().toISOString();
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
 
     logger.info(`保存时间轴数据`, { projectUuid, tracksCount: dto.tracks.length });
   }
@@ -402,20 +435,20 @@ export class 编舞服务 {
   /**
    * 获取自定义动作列表
    */
-  getCustomActions(projectUuid: string): CustomAction[] {
+  async getCustomActions(projectUuid: string): Promise<CustomAction[]> {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
     const actionsPath = path.join(project.folder_path, 'custom-actions.json');
-    if (!fs.existsSync(actionsPath)) {
-      return [];
-    }
-
     try {
-      return JSON.parse(fs.readFileSync(actionsPath, 'utf-8'));
-    } catch {
+      const raw = await 异步文件系统.readFile(actionsPath, 'utf-8');
+      return JSON.parse(raw);
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        return [];
+      }
       return [];
     }
   }
@@ -423,16 +456,16 @@ export class 编舞服务 {
   /**
    * 保存自定义动作
    */
-  saveCustomAction(
+  async saveCustomAction(
     projectUuid: string,
     data: { name: string; description?: string; tracks: TimelineTrack[]; config: TimelineConfig }
-  ): CustomAction {
+  ): Promise<CustomAction> {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
-    const actions = this.getCustomActions(projectUuid);
+    const actions = await this.getCustomActions(projectUuid);
     const now = new Date().toISOString();
 
     const action: CustomAction = {
@@ -446,9 +479,9 @@ export class 编舞服务 {
     };
 
     actions.push(action);
-    fs.writeFileSync(
+    await 异步文件系统.writeFile(
       path.join(project.folder_path, 'custom-actions.json'),
-      JSON.stringify(actions, null, 2)
+      JSON.stringify(actions, null, 2),
     );
 
     return action;
@@ -459,15 +492,17 @@ export class 编舞服务 {
   /**
    * 获取音频文件路径
    */
-  getAudioPath(projectUuid: string, filename: string): string {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async getAudioPath(projectUuid: string, filename: string): Promise<string> {
+    const project = this.获取项目记录(projectUuid);
 
     const audioPath = path.join(project.folder_path, 'audio', filename);
-    if (!fs.existsSync(audioPath)) {
-      throw new Error('音频文件不存在');
+    try {
+      await 异步文件系统.access(audioPath, fs.constants.F_OK);
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        throw new Error('音频文件不存在');
+      }
+      throw error;
     }
 
     return audioPath;
@@ -476,16 +511,11 @@ export class 编舞服务 {
   /**
    * 保存上传的音频文件
    */
-  saveAudioFile(projectUuid: string, filename: string, buffer: Buffer): string {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async saveAudioFile(projectUuid: string, filename: string, buffer: Buffer): Promise<string> {
+    const project = this.获取项目记录(projectUuid);
 
     const audioDir = path.join(project.folder_path, 'audio');
-    if (!fs.existsSync(audioDir)) {
-      fs.mkdirSync(audioDir, { recursive: true });
-    }
+    await 异步文件系统.mkdir(audioDir, { recursive: true });
 
     // 添加时间戳避免重名
     const ext = path.extname(filename);
@@ -493,7 +523,7 @@ export class 编舞服务 {
     const safeFilename = `${basename}_${Date.now()}${ext}`;
     const audioPath = path.join(audioDir, safeFilename);
 
-    fs.writeFileSync(audioPath, new Uint8Array(buffer));
+    await 异步文件系统.writeFile(audioPath, new Uint8Array(buffer));
     return safeFilename;
   }
 
@@ -503,13 +533,13 @@ export class 编舞服务 {
    * 编译时间轴为执行计划
    * 遍历所有轨道的 clips，按 executeAt 排序，生成 ScheduledAction 列表
    */
-  compileTimeline(projectUuid: string): ExecutionPlan {
+  async compileTimeline(projectUuid: string): Promise<ExecutionPlan> {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
     }
 
-    const timelineData = this.getTimeline(projectUuid);
+    const timelineData = await this.getTimeline(projectUuid);
     const { tracks, config } = timelineData;
 
     const scheduleId = uuidv7();
@@ -581,13 +611,13 @@ export class 编舞服务 {
   /**
    * 执行编舞（编译时间轴 + 启动调度器）
    */
-  executeChoreo(projectUuid: string): ExecutionStatus {
+  async executeChoreo(projectUuid: string): Promise<ExecutionStatus> {
     if (!this.wsService) {
       throw new Error('WebSocket 服务未初始化');
     }
 
     // 编译时间轴
-    const plan = this.compileTimeline(projectUuid);
+    const plan = await this.compileTimeline(projectUuid);
 
     if (plan.actions.length === 0) {
       throw new Error('时间轴中没有可执行的动作（请确保动作块已绑定机器人且已选择动作类型）');
@@ -725,57 +755,50 @@ export class 编舞服务 {
   /**
    * 获取项目文件列表
    */
-  getProjectFiles(projectUuid: string): any[] {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async getProjectFiles(projectUuid: string): Promise<any[]> {
+    const project = this.获取项目记录(projectUuid);
 
-    const readDirectory = (dirPath: string, relativePath: string = ''): any[] => {
-      const items: any[] = [];
-
+    const readDirectory = async (dirPath: string, relativePath: string = ''): Promise<any[]> => {
       try {
-        const files = fs.readdirSync(dirPath);
+        const entries = await 异步文件系统.readdir(dirPath, { withFileTypes: true });
+        const items = await Promise.all(
+          entries
+            .filter((entry) => !entry.name.startsWith('.') && entry.name !== 'node_modules' && entry.name !== 'backups')
+            .map(async (entry) => {
+              const fullPath = path.join(dirPath, entry.name);
+              const relPath = relativePath ? path.join(relativePath, entry.name) : entry.name;
 
-        for (const file of files) {
-          // 跳过隐藏文件和特定文件夹
-          if (file.startsWith('.') || file === 'node_modules' || file === 'backups') {
-            continue;
-          }
+              if (entry.isDirectory()) {
+                return {
+                  name: entry.name,
+                  path: relPath,
+                  isDirectory: true,
+                  children: await readDirectory(fullPath, relPath),
+                };
+              }
 
-          const fullPath = path.join(dirPath, file);
-          const relPath = relativePath ? path.join(relativePath, file) : file;
-          const stat = fs.statSync(fullPath);
+              const stat = await 异步文件系统.stat(fullPath);
+              return {
+                name: entry.name,
+                path: relPath,
+                isDirectory: false,
+                size: stat.size,
+                modifiedTime: stat.mtime,
+              };
+            }),
+        );
 
-          if (stat.isDirectory()) {
-            items.push({
-              name: file,
-              path: relPath,
-              isDirectory: true,
-              children: readDirectory(fullPath, relPath),
-            });
-          } else {
-            items.push({
-              name: file,
-              path: relPath,
-              isDirectory: false,
-              size: stat.size,
-              modifiedTime: stat.mtime,
-            });
-          }
-        }
+        items.sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        return items;
       } catch (error) {
         logger.error(`读取目录失败: ${dirPath}`, error);
+        return [];
       }
-
-      // 排序：文件夹在前，文件在后，同类按名称排序
-      items.sort((a, b) => {
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-      return items;
     };
 
     return readDirectory(project.folder_path);
@@ -784,99 +807,69 @@ export class 编舞服务 {
   /**
    * 读取项目文件内容
    */
-  getFileContent(projectUuid: string, filePath: string): string {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async getFileContent(projectUuid: string, filePath: string): Promise<string> {
+    const project = this.获取项目记录(projectUuid);
+    const fullPath = this.解析项目内路径(project, filePath);
 
-    if (!filePath) {
-      throw new Error('文件路径是必需的');
+    try {
+      const stat = await 异步文件系统.stat(fullPath);
+      if (stat.isDirectory()) {
+        throw new Error('无法读取文件夹内容');
+      }
+      return await 异步文件系统.readFile(fullPath, 'utf-8');
+    } catch (error: any) {
+      if (error?.message === '无法读取文件夹内容') {
+        throw error;
+      }
+      if (error?.code === 'ENOENT') {
+        throw new Error('文件不存在');
+      }
+      throw error;
     }
-
-    // 防止目录遍历攻击
-    const fullPath = path.join(project.folder_path, filePath);
-    if (!fullPath.startsWith(project.folder_path)) {
-      throw new Error('非法的文件路径');
-    }
-
-    if (!fs.existsSync(fullPath)) {
-      throw new Error('文件不存在');
-    }
-
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory()) {
-      throw new Error('无法读取文件夹内容');
-    }
-
-    return fs.readFileSync(fullPath, 'utf-8');
   }
 
   /**
    * 保存项目文件内容
    */
-  saveFileContent(projectUuid: string, filePath: string, content: string): void {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
-
-    if (!filePath) {
-      throw new Error('文件路径是必需的');
-    }
-
-    // 防止目录遍历攻击
-    const fullPath = path.join(project.folder_path, filePath);
-    if (!fullPath.startsWith(project.folder_path)) {
-      throw new Error('非法的文件路径');
-    }
+  async saveFileContent(projectUuid: string, filePath: string, content: string): Promise<void> {
+    const project = this.获取项目记录(projectUuid);
+    const fullPath = this.解析项目内路径(project, filePath);
 
     // 确保目录存在
     const dir = path.dirname(fullPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    await 异步文件系统.mkdir(dir, { recursive: true });
 
-    fs.writeFileSync(fullPath, content, 'utf-8');
+    await 异步文件系统.writeFile(fullPath, content, 'utf-8');
 
     // 更新项目时间
     project.updated_at = new Date().toISOString();
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
   }
 
   /**
    * 删除项目文件
    */
-  deleteFile(projectUuid: string, filePath: string): void {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async deleteFile(projectUuid: string, filePath: string): Promise<void> {
+    const project = this.获取项目记录(projectUuid);
+    const fullPath = this.解析项目内路径(project, filePath);
 
-    if (!filePath) {
-      throw new Error('文件路径是必需的');
-    }
-
-    // 防止目录遍历攻击
-    const fullPath = path.join(project.folder_path, filePath);
-    if (!fullPath.startsWith(project.folder_path)) {
-      throw new Error('非法的文件路径');
-    }
-
-    if (!fs.existsSync(fullPath)) {
-      throw new Error('文件不存在');
-    }
-
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory()) {
-      fs.rmSync(fullPath, { recursive: true, force: true });
-    } else {
-      fs.unlinkSync(fullPath);
+    try {
+      const stat = await 异步文件系统.stat(fullPath);
+      if (stat.isDirectory()) {
+        await 异步文件系统.rm(fullPath, { recursive: true, force: true });
+      } else {
+        await 异步文件系统.unlink(fullPath);
+      }
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        throw new Error('文件不存在');
+      }
+      throw error;
     }
 
     // 更新项目时间
     project.updated_at = new Date().toISOString();
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
   }
 
   /**
@@ -893,38 +886,39 @@ export class 编舞服务 {
   /**
    * 列出项目音频文件
    */
-  listAudioFiles(projectUuid: string): string[] {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async listAudioFiles(projectUuid: string): Promise<string[]> {
+    const project = this.获取项目记录(projectUuid);
 
     const audioDir = path.join(project.folder_path, 'audio');
-    if (!fs.existsSync(audioDir)) {
-      return [];
+    try {
+      const files = await 异步文件系统.readdir(audioDir);
+      return files.filter((file) => {
+        const ext = path.extname(file).toLowerCase();
+        return ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'].includes(ext);
+      });
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        return [];
+      }
+      throw error;
     }
-
-    return fs.readdirSync(audioDir).filter((file) => {
-      const ext = path.extname(file).toLowerCase();
-      return ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'].includes(ext);
-    });
   }
 
   /**
    * 删除音频文件
    */
-  deleteAudioFile(projectUuid: string, filename: string): void {
-    const project = this.projects.get(projectUuid);
-    if (!project) {
-      throw new Error('项目不存在');
-    }
+  async deleteAudioFile(projectUuid: string, filename: string): Promise<void> {
+    const project = this.获取项目记录(projectUuid);
 
     const audioPath = path.join(project.folder_path, 'audio', filename);
-    if (!fs.existsSync(audioPath)) {
-      throw new Error('音频文件不存在');
+    try {
+      await 异步文件系统.unlink(audioPath);
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        throw new Error('音频文件不存在');
+      }
+      throw error;
     }
-
-    fs.unlinkSync(audioPath);
   }
 
   // ==================== 项目保存/导入/导出 ====================
@@ -932,7 +926,7 @@ export class 编舞服务 {
   /**
    * 保存项目
    */
-  saveProject(projectUuid: string): void {
+  async saveProject(projectUuid: string): Promise<void> {
     const project = this.projects.get(projectUuid);
     if (!project) {
       throw new Error('项目不存在');
@@ -942,12 +936,12 @@ export class 编舞服务 {
     project.updated_at = new Date().toISOString();
 
     // 写入 project.json
-    fs.writeFileSync(
+    await 异步文件系统.writeFile(
       path.join(project.folder_path, 'project.json'),
-      JSON.stringify(project, null, 2)
+      JSON.stringify(project, null, 2),
     );
 
-    this.saveProjectIndex();
+    await this.saveProjectIndexAsync();
     logger.info(`保存项目: ${project.name}`, { uuid: projectUuid });
   }
 

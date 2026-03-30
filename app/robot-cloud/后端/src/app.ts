@@ -18,7 +18,7 @@ export class 应用程序 {
   }
 
   static async create(): Promise<应用程序> {
-    const 上下文 = createAppContext();
+    const 上下文 = await createAppContext();
     const 应用 = await createApp(上下文);
     return new 应用程序(上下文, 应用);
   }

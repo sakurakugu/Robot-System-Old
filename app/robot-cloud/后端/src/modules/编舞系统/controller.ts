@@ -71,7 +71,7 @@ export class 编舞控制器 {
         res.status(400).json({ success: false, error: '项目名称是必需的' });
         return;
       }
-      const project = this.service.createProject(dto);
+      const project = await this.service.createProject(dto);
       res.json({ success: true, data: project });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -84,7 +84,7 @@ export class 编舞控制器 {
   updateProject = async (req: Request, res: Response): Promise<void> => {
     try {
       const dto: UpdateProjectDto = req.body;
-      const project = this.service.updateProject(getParam(req.params.uuid), dto);
+      const project = await this.service.updateProject(getParam(req.params.uuid), dto);
       res.json({ success: true, data: project });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -100,7 +100,7 @@ export class 编舞控制器 {
    */
   deleteProject = async (req: Request, res: Response): Promise<void> => {
     try {
-      this.service.deleteProject(getParam(req.params.uuid));
+      await this.service.deleteProject(getParam(req.params.uuid));
       res.json({ success: true, message: '项目已删除' });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -116,7 +116,7 @@ export class 编舞控制器 {
    */
   openProject = async (req: Request, res: Response): Promise<void> => {
     try {
-      const project = this.service.openProject(getParam(req.params.uuid));
+      const project = await this.service.openProject(getParam(req.params.uuid));
       res.json({ success: true, data: project });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -191,7 +191,7 @@ export class 编舞控制器 {
    */
   getTimeline = async (req: Request, res: Response): Promise<void> => {
     try {
-      const timeline = this.service.getTimeline(getParam(req.params.uuid));
+      const timeline = await this.service.getTimeline(getParam(req.params.uuid));
       res.json({ success: true, data: timeline });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -208,7 +208,7 @@ export class 编舞控制器 {
   saveTimeline = async (req: Request, res: Response): Promise<void> => {
     try {
       const dto: SaveTimelineDto = req.body;
-      this.service.saveTimeline(getParam(req.params.uuid), dto);
+      await this.service.saveTimeline(getParam(req.params.uuid), dto);
       res.json({ success: true, message: '时间轴已保存' });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -226,7 +226,7 @@ export class 编舞控制器 {
    */
   getCustomActions = async (req: Request, res: Response): Promise<void> => {
     try {
-      const actions = this.service.getCustomActions(getParam(req.params.uuid));
+      const actions = await this.service.getCustomActions(getParam(req.params.uuid));
       res.json({ success: true, data: actions });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -247,7 +247,7 @@ export class 编舞控制器 {
         res.status(400).json({ success: false, error: '名称和轨道数据是必需的' });
         return;
       }
-      const action = this.service.saveCustomAction(getParam(req.params.uuid), {
+      const action = await this.service.saveCustomAction(getParam(req.params.uuid), {
         name,
         description,
         tracks,
@@ -270,7 +270,7 @@ export class 编舞控制器 {
    */
   getAudio = async (req: Request, res: Response): Promise<void> => {
     try {
-      const audioPath = this.service.getAudioPath(getParam(req.params.uuid), getParam(req.params.filename));
+      const audioPath = await this.service.getAudioPath(getParam(req.params.uuid), getParam(req.params.filename));
       res.sendFile(audioPath);
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '音频文件不存在') {
@@ -291,7 +291,7 @@ export class 编舞控制器 {
         return;
       }
 
-      const filename = this.service.saveAudioFile(
+      const filename = await this.service.saveAudioFile(
         getParam(req.params.uuid),
         req.file.originalname,
         req.file.buffer
@@ -322,7 +322,7 @@ export class 编舞控制器 {
    */
   executeChoreo = async (req: Request, res: Response): Promise<void> => {
     try {
-      const status = this.service.executeChoreo(getParam(req.params.uuid));
+      const status = await this.service.executeChoreo(getParam(req.params.uuid));
       res.json({
         success: true,
         data: status,
@@ -417,7 +417,7 @@ export class 编舞控制器 {
    */
   getProjectFiles = async (req: Request, res: Response): Promise<void> => {
     try {
-      const files = this.service.getProjectFiles(getParam(req.params.uuid));
+      const files = await this.service.getProjectFiles(getParam(req.params.uuid));
       res.json({ success: true, data: files });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -434,7 +434,7 @@ export class 编舞控制器 {
   getFileContent = async (req: Request, res: Response): Promise<void> => {
     try {
       const filePath = getQueryParam(req.query.path);
-      const content = this.service.getFileContent(getParam(req.params.uuid), filePath);
+      const content = await this.service.getFileContent(getParam(req.params.uuid), filePath);
       res.json({ success: true, data: content });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '文件不存在') {
@@ -453,7 +453,7 @@ export class 编舞控制器 {
   saveFileContent = async (req: Request, res: Response): Promise<void> => {
     try {
       const { path: filePath, content } = req.body;
-      this.service.saveFileContent(getParam(req.params.uuid), filePath, content);
+      await this.service.saveFileContent(getParam(req.params.uuid), filePath, content);
       res.json({ success: true, message: '文件已保存' });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -472,7 +472,7 @@ export class 编舞控制器 {
   deleteFile = async (req: Request, res: Response): Promise<void> => {
     try {
       const filePath = getQueryParam(req.query.path);
-      this.service.deleteFile(getParam(req.params.uuid), filePath);
+      await this.service.deleteFile(getParam(req.params.uuid), filePath);
       res.json({ success: true, message: '文件已删除' });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '文件不存在') {
@@ -490,7 +490,7 @@ export class 编舞控制器 {
    */
   listAudioFiles = async (req: Request, res: Response): Promise<void> => {
     try {
-      const files = this.service.listAudioFiles(getParam(req.params.uuid));
+      const files = await this.service.listAudioFiles(getParam(req.params.uuid));
       res.json({ success: true, data: files });
     } catch (error: any) {
       if (error.message === '项目不存在') {
@@ -506,7 +506,7 @@ export class 编舞控制器 {
    */
   deleteAudioFile = async (req: Request, res: Response): Promise<void> => {
     try {
-      this.service.deleteAudioFile(getParam(req.params.uuid), getParam(req.params.filename));
+      await this.service.deleteAudioFile(getParam(req.params.uuid), getParam(req.params.filename));
       res.json({ success: true, message: '音频文件已删除' });
     } catch (error: any) {
       if (error.message === '项目不存在' || error.message === '音频文件不存在') {
@@ -524,7 +524,7 @@ export class 编舞控制器 {
    */
   saveProject = async (req: Request, res: Response): Promise<void> => {
     try {
-      this.service.saveProject(getParam(req.params.uuid));
+      await this.service.saveProject(getParam(req.params.uuid));
       res.json({ success: true, message: '工程保存成功' });
     } catch (error: any) {
       if (error.message === '项目不存在') {

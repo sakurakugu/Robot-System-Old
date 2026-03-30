@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import WebSocket服务 from './service';
+import type { ConversationRepository } from '../大模型交互/repository';
 import type { RoleRepository } from '../角色管理/repository';
 import type { RoleRecord } from '../角色管理/types';
 import type { RobotRepository } from '../机器人管理/repository';
@@ -60,30 +61,10 @@ jest.mock('../../core/logger', () => ({
   },
 }));
 
-type 数据库Mock = {
-  getRobot: jest.Mock;
-  updateRobot: jest.Mock;
-  upsertRobot: jest.Mock;
-  getRole: jest.Mock;
-  insertActionLog: jest.Mock;
-  insertConversation: jest.Mock;
-};
-
 class 假WebSocket extends EventEmitter {
   readyState = 1;
   send = jest.fn();
   close = jest.fn();
-}
-
-function 创建数据库Mock(): 数据库Mock {
-  return {
-    getRobot: jest.fn(),
-    updateRobot: jest.fn(),
-    upsertRobot: jest.fn(),
-    getRole: jest.fn(),
-    insertActionLog: jest.fn(),
-    insertConversation: jest.fn(),
-  };
 }
 
 function 创建机器人仓库Mock(): jest.Mocked<RobotRepository> {
@@ -106,6 +87,17 @@ function 创建角色仓库Mock(): jest.Mocked<RoleRepository> {
     updateRole: jest.fn(),
     deleteRole: jest.fn(),
     getRobotsByRole: jest.fn(),
+  };
+}
+
+function 创建对话仓库Mock(): jest.Mocked<ConversationRepository> {
+  return {
+    createConversation: jest.fn(),
+    getRecentConversationMessages: jest.fn(),
+    listConversations: jest.fn(),
+    clearConversations: jest.fn(),
+    createActionLog: jest.fn(),
+    listActionLogs: jest.fn(),
   };
 }
 
@@ -177,11 +169,10 @@ describe('WebSocket服务', () => {
   });
 
   it('处理机器人连接时应通过机器人仓库更新在线状态', async () => {
-    const database = 创建数据库Mock();
     const repository = 创建机器人仓库Mock();
     repository.getRobot.mockResolvedValue(创建机器人记录());
 
-    const service = new WebSocket服务(database as any);
+    const service = new WebSocket服务();
     service.set机器人仓库(repository);
     (service as any).setupHeartbeat = jest.fn();
 
@@ -194,16 +185,13 @@ describe('WebSocket服务', () => {
 
     expect(repository.getRobot).toHaveBeenCalledWith('robot-1');
     expect(repository.updateRobot).toHaveBeenCalledWith('robot-1', { status: 'online' });
-    expect(database.updateRobot).not.toHaveBeenCalled();
-    expect(database.upsertRobot).not.toHaveBeenCalled();
   });
 
   it('处理首次机器人连接时应通过机器人仓库补建记录', async () => {
-    const database = 创建数据库Mock();
     const repository = 创建机器人仓库Mock();
     repository.getRobot.mockResolvedValue(undefined);
 
-    const service = new WebSocket服务(database as any);
+    const service = new WebSocket服务();
     service.set机器人仓库(repository);
     (service as any).setupHeartbeat = jest.fn();
 
@@ -218,11 +206,9 @@ describe('WebSocket服务', () => {
       uuid: 'robot-1',
       status: 'online',
     });
-    expect(database.upsertRobot).not.toHaveBeenCalled();
   });
 
   it('处理机器人注册时应通过机器人仓库写入注册信息', async () => {
-    const database = 创建数据库Mock();
     const repository = 创建机器人仓库Mock();
     repository.getRobot.mockResolvedValue(创建机器人记录({
       name: '旧名字',
@@ -232,7 +218,7 @@ describe('WebSocket服务', () => {
       server_version: '3.0.0',
     }));
 
-    const service = new WebSocket服务(database as any);
+    const service = new WebSocket服务();
     service.set机器人仓库(repository);
     (service as any).sendToRobot = jest.fn();
     (service as any).sendError = jest.fn();
@@ -254,11 +240,9 @@ describe('WebSocket服务', () => {
       server_version: '3.1.0',
       status: 'online',
     }));
-    expect(database.updateRobot).not.toHaveBeenCalled();
   });
 
   it('处理音频开始时应通过角色仓库读取 ASR 配置', async () => {
-    const database = 创建数据库Mock();
     const 机器人仓库 = 创建机器人仓库Mock();
     const 角色仓库 = 创建角色仓库Mock();
     机器人仓库.getRobot.mockResolvedValue(创建机器人记录({
@@ -266,7 +250,7 @@ describe('WebSocket服务', () => {
     }));
     角色仓库.getRole.mockResolvedValue(创建角色记录());
 
-    const service = new WebSocket服务(database as any);
+    const service = new WebSocket服务();
     service.set机器人仓库(机器人仓库);
     service.set角色仓库(角色仓库);
 
@@ -284,15 +268,90 @@ describe('WebSocket服务', () => {
       provider: 'custom-asr',
       model: 'custom-model',
     });
-    expect(database.getRole).not.toHaveBeenCalled();
+  });
+
+  it('获取音频路由配置时应通过机器人仓库读取持久化配置', async () => {
+    const 机器人仓库 = 创建机器人仓库Mock();
+    机器人仓库.getRobot.mockResolvedValue(创建机器人记录({
+      audio_route_config: JSON.stringify({
+        mode: 'phone',
+        targetPhoneDeviceId: 'phone-1',
+        fallback: 'drop',
+        updatedAt: '2026-03-30T00:00:00.000Z',
+      }),
+    }));
+
+    const service = new WebSocket服务();
+    service.set机器人仓库(机器人仓库);
+
+    const route = await (service as any).getAudioRouteConfig('robot-1');
+
+    expect(route).toEqual({
+      mode: 'phone',
+      targetPhoneDeviceId: 'phone-1',
+      fallback: 'drop',
+      updatedAt: '2026-03-30T00:00:00.000Z',
+    });
+    expect(机器人仓库.getRobot).toHaveBeenCalledWith('robot-1');
+  });
+
+  it('处理动作输入时应通过对话仓库写入动作日志', async () => {
+    const 对话仓库 = 创建对话仓库Mock();
+
+    const service = new WebSocket服务();
+    service.set对话仓库(对话仓库);
+    (service as any).sendToRobot = jest.fn();
+    (service as any).broadcastMessage = jest.fn();
+
+    await (service as any).handleActionInput('robot-1', 'sit_down', { speed: 1 });
+
+    expect(对话仓库.createActionLog).toHaveBeenCalledWith({
+      robot_id: 'robot-1',
+      conversation_id: 'generated-robot-id',
+      action_name: 'sit_down',
+      parameters: { speed: 1 },
+      status: 'success',
+      result_detail: {
+        source: 'manual_action_input',
+        safetyChecked: true,
+      },
+    });
+  });
+
+  it('写入对话记录时应通过对话仓库持久化', async () => {
+    const 对话仓库 = 创建对话仓库Mock();
+
+    const service = new WebSocket服务();
+    service.set对话仓库(对话仓库);
+
+    await (service as any).写入对话记录({
+      robot_id: 'robot-1',
+      conversation_id: 'conv-1',
+      type: 'text',
+      user_input: '你好',
+      ai_response: '你好，我在',
+      actions: [],
+      processing_time: 123,
+      metadata: { source: 'test' },
+    });
+
+    expect(对话仓库.createConversation).toHaveBeenCalledWith({
+      robot_id: 'robot-1',
+      conversation_id: 'conv-1',
+      type: 'text',
+      user_input: '你好',
+      ai_response: '你好，我在',
+      actions: [],
+      processing_time: 123,
+      metadata: { source: 'test' },
+    });
   });
 
   it('处理机器人断开连接时应通过机器人仓库写入离线状态', async () => {
-    const database = 创建数据库Mock();
     const repository = 创建机器人仓库Mock();
     const ws = new 假WebSocket();
 
-    const service = new WebSocket服务(database as any);
+    const service = new WebSocket服务();
     service.set机器人仓库(repository);
     (service as any).robotConnections.set('robot-1', new Map([
       ['business', {
@@ -304,6 +363,5 @@ describe('WebSocket服务', () => {
     await 等待异步任务();
 
     expect(repository.updateRobot).toHaveBeenCalledWith('robot-1', { status: 'offline' });
-    expect(database.updateRobot).not.toHaveBeenCalled();
   });
 });

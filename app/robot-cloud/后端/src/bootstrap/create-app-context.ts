@@ -65,7 +65,7 @@ export interface 应用上下文 {
   };
 }
 
-export function createAppContext(): 应用上下文 {
+export async function createAppContext(): Promise<应用上下文> {
   const 数据库 = new DatabaseService();
   const 异步数据库 = new PostgreSQL数据库客户端();
   const 设置仓库 = new PostgresSettingsRepository(异步数据库);
@@ -77,7 +77,7 @@ export function createAppContext(): 应用上下文 {
 
   数据库.resetAllRobotsStatusToOffline();
 
-  const WebSocket服务 = new WebSocketService(数据库);
+  const WebSocket服务 = new WebSocketService();
 
   const 服务 = {
     机器人服务: new 机器人服务(机器人仓库),
@@ -122,6 +122,7 @@ export function createAppContext(): 应用上下文 {
   WebSocket服务.set对话仓库(对话仓库);
   WebSocket服务.set角色仓库(角色仓库);
   WebSocket服务.set机器人仓库(机器人仓库);
+  await 服务.编舞服务.初始化();
 
   return {
     数据库,

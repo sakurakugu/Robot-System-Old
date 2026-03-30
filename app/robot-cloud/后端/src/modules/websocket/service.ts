@@ -3,7 +3,6 @@ import OpusScript from 'opusscript';
 import type { Duplex } from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import 配置 from '../../config';
-import type DatabaseService from '../../core/database';
 import { logger } from '../../core/logger';
 import { hasVisionTag, isValidRobotId, parseNormalizedTargetPosition, RateLimiter, removeActionTags, removeTargetTags, removeVisionTags, uuidv7 } from '../../core/utils/helpers';
 import { LLM供应商列表 } from '../../modules/大模型管理/types';
@@ -79,7 +78,6 @@ class WebSocket服务 {
   private uiSocketMeta: WeakMap<WebSocket, UISocketMeta> = new WeakMap();
   // robotId -> phoneDeviceId -> phoneSessionId -> lastActiveAt
   private phoneSessionIndex: Map<string, Map<string, Map<string, number>>> = new Map();
-  private database: DatabaseService;
   private 账号服务?: AccountService;
   private 对话服务?: 对话服务;
   private 对话仓库?: ConversationRepository;
@@ -106,8 +104,7 @@ class WebSocket服务 {
   private ttsRateLimiter = new RateLimiter(5, 5000);
   private inputMergeWindowMs = 500;
 
-  constructor(database: DatabaseService) {
-    this.database = database;
+  constructor() {
     this.ttsService = new TTSService();
     this.asrService = new 语音识别服务();
     this.请求响应跟踪器 = new WebSocket请求响应跟踪器();
@@ -140,34 +137,49 @@ class WebSocket服务 {
     this.机器人仓库 = 机器人仓库;
   }
 
-  private 获取机器人记录(robotId: string): Promise<RobotRecord | undefined> {
-    if (this.机器人仓库) {
-      return this.机器人仓库.getRobot(robotId);
+  private 获取必需机器人仓库(): RobotRepository {
+    if (!this.机器人仓库) {
+      throw new Error('机器人仓库未初始化');
     }
-    return Promise.resolve(this.database.getRobot(robotId));
+    return this.机器人仓库;
+  }
+
+  private 获取机器人记录(robotId: string): Promise<RobotRecord | undefined> {
+    return this.获取必需机器人仓库().getRobot(robotId);
   }
 
   private async 更新机器人记录(robotId: string, data: Partial<RobotRecord>): Promise<void> {
-    if (this.机器人仓库) {
-      await this.机器人仓库.updateRobot(robotId, data);
-      return;
-    }
-    this.database.updateRobot(robotId, data);
+    await this.获取必需机器人仓库().updateRobot(robotId, data);
   }
 
   private async 新增或更新机器人记录(data: Partial<RobotRecord> & { uuid: string }): Promise<void> {
-    if (this.机器人仓库) {
-      await this.机器人仓库.upsertRobot(data);
-      return;
+    await this.获取必需机器人仓库().upsertRobot(data);
+  }
+
+  private 获取必需角色仓库(): RoleRepository {
+    if (!this.角色仓库) {
+      throw new Error('角色仓库未初始化');
     }
-    this.database.upsertRobot(data);
+    return this.角色仓库;
   }
 
   private 获取角色记录(roleId: string): Promise<RoleRecord | undefined> {
-    if (this.角色仓库) {
-      return this.角色仓库.getRole(roleId);
+    return this.获取必需角色仓库().getRole(roleId);
+  }
+
+  private 获取必需对话仓库(): ConversationRepository {
+    if (!this.对话仓库) {
+      throw new Error('对话仓库未初始化');
     }
-    return Promise.resolve(this.database.getRole(roleId));
+    return this.对话仓库;
+  }
+
+  private async 写入动作日志(data: Parameters<ConversationRepository['createActionLog']>[0]): Promise<void> {
+    await this.获取必需对话仓库().createActionLog(data);
+  }
+
+  private async 写入对话记录(data: Parameters<ConversationRepository['createConversation']>[0]): Promise<void> {
+    await this.获取必需对话仓库().createConversation(data);
   }
 
   private 记录机器人初始化任务(robotId: string, task: Promise<void>): void {
@@ -830,10 +842,11 @@ class WebSocket服务 {
 
       try {
         if (ttsText) {
+          const audioRoute = await this.getAudioRouteConfig(robotId);
           const streamEnabled = ttsOptions?.stream !== false;
           if (streamEnabled) {
             const sessionId = traceId;
-            this.sendAudioMessageByRoute(robotId, {
+            this.sendAudioMessageByRoute(robotId, audioRoute, {
               type: 'audio_stream_start',
               robotId,
               timestamp: Date.now(),
@@ -844,7 +857,7 @@ class WebSocket服务 {
               },
             });
             const audio = await this.ttsService.synthesizeStream(ttsText, ttsOptions, (chunk: { seq: number; base64: string; format: 'mp3' }) => {
-              this.sendAudioMessageByRoute(robotId, {
+              this.sendAudioMessageByRoute(robotId, audioRoute, {
                 type: 'audio_stream_chunk',
                 robotId,
                 timestamp: Date.now(),
@@ -856,7 +869,7 @@ class WebSocket服务 {
                 },
               });
             });
-            this.sendAudioMessageByRoute(robotId, {
+            this.sendAudioMessageByRoute(robotId, audioRoute, {
               type: 'audio_stream_end',
               robotId,
               timestamp: Date.now(),
@@ -866,8 +879,8 @@ class WebSocket服务 {
                 duration: audio.duration,
               },
             });
-            if (this.shouldSendFinalAudioResponse(robotId)) {
-              this.sendAudioMessageByRoute(robotId, {
+            if (this.shouldSendFinalAudioResponse(robotId, audioRoute)) {
+              this.sendAudioMessageByRoute(robotId, audioRoute, {
                 type: 'audio_response',
                 robotId,
                 timestamp: Date.now(),
@@ -877,7 +890,7 @@ class WebSocket服务 {
             }
           } else {
             const audio = await this.ttsService.synthesize(ttsText, ttsOptions);
-            this.sendAudioMessageByRoute(robotId, {
+            this.sendAudioMessageByRoute(robotId, audioRoute, {
               type: 'audio_response',
               robotId,
               timestamp: Date.now(),
@@ -931,71 +944,39 @@ class WebSocket服务 {
         }, 'business');
 
         // 记录动作
-        if (this.对话仓库) {
-          await this.对话仓库.createActionLog({
-            robot_id: robotId,
-            conversation_id: traceId,
-            action_name: action.name,
-            parameters: action.parameters,
-            status: 'success',
-            result_detail: {
-              source: 'llm',
-              safetyChecked: true,
-            },
-          });
-        } else {
-          this.database.insertActionLog(robotId, action.name, action.parameters, 'success', {
-            conversationId: traceId,
-            resultDetail: {
-              source: 'llm',
-              safetyChecked: true,
-            },
-          });
-        }
+        await this.写入动作日志({
+          robot_id: robotId,
+          conversation_id: traceId,
+          action_name: action.name,
+          parameters: action.parameters,
+          status: 'success',
+          result_detail: {
+            source: 'llm',
+            safetyChecked: true,
+          },
+        });
       }
 
       // 记录对话
-      if (this.对话仓库) {
-        await this.对话仓库.createConversation({
-          robot_id: robotId,
-          conversation_id: traceId,
-          type: inputType,
-          user_input: text,
-          ai_response: finalResponse.text,
-          actions: normalizedActions,
-          processing_time: processingTime,
-          metadata: {
-            ...finalResponse.metadata,
-            conversationId: traceId,
-            inputType,
-            asrTime: audioMeta?.asrTime,
-            audioDurationMs: audioMeta?.durationMs,
-            audioSessionId: audioMeta?.sessionId,
-            visionImage,
-            targetPosition,
-          },
-        });
-      } else {
-        this.database.insertConversation({
-          robot_id: robotId,
-          conversation_id: traceId,
-          type: inputType,
-          user_input: text,
-          ai_response: finalResponse.text,
-          actions: normalizedActions,
-          processing_time: processingTime,
-          metadata: {
-            ...finalResponse.metadata,
-            conversationId: traceId,
-            inputType,
-            asrTime: audioMeta?.asrTime,
-            audioDurationMs: audioMeta?.durationMs,
-            audioSessionId: audioMeta?.sessionId,
-            visionImage,
-            targetPosition,
-          },
-        });
-      }
+      await this.写入对话记录({
+        robot_id: robotId,
+        conversation_id: traceId,
+        type: inputType,
+        user_input: text,
+        ai_response: finalResponse.text,
+        actions: normalizedActions,
+        processing_time: processingTime,
+        metadata: {
+          ...finalResponse.metadata,
+          conversationId: traceId,
+          inputType,
+          asrTime: audioMeta?.asrTime,
+          audioDurationMs: audioMeta?.durationMs,
+          audioSessionId: audioMeta?.sessionId,
+          visionImage,
+          targetPosition,
+        },
+      });
 
       logger.记录对话({
         robotId,
@@ -1031,10 +1012,11 @@ class WebSocket服务 {
         return;
       }
 
+      const audioRoute = await this.getAudioRouteConfig(robotId);
       const streamEnabled = ttsOptions?.stream !== false;
       const sessionId = conversationId || uuidv7();
       if (streamEnabled) {
-        this.sendAudioMessageByRoute(robotId, {
+        this.sendAudioMessageByRoute(robotId, audioRoute, {
           type: 'audio_stream_start',
           robotId,
           timestamp: Date.now(),
@@ -1045,7 +1027,7 @@ class WebSocket服务 {
           },
         });
         const audio = await this.ttsService.synthesizeStream(sanitizedText, ttsOptions, (chunk: { seq: number; base64: string; format: 'mp3' }) => {
-          this.sendAudioMessageByRoute(robotId, {
+          this.sendAudioMessageByRoute(robotId, audioRoute, {
             type: 'audio_stream_chunk',
             robotId,
             timestamp: Date.now(),
@@ -1057,7 +1039,7 @@ class WebSocket服务 {
             },
           });
         });
-        this.sendAudioMessageByRoute(robotId, {
+        this.sendAudioMessageByRoute(robotId, audioRoute, {
           type: 'audio_stream_end',
           robotId,
           timestamp: Date.now(),
@@ -1067,8 +1049,8 @@ class WebSocket服务 {
             duration: audio.duration,
           },
         });
-        if (this.shouldSendFinalAudioResponse(robotId)) {
-          this.sendAudioMessageByRoute(robotId, {
+        if (this.shouldSendFinalAudioResponse(robotId, audioRoute)) {
+          this.sendAudioMessageByRoute(robotId, audioRoute, {
             type: 'audio_response',
             robotId,
             timestamp: Date.now(),
@@ -1078,7 +1060,7 @@ class WebSocket服务 {
         }
       } else {
         const audio = await this.ttsService.synthesize(sanitizedText, ttsOptions);
-        this.sendAudioMessageByRoute(robotId, {
+        this.sendAudioMessageByRoute(robotId, audioRoute, {
           type: 'audio_response',
           robotId,
           timestamp: Date.now(),
@@ -1120,27 +1102,17 @@ class WebSocket服务 {
       }, 'business');
 
       // 记录动作
-      if (this.对话仓库) {
-        await this.对话仓库.createActionLog({
-          robot_id: robotId,
-          conversation_id: traceId,
-          action_name: action,
-          parameters: parameters || {},
-          status: 'success',
-          result_detail: {
-            source: 'manual_action_input',
-            safetyChecked: true,
-          },
-        });
-      } else {
-        this.database.insertActionLog(robotId, action, parameters || {}, 'success', {
-          conversationId: traceId,
-          resultDetail: {
-            source: 'manual_action_input',
-            safetyChecked: true,
-          },
-        });
-      }
+      await this.写入动作日志({
+        robot_id: robotId,
+        conversation_id: traceId,
+        action_name: action,
+        parameters: parameters || {},
+        status: 'success',
+        result_detail: {
+          source: 'manual_action_input',
+          safetyChecked: true,
+        },
+      });
 
       // 通知UI已发送（添加 noTTS 标记，不生成TTS音频）
       this.broadcastMessage(robotId, {
@@ -1990,8 +1962,8 @@ class WebSocket服务 {
   /**
    * 获取机器人音频路由配置
    */
-  private getAudioRouteConfig(robotId: string): 音频路由配置 {
-    const robot = this.database.getRobot(robotId);
+  private async getAudioRouteConfig(robotId: string): Promise<音频路由配置> {
+    const robot = await this.获取机器人记录(robotId);
     const raw = robot?.audio_route_config;
     if (!raw) {
       return 默认音频路由配置;
@@ -2014,9 +1986,7 @@ class WebSocket服务 {
   /**
    * 按路由策略发送 audio_download 消息
    */
-  private sendAudioMessageByRoute(robotId: string, message: ServerMessage): void {
-    const route = this.getAudioRouteConfig(robotId);
-
+  private sendAudioMessageByRoute(robotId: string, route: 音频路由配置, message: ServerMessage): void {
     if (route.mode === 'mute') {
       return;
     }
@@ -2044,8 +2014,7 @@ class WebSocket服务 {
     }
   }
 
-  private shouldSendFinalAudioResponse(robotId: string): boolean {
-    const route = this.getAudioRouteConfig(robotId);
+  private shouldSendFinalAudioResponse(robotId: string, route: 音频路由配置): boolean {
     if (route.mode !== 'phone') {
       return true;
     }

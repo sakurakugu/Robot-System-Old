@@ -16,12 +16,12 @@ import { createChoreoRoutes } from '../modules/编舞系统/routes';
 import { createRoleRoutes } from '../modules/角色管理/routes';
 import { createSettingsRoutes } from '../modules/设置/routes';
 
-function 加载持久化配置(context: 应用上下文): void {
+async function 加载持久化配置(context: 应用上下文): Promise<void> {
   try {
-    context.服务.设置服务.loadPersistedAIConfig();
-    context.服务.大模型配置服务.loadPersistedConfig();
+    await context.服务.设置服务.loadPersistedAIConfig();
+    await context.服务.大模型配置服务.loadPersistedConfig();
 
-    const 活跃LLM = context.服务.大模型配置服务.getActiveLLMConfig();
+    const 活跃LLM = await context.服务.大模型配置服务.getActiveLLMConfig();
     logger.info('LLM 配置已加载', {
       provider: 活跃LLM.provider,
       model: 活跃LLM.model,
@@ -36,12 +36,12 @@ function 加载持久化配置(context: 应用上下文): void {
   }
 }
 
-export function createApp(context: 应用上下文): express.Application {
+export async function createApp(context: 应用上下文): Promise<express.Application> {
   const app = express();
   const 路由器 = express.Router();
   const 受保护路由器 = express.Router();
 
-  加载持久化配置(context);
+  await 加载持久化配置(context);
 
   app.use(cors());
   app.use(express.json());

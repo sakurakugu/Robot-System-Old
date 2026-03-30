@@ -26,6 +26,7 @@ import { 角色控制器 } from '../modules/角色管理/controller';
 import { PostgresRoleRepository } from '../modules/角色管理/repository';
 import { 角色服务 } from '../modules/角色管理/service';
 import { 设置控制器 } from '../modules/设置/controller';
+import { PostgresSettingsRepository } from '../modules/设置/repository';
 import { 设置服务 } from '../modules/设置/service';
 
 export interface 应用上下文 {
@@ -63,6 +64,7 @@ export interface 应用上下文 {
 export function createAppContext(): 应用上下文 {
   const 数据库 = new DatabaseService();
   const 异步数据库 = new PostgreSQL数据库客户端();
+  const 设置仓库 = new PostgresSettingsRepository(异步数据库);
 
   数据库.resetAllRobotsStatusToOffline();
 
@@ -71,8 +73,8 @@ export function createAppContext(): 应用上下文 {
   const 服务 = {
     机器人服务: new 机器人服务(数据库),
     对话服务: new 对话服务(数据库),
-    大模型配置服务: new 大模型配置服务(数据库),
-    设置服务: new 设置服务(数据库),
+    大模型配置服务: new 大模型配置服务(设置仓库),
+    设置服务: new 设置服务(设置仓库),
     角色服务: new 角色服务(
       new PostgresRoleRepository(异步数据库),
     ),

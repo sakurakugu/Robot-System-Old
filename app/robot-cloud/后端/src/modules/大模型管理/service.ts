@@ -1,6 +1,6 @@
 import 配置 from '../../config';
 import { apiKeyManager } from '../../core/config/apikey-manager';
-import type DatabaseService from '../../core/database';
+import type { SettingsRepository } from '../设置/repository';
 import {
   LLM供应商列表,
   所有LLM供应商,
@@ -21,7 +21,7 @@ type LLM配置更新参数 = {
 };
 
 export class 大模型配置服务 {
-  constructor(private database: DatabaseService) { }
+  constructor(private repository: SettingsRepository) { }
 
   private 获取设置键(provider: LLM供应商枚举, field: 'apiKey' | 'model' | 'baseUrl'): string {
     if (field === 'apiKey') {
@@ -43,7 +43,7 @@ export class 大模型配置服务 {
     }
   }
 
-  getLLMConfig(): LLMConfigView {
+  async getLLMConfig(): Promise<LLMConfigView> {
     const provider = 配置.llm.provider;
     const providers = {} as LLMConfigView['providers'];
 
@@ -60,14 +60,16 @@ export class 大模型配置服务 {
     return { provider, providers };
   }
 
-  getLLMProviders(): LLM供应商选项[] {
+  async getLLMProviders(): Promise<LLM供应商选项[]> {
     return LLM供应商列表;
   }
 
-  updateLLMConfig(data: LLM配置更新参数): { success: boolean } {
+  async updateLLMConfig(data: LLM配置更新参数): Promise<{ success: boolean }> {
+    const 任务列表: Promise<void>[] = [];
+
     if (data.provider && 所有LLM供应商.includes(data.provider)) {
       配置.llm.provider = data.provider;
-      this.database.setSetting('llm.provider', data.provider);
+      任务列表.push(this.repository.setSetting('llm.provider', data.provider));
     }
 
     for (const provider of 所有LLM供应商) {
@@ -79,9 +81,9 @@ export class 大模型配置服务 {
         const apiKey = providerData.apiKey.trim();
         apiKeyManager.set(provider, apiKey);
         if (apiKey) {
-          this.database.setSetting(`apiKey.${provider}`, apiKey);
+          任务列表.push(this.repository.setSetting(`apiKey.${provider}`, apiKey));
         } else {
-          this.database.deleteSetting(`apiKey.${provider}`);
+          任务列表.push(this.repository.deleteSetting(`apiKey.${provider}`));
         }
       }
       if (typeof providerData.model === 'string') {
@@ -89,7 +91,7 @@ export class 大模型配置服务 {
           throw new Error(`模型 ${providerData.model} 不属于供应商 ${provider}`);
         }
         cfg.model = providerData.model;
-        this.database.setSetting(`llm.${provider}.model`, providerData.model);
+        任务列表.push(this.repository.setSetting(`llm.${provider}.model`, providerData.model));
       }
       if (typeof providerData.baseUrl === 'string') {
         const baseUrl = providerData.baseUrl.trim();
@@ -97,15 +99,17 @@ export class 大模型配置服务 {
           throw new Error(`无效的 baseUrl: ${baseUrl}`);
         }
         cfg.baseUrl = baseUrl || undefined;
-        this.database.setSetting(`llm.${provider}.baseUrl`, baseUrl);
+        任务列表.push(this.repository.setSetting(`llm.${provider}.baseUrl`, baseUrl));
       }
     }
+
+    await Promise.all(任务列表);
 
     return { success: true };
   }
 
-  loadPersistedConfig(): void {
-    const settings = this.database.getAllSettings();
+  async loadPersistedConfig(): Promise<void> {
+    const settings = await this.repository.getAllSettings();
 
     const provider = settings['llm.provider'] as LLM供应商枚举;
     if (provider && 所有LLM供应商.includes(provider)) {
@@ -125,7 +129,7 @@ export class 大模型配置服务 {
     }
   }
 
-  getActiveLLMConfig(): LLMActiveConfigView {
+  async getActiveLLMConfig(): Promise<LLMActiveConfigView> {
     const provider = 配置.llm.provider;
     const activeProvider = 配置.llm.providers[provider];
     return {

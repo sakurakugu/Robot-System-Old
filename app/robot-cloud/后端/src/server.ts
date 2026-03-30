@@ -18,7 +18,7 @@ function 执行数据库迁移(): void {
 async function main(): Promise<void> {
   执行数据库迁移();
 
-  const 应用 = new 应用程序();
+  const 应用 = await 应用程序.create();
   const HTTP服务 = createServer(应用.应用);
 
   // 初始化WebSocket服务（不同角色使用不同路径）
@@ -51,20 +51,33 @@ async function main(): Promise<void> {
   });
 
   // 优雅关闭
-  process.on("SIGINT", () => {
-    logger.info("收到SIGINT信号，正在关闭服务器...");
-    HTTP服务.close(() => {
-      logger.info("服务器已关闭");
-      process.exit(0);
+  let 正在关闭 = false;
+
+  const 优雅关闭 = (信号: string) => {
+    if (正在关闭) {
+      return;
+    }
+    正在关闭 = true;
+
+    logger.info(`收到${信号}信号，正在关闭服务器...`);
+    HTTP服务.close(async () => {
+      try {
+        await 应用.close();
+        logger.info("服务器已关闭");
+        process.exit(0);
+      } catch (错误) {
+        logger.error("关闭应用资源失败", 错误 as Error);
+        process.exit(1);
+      }
     });
+  };
+
+  process.on("SIGINT", () => {
+    优雅关闭("SIGINT");
   });
 
   process.on("SIGTERM", () => {
-    logger.info("收到SIGTERM信号，正在关闭服务器...");
-    HTTP服务.close(() => {
-      logger.info("服务器已关闭");
-      process.exit(0);
-    });
+    优雅关闭("SIGTERM");
   });
 }
 

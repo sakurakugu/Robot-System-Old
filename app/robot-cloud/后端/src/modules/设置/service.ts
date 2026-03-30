@@ -1,5 +1,5 @@
 import 配置 from '../../config';
-import type DatabaseService from '../../core/database';
+import type { SettingsRepository } from './repository';
 import type { AIConfig, UIConfig } from './types';
 
 /**
@@ -7,15 +7,17 @@ import type { AIConfig, UIConfig } from './types';
  * 统一管理所有系统配置
  */
 export class 设置服务 {
-  constructor(private database: DatabaseService) { }
+  constructor(private repository: SettingsRepository) { }
 
   /**
    * 加载 AI 相关配置（优先数据库，其次 .env）
    */
-  loadPersistedAIConfig(): void {
-    const appId = this.读取并迁移环境变量('asr.xunfei.appId', 'XUNFEI_ASR_APP_ID');
-    const apiKey = this.读取并迁移环境变量('asr.xunfei.apiKey', 'XUNFEI_ASR_API_KEY');
-    const apiSecret = this.读取并迁移环境变量('asr.xunfei.apiSecret', 'XUNFEI_ASR_API_SECRET');
+  async loadPersistedAIConfig(): Promise<void> {
+    const [appId, apiKey, apiSecret] = await Promise.all([
+      this.读取并迁移环境变量('asr.xunfei.appId', 'XUNFEI_ASR_APP_ID'),
+      this.读取并迁移环境变量('asr.xunfei.apiKey', 'XUNFEI_ASR_API_KEY'),
+      this.读取并迁移环境变量('asr.xunfei.apiSecret', 'XUNFEI_ASR_API_SECRET'),
+    ]);
 
     if (!配置.asr.xunfei) {
       配置.asr.xunfei = { appId: '', apiKey: '', apiSecret: '' };
@@ -26,7 +28,7 @@ export class 设置服务 {
     配置.asr.xunfei.apiSecret = apiSecret;
   }
 
-  getAIConfig(): AIConfig {
+  async getAIConfig(): Promise<AIConfig> {
     const xunfei = 配置.asr.xunfei || { appId: '', apiKey: '', apiSecret: '' };
     return {
       xunfeiAsr: {
@@ -40,13 +42,13 @@ export class 设置服务 {
     };
   }
 
-  updateAIConfig(data: Partial<{
+  async updateAIConfig(data: Partial<{
     xunfeiAsr: {
       appId?: string;
       apiKey?: string;
       apiSecret?: string;
     };
-  }>): { success: boolean } {
+  }>): Promise<{ success: boolean }> {
     if (!data.xunfeiAsr) {
       return { success: true };
     }
@@ -56,21 +58,25 @@ export class 设置服务 {
     }
 
     const xunfei = data.xunfeiAsr;
+    const 任务列表: Promise<void>[] = [];
+
     if (typeof xunfei.appId === 'string') {
       const value = xunfei.appId.trim();
       配置.asr.xunfei.appId = value;
-      this.更新设置值('asr.xunfei.appId', value);
+      任务列表.push(this.更新设置值('asr.xunfei.appId', value));
     }
     if (typeof xunfei.apiKey === 'string') {
       const value = xunfei.apiKey.trim();
       配置.asr.xunfei.apiKey = value;
-      this.更新设置值('asr.xunfei.apiKey', value);
+      任务列表.push(this.更新设置值('asr.xunfei.apiKey', value));
     }
     if (typeof xunfei.apiSecret === 'string') {
       const value = xunfei.apiSecret.trim();
       配置.asr.xunfei.apiSecret = value;
-      this.更新设置值('asr.xunfei.apiSecret', value);
+      任务列表.push(this.更新设置值('asr.xunfei.apiSecret', value));
     }
+
+    await Promise.all(任务列表);
 
     return { success: true };
   }
@@ -78,14 +84,19 @@ export class 设置服务 {
   /**
    * 获取 UI 配置
    */
-  getUIConfig(): UIConfig {
-    const serverUrl = this.database.getSetting('ui.serverUrl') || '';
+  async getUIConfig(): Promise<UIConfig> {
+    const settings = await this.repository.getSettings([
+      'ui.serverUrl',
+      'ui.maxHistory',
+      'ui.controlLayout',
+    ]);
 
-    const mhRaw = this.database.getSetting('ui.maxHistory');
+    const serverUrl = settings['ui.serverUrl'] || '';
+    const mhRaw = settings['ui.maxHistory'];
     const maxHistory = mhRaw ? parseInt(mhRaw, 10) || 10 : 10;
 
     let controlLayout: UIConfig['controlLayout'] = null;
-    const layoutRaw = this.database.getSetting('ui.controlLayout');
+    const layoutRaw = settings['ui.controlLayout'];
     if (layoutRaw) {
       try {
         controlLayout = JSON.parse(layoutRaw);
@@ -106,20 +117,22 @@ export class 设置服务 {
   /**
    * 更新 UI 配置
    */
-  updateUIConfig(data: Partial<{
+  async updateUIConfig(data: Partial<{
     serverUrl: string;
     webWsBusinessUrl: string;
     webWsAudioUploadUrl: string;
     webWsAudioDownloadUrl: string;
     maxHistory: number | number[];
     controlLayout: Record<string, { x: number; y: number }> | string;
-  }>): void {
+  }>): Promise<void> {
+    const 任务列表: Promise<void>[] = [];
+
     if (typeof data.serverUrl === 'string') {
       const value = data.serverUrl.trim();
       if (value.length > 0) {
-        this.database.setSetting('ui.serverUrl', value);
+        任务列表.push(this.repository.setSetting('ui.serverUrl', value));
       } else {
-        this.database.deleteSetting('ui.serverUrl');
+        任务列表.push(this.repository.deleteSetting('ui.serverUrl'));
       }
     }
 
@@ -130,7 +143,7 @@ export class 设置服务 {
         ? Number(data.maxHistory[0])
         : Number(data.maxHistory);
       if (!Number.isNaN(mh)) {
-        this.database.setSetting('ui.maxHistory', String(mh));
+        任务列表.push(this.repository.setSetting('ui.maxHistory', String(mh)));
       }
     }
 
@@ -138,27 +151,29 @@ export class 设置服务 {
       const layoutValue = typeof data.controlLayout === 'string'
         ? data.controlLayout
         : JSON.stringify(data.controlLayout || {});
-      this.database.setSetting('ui.controlLayout', layoutValue);
+      任务列表.push(this.repository.setSetting('ui.controlLayout', layoutValue));
     }
+
+    await Promise.all(任务列表);
   }
 
-  private 更新设置值(key: string, value: string): void {
+  private async 更新设置值(key: string, value: string): Promise<void> {
     if (value.length > 0) {
-      this.database.setSetting(key, value);
+      await this.repository.setSetting(key, value);
       return;
     }
-    this.database.deleteSetting(key);
+    await this.repository.deleteSetting(key);
   }
 
-  private 读取并迁移环境变量(dbKey: string, envKey: string): string {
-    const persisted = this.database.getSetting(dbKey);
+  private async 读取并迁移环境变量(dbKey: string, envKey: string): Promise<string> {
+    const persisted = await this.repository.getSetting(dbKey);
     if (persisted !== undefined) {
       return persisted;
     }
 
     const envValue = (process.env[envKey] || '').trim();
     if (envValue) {
-      this.database.setSetting(dbKey, envValue);
+      await this.repository.setSetting(dbKey, envValue);
     }
     return envValue;
   }

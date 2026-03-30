@@ -6,7 +6,7 @@ export class 大模型管理控制器 {
 
   getLLMConfig = async (_req: Request, res: Response) => {
     try {
-      const data = this.llmConfigService.getLLMConfig();
+      const data = await this.llmConfigService.getLLMConfig();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -15,7 +15,7 @@ export class 大模型管理控制器 {
 
   getLLMProviders = async (_req: Request, res: Response) => {
     try {
-      const data = this.llmConfigService.getLLMProviders();
+      const data = await this.llmConfigService.getLLMProviders();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -24,7 +24,7 @@ export class 大模型管理控制器 {
 
   updateLLMConfig = async (req: Request, res: Response) => {
     try {
-      const data = this.llmConfigService.updateLLMConfig(req.body || {});
+      const data = await this.llmConfigService.updateLLMConfig(req.body || {});
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
@@ -33,7 +33,7 @@ export class 大模型管理控制器 {
 
   getActiveLLMConfig = async (_req: Request, res: Response) => {
     try {
-      const data = this.llmConfigService.getActiveLLMConfig();
+      const data = await this.llmConfigService.getActiveLLMConfig();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

@@ -10,7 +10,7 @@ export class 设置控制器 {
 
   getAIConfig = async (_req: Request, res: Response) => {
     try {
-      const data = this.settingsService.getAIConfig();
+      const data = await this.settingsService.getAIConfig();
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -19,7 +19,7 @@ export class 设置控制器 {
 
   updateAIConfig = async (req: Request, res: Response) => {
     try {
-      const data = this.settingsService.updateAIConfig(req.body || {});
+      const data = await this.settingsService.updateAIConfig(req.body || {});
       res.json({ success: true, data });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
@@ -31,7 +31,7 @@ export class 设置控制器 {
    */
   getUIConfig = async (req: Request, res: Response) => {
     try {
-      const data = this.settingsService.getUIConfig();
+      const data = await this.settingsService.getUIConfig();
       const host = (req.headers.host || '').trim();
       const serverUrl = data.serverUrl && String(data.serverUrl).length > 0 ? data.serverUrl : host;
 
@@ -77,7 +77,7 @@ export class 设置控制器 {
    */
   updateUIConfig = async (req: Request, res: Response) => {
     try {
-      this.settingsService.updateUIConfig(req.body || {});
+      await this.settingsService.updateUIConfig(req.body || {});
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

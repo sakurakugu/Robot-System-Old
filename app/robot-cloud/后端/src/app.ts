@@ -209,7 +209,7 @@ export class 应用程序 {
     this.应用.use('/api/v1', 路由器);
 
     // 错误处理
-    this.应用.use((错误: any, 请求: express.Request, 响应: express.Response, 下一步: express.NextFunction) => {
+    this.应用.use((错误: any, 请求: express.Request, 响应: express.Response, _下一步: express.NextFunction) => {
       logger.error('未处理的错误', 错误);
       响应.status(500).json({
         success: false,

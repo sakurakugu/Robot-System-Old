@@ -125,7 +125,7 @@ export class 机器人服务 {
           uuid = remoteUuid;
           logger.info(`从机器人读取到UUID: ${uuid}`);
         }
-      } catch (error) {
+      } catch {
         logger.warn('读取远程UUID失败，将生成新的');
       }
 

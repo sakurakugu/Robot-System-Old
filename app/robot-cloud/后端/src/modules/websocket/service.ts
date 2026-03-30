@@ -14,6 +14,7 @@ import 对话服务 from '../大模型交互/chat-service';
 import TTSService from '../大模型交互/tts-service';
 import type { 机器人服务 } from '../机器人管理/service';
 import type { 音频路由配置 } from '../机器人管理/types';
+import { WebSocket请求响应跟踪器 } from './request-response-tracker';
 
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
@@ -45,6 +46,15 @@ type UISocketMeta = {
   lastActiveAt: number;
 };
 
+type 机器人请求等待选项 = {
+  请求类型: string;
+  响应类型: string;
+  数据?: Record<string, unknown>;
+  发送失败消息: string;
+  超时毫秒: number;
+  超时消息: string;
+};
+
 const 默认音频路由配置: 音频路由配置 = {
   mode: 'robot',
   targetPhoneDeviceId: null,
@@ -70,6 +80,7 @@ class WebSocket服务 {
   private 机器人服务?: 机器人服务;
   private ttsService: TTSService;
   private asrService: 语音识别服务;
+  private 请求响应跟踪器: WebSocket请求响应跟踪器;
   private audioSessions: Map<string, AudioSession> = new Map();
   private inputMergeTimers: Map<string, NodeJS.Timeout> = new Map();
   private pendingInputs: Map<
@@ -90,6 +101,7 @@ class WebSocket服务 {
     this.database = database;
     this.ttsService = new TTSService();
     this.asrService = new 语音识别服务();
+    this.请求响应跟踪器 = new WebSocket请求响应跟踪器();
   }
 
   /**
@@ -243,7 +255,7 @@ class WebSocket服务 {
         logger.info('关闭旧的机器人连接', { robotId, channel });
         try {
           existingConnection.websocket.close(1000, '新连接已建立');
-        } catch (error) {
+        } catch {
           // 忽略关闭错误
         }
       }
@@ -1377,7 +1389,7 @@ class WebSocket服务 {
       if (session.opusDecoder) {
         try {
           session.opusDecoder.delete?.();
-        } catch (error) {
+        } catch {
           // 忽略清理错误
         }
       }
@@ -2068,51 +2080,68 @@ class WebSocket服务 {
     }
   }
 
-  /**
-   * 请求机器人拍照（用于API调用）
-   */
-  async 请求机器人拍照(robotId: string): Promise<{ success: boolean; image?: string; format?: string; error?: string }> {
-    // 检查机器人是否在线
+  private 获取业务连接(robotId: string): RobotConnection {
     const connection = this.robotConnections.get(robotId)?.get('business');
     if (!connection) {
       throw new Error('机器人未连接');
     }
+    return connection;
+  }
 
+  private async 发送请求并等待机器人响应<T响应>(
+    robotId: string,
+    选项: 机器人请求等待选项,
+  ): Promise<T响应> {
+    const connection = this.获取业务连接(robotId);
     const requestId = uuidv7();
 
-    // 发送拍照命令
     const success = this.sendToRobot(robotId, {
-      type: 'camera_capture',
+      type: 选项.请求类型,
       robotId,
       timestamp: Date.now(),
-      data: { requestId },
-    }, 'business');
+      data: {
+        requestId,
+        ...(选项.数据 || {}),
+      },
+    } as any, 'business');
 
     if (!success) {
-      throw new Error('发送拍照命令失败');
+      throw new Error(选项.发送失败消息);
     }
 
-    // 等待响应（最多30秒）
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('拍照请求超时'));
-      }, 30000);
-
-      // 临时监听响应
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'camera_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
+    return this.请求响应跟踪器.等待响应<T响应>(connection.websocket, {
+      超时毫秒: 选项.超时毫秒,
+      超时消息: 选项.超时消息,
+      连接关闭消息: '机器人连接已关闭',
+      匹配器: (message) => {
+        if (message.type !== 选项.响应类型) {
+          return undefined;
         }
-      };
 
-      connection.websocket.on('message', checkResponse);
+        const data = message.data;
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          return undefined;
+        }
+
+        if ((data as Record<string, unknown>).requestId !== requestId) {
+          return undefined;
+        }
+
+        return data as T响应;
+      },
+    });
+  }
+
+  /**
+   * 请求机器人拍照（用于API调用）
+   */
+  async 请求机器人拍照(robotId: string): Promise<{ success: boolean; image?: string; format?: string; error?: string }> {
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'camera_capture',
+      响应类型: 'camera_response',
+      发送失败消息: '发送拍照命令失败',
+      超时毫秒: 30000,
+      超时消息: '拍照请求超时',
     });
   }
 
@@ -2120,43 +2149,12 @@ class WebSocket服务 {
    * 请求获取机器人音量（用于API调用）
    */
   async 请求获取机器人音量(robotId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'volume_get',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送获取音量命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('获取音量请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'volume_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'volume_get',
+      响应类型: 'volume_response',
+      发送失败消息: '发送获取音量命令失败',
+      超时毫秒: 30000,
+      超时消息: '获取音量请求超时',
     });
   }
 
@@ -2164,43 +2162,13 @@ class WebSocket服务 {
    * 请求设置机器人音量（用于API调用）
    */
   async 请求设置机器人音量(robotId: string, volume: number): Promise<{ success: boolean; data?: any; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'volume_set',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId, volume },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送设置音量命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('设置音量请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'volume_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'volume_set',
+      响应类型: 'volume_response',
+      数据: { volume },
+      发送失败消息: '发送设置音量命令失败',
+      超时毫秒: 30000,
+      超时消息: '设置音量请求超时',
     });
   }
 
@@ -2208,43 +2176,13 @@ class WebSocket服务 {
    * 请求设置机器人静音（用于API调用）
    */
   async 请求设置机器人静音(robotId: string, mute: boolean): Promise<{ success: boolean; data?: any; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'volume_mute',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId, mute },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送设置静音命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('设置静音请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'volume_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'volume_mute',
+      响应类型: 'volume_response',
+      数据: { mute },
+      发送失败消息: '发送设置静音命令失败',
+      超时毫秒: 30000,
+      超时消息: '设置静音请求超时',
     });
   }
 
@@ -2252,43 +2190,12 @@ class WebSocket服务 {
    * 请求获取机器人配置（用于API调用）
    */
   async 请求获取机器人配置(robotId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'config_get',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送获取配置命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('获取配置请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'config_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'config_get',
+      响应类型: 'config_response',
+      发送失败消息: '发送获取配置命令失败',
+      超时毫秒: 30000,
+      超时消息: '获取配置请求超时',
     });
   }
 
@@ -2296,43 +2203,13 @@ class WebSocket服务 {
    * 请求更新机器人配置（用于API调用）
    */
   async 请求更新机器人配置(robotId: string, config: any): Promise<{ success: boolean; data?: any; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'config_update',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId, config },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送更新配置命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('更新配置请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'config_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'config_update',
+      响应类型: 'config_response',
+      数据: { config },
+      发送失败消息: '发送更新配置命令失败',
+      超时毫秒: 30000,
+      超时消息: '更新配置请求超时',
     });
   }
 
@@ -2410,43 +2287,13 @@ class WebSocket服务 {
    * 请求设置SDK模式（用于API调用）
    */
   async 请求设置SDK模式(robotId: string, sdkMode: boolean): Promise<{ success: boolean; sdkMode?: boolean; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'sdk_mode_set',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId, sdkMode },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送设置SDK模式命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('设置SDK模式请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'sdk_mode_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'sdk_mode_set',
+      响应类型: 'sdk_mode_response',
+      数据: { sdkMode },
+      发送失败消息: '发送设置SDK模式命令失败',
+      超时毫秒: 30000,
+      超时消息: '设置SDK模式请求超时',
     });
   }
 
@@ -2454,43 +2301,12 @@ class WebSocket服务 {
    * 请求获取SDK模式（用于API调用）
    */
   async 请求获取SDK模式(robotId: string): Promise<{ success: boolean; sdkMode?: boolean; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'sdk_mode_get',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送获取SDK模式命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('获取SDK模式请求超时'));
-      }, 30000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'sdk_mode_response' && message.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(message.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'sdk_mode_get',
+      响应类型: 'sdk_mode_response',
+      发送失败消息: '发送获取SDK模式命令失败',
+      超时毫秒: 30000,
+      超时消息: '获取SDK模式请求超时',
     });
   }
 
@@ -2498,43 +2314,13 @@ class WebSocket服务 {
    * 请求写入日志标记（用于API调用）
    */
   async 请求日志标记(robotId: string, message: string = ''): Promise<{ success: boolean; marker?: string; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'log_mark',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId, message },
-    }, 'business');
-
-    if (!success) {
-      throw new Error('发送日志标记命令失败');
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('日志标记请求超时'));
-      }, 10000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.type === 'log_mark_response' && msg.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(msg.data);
-          }
-        } catch (error) {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'log_mark',
+      响应类型: 'log_mark_response',
+      数据: { message },
+      发送失败消息: '发送日志标记命令失败',
+      超时毫秒: 10000,
+      超时消息: '日志标记请求超时',
     });
   }
 
@@ -2546,44 +2332,13 @@ class WebSocket服务 {
     downloadPaths: { agent?: string; server?: string; common?: string },
     hashes: { agent?: string; server?: string; common?: string },
   ): Promise<{ success: boolean; downloaded?: string[]; error?: string }> {
-    const connection = this.robotConnections.get(robotId)?.get('business');
-    if (!connection) {
-      throw new Error('机器人未连接');
-    }
-
-    const requestId = uuidv7();
-
-    const success = this.sendToRobot(robotId, {
-      type: 'package_download',
-      robotId,
-      timestamp: Date.now(),
-      data: { requestId, downloadPaths, hashes },
-    } as any, 'business');
-
-    if (!success) {
-      throw new Error('发送推送安装包命令失败');
-    }
-
-    // 等待机器人响应（最多 5 分钟，下载大文件需要足够时间）
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('推送安装包请求超时'));
-      }, 300000);
-
-      const checkResponse = (data: Buffer) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.type === 'package_download_response' && msg.data?.requestId === requestId) {
-            clearTimeout(timeout);
-            connection.websocket.off('message', checkResponse);
-            resolve(msg.data);
-          }
-        } catch {
-          // 忽略解析错误
-        }
-      };
-
-      connection.websocket.on('message', checkResponse);
+    return this.发送请求并等待机器人响应(robotId, {
+      请求类型: 'package_download',
+      响应类型: 'package_download_response',
+      数据: { downloadPaths, hashes },
+      发送失败消息: '发送推送安装包命令失败',
+      超时毫秒: 300000,
+      超时消息: '推送安装包请求超时',
     });
   }
 }

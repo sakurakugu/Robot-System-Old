@@ -5,9 +5,11 @@ import type {
   ApiResponse,
   ConnectionTestResult,
   CreateRobotDTO,
+  LocalIpResponse,
   RobotGroupsResponse,
   RobotListResponse,
   RobotResponse,
+  RobotVolumeResponse,
   UpdateRobotDTO
 } from './types'
 
@@ -44,6 +46,13 @@ export function createRobot(data: CreateRobotDTO) {
  */
 export function updateRobot(uuid: string, data: UpdateRobotDTO) {
   return http.put<RobotResponse>(`/api/v1/robots/${uuid}`, data)
+}
+
+/**
+ * 获取当前机器人的本地网络出口 IP
+ */
+export function getLocalNetworkIp() {
+  return http.get<LocalIpResponse>('/api/v1/network/local-ip')
 }
 
 /**
@@ -94,7 +103,7 @@ export function uploadLog(uuid: string, data: { from?: string; to?: string; logT
  * 获取机器人音量
  */
 export function getRobotVolume(uuid: string) {
-  return http.get<{ success: boolean; data: { volume: number; muted: boolean } }>(`/api/v1/robots/${uuid}/volume`)
+  return http.get<RobotVolumeResponse>(`/api/v1/robots/${uuid}/volume`)
 }
 
 /**

@@ -293,12 +293,17 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot, Mic, MicOff } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { capturePhoto } from '../api'
+import { useRobotStore } from '../store'
+import { getUIConfig, updateUIConfig } from '../../settings/api'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string }>()
 const router = useRouter()
+const robotStore = useRobotStore()
+const { robots } = storeToRefs(robotStore)
 
 // WebSocket & Robot State
 const {
@@ -336,10 +341,6 @@ let sdkModeSwitchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(twoLegStandActive, (val) => {
   rightJoystickDisabled.value = val
 })
-
-// Robots List (Mock or Fetch)
-type RobotItem = { uuid: string; name?: string; status?: string }
-const robots = ref<RobotItem[]>([])
 
 type ControlLayout = Record<string, { x: number; y: number }>
 
@@ -667,11 +668,7 @@ const cancelLayoutEdit = () => {
 
 const saveLayout = async () => {
   try {
-    await fetch('/api/v1/config/ui', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ controlLayout: controlLayout.value }),
-    })
+    await updateUIConfig({ controlLayout: controlLayout.value })
     ElMessage.success('布局已保存')
     layoutEditMode.value = false
   } catch {
@@ -683,23 +680,21 @@ const saveLayout = async () => {
 // Fetch robots
 const fetchRobots = async () => {
   try {
-    const res = await fetch('/api/v1/robots')
-    const json = await res.json()
-    const list: any[] = json?.data?.robots || []
-    robots.value = list.map((r) => ({ uuid: r.uuid, name: r.name || '', status: r.status || 'offline' }))
+    if (robots.value.length === 0) {
+      await robotStore.fetchRobots()
+    }
     if (robots.value.length > 0 && !selectedUuid.value && !props.robotUuid) {
       selectedUuid.value = robots.value[0].uuid
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error('加载机器人列表失败:', error)
   }
 }
 
 const fetchControlLayout = async () => {
   try {
-    const res = await fetch('/api/v1/config/ui')
-    const json = await res.json()
-    const layout = json?.data?.controlLayout
+    const response = await getUIConfig()
+    const layout = response.data?.controlLayout
     if (layout && typeof layout === 'object') {
       const next: ControlLayout = { ...defaultControlLayout }
       for (const key of Object.keys(layout)) {

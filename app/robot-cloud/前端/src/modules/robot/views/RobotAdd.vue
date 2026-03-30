@@ -35,7 +35,7 @@
             placeholder="例如：192.168.1.110"
           />
           <el-text
-            v-if="formData.robot_ip && !isValidIp(formData.robot_ip)"
+            v-if="formData.robot_ip && !isValidIP(formData.robot_ip)"
             type="danger"
             size="small"
           >
@@ -84,10 +84,12 @@
 
 <script setup lang="ts">
 import PageHeader from '@/components/PageHeader.vue'
+import { isValidIP } from '@/utils/validator'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { createRobot } from '../api'
 
 type FormData = {
   name: string
@@ -104,15 +106,14 @@ const formData = ref<FormData>({
   group_name: ''
 })
 
-const isValidIp = (ip: string) => {
-  const ipv4 = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/
-  return ipv4.test(ip)
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
 }
 
 const isFormValid = computed(() => {
   return Boolean(
     formData.value.name &&
-    (!formData.value.robot_ip || isValidIp(formData.value.robot_ip))
+    (!formData.value.robot_ip || isValidIP(formData.value.robot_ip))
   )
 })
 
@@ -123,8 +124,8 @@ function goBack() {
 function notifyRobotsUpdated() {
   try {
     window.dispatchEvent(new CustomEvent('robots_updated'))
-  } catch (e: any) {
-    ElMessage.error(e?.message || '通知失败')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '通知失败'))
   }
 }
 
@@ -135,18 +136,12 @@ async function saveRobot() {
     group_name: formData.value.group_name || ''
   }
   try {
-    const res = await fetch('/api/v1/robots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
+    await createRobot(payload)
     notifyRobotsUpdated()
     ElMessage.success('添加成功')
     goBack()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '保存失败'))
   }
 }
 </script>

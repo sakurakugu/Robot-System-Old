@@ -602,11 +602,32 @@
 </template>
 
 <script setup lang="ts">
-import { isValidIP } from '@/utils/validator'
+import type { InputInstance } from 'element-plus'
 import { ElMessage } from 'element-plus'
+import { isValidIP } from '@/utils/validator'
 import { Bot } from 'lucide-vue-next'
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { getRoles } from '../../role/api'
+import type { Role } from '../../role/types'
+import {
+  deleteRobot as removeRobot,
+  getLocalNetworkIp,
+  getRobotDetail,
+  getRobotVolume,
+  markRobotLog,
+  setRobotMute,
+  setRobotVolume,
+  testRobotConnection as runRobotConnectionTest,
+  updateRobot as updateRobotDetail,
+} from '../api'
+import {
+  buildRobotAutoSavePayload,
+  buildRobotSettingsState,
+  createRobotSettingsFormData,
+  getRobotErrorMessage,
+} from '../settings'
+import type { RobotSettingsField, RobotSettingsFormData } from '../settings'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string; hideTabs?: boolean; activeTab?: string }>()
 const route = useRoute()
@@ -617,32 +638,14 @@ const currentTab = ref(props.activeTab || 'basic')
 const loading = ref(false)
 
 // Data Models
-const formData = reactive({
-  name: '',
-  model: '',
-  role_id: '',
-  group_name: '',
-  sn: '',
-  uuid: '',
-  ip: '',
-  local_ip: '',
-  version: '',
-  motion_control_version: '',
-  server_version: '',
-  ai_temperature: 0.7,
-  ai_model: '',
-  ai_voice: '',
-  ai_intent: '',
-  ai_role_name: '',
-  ai_system_prompt: ''
-})
+const formData = reactive<RobotSettingsFormData>(createRobotSettingsFormData())
 
-const roles = ref<any[]>([])
+const roles = ref<Role[]>([])
 
 const tags = ref<string[]>([])
 const inputVisible = ref(false)
 const inputValue = ref('')
-const InputRef = ref()
+const InputRef = ref<InputInstance>()
 
 const status = reactive({
   temperature: 42,
@@ -682,92 +685,72 @@ const firmwareUpdateAvailable = ref(false)
 const hasUpdate = computed(() => firmwareUpdateAvailable.value)
 const canOpenWifi = computed(() => status.connected && isValidIP(formData.ip))
 
-// Methods
-
-const loadData = async () => {
-  loading.value = true
+const loadRoles = async () => {
   try {
-    if (uuid.value) {
-      const res = await fetch(`/api/v1/robots/${uuid.value}`)
-      const json = await res.json().catch(() => ({}))
-      if (res.ok && json.success && json.data) {
-        const r = json.data
-        formData.uuid = r.uuid || ''
-        formData.name = r.name || ''
-        formData.model = r.model || ''
-        formData.version = r.version || ''
-        formData.motion_control_version = r.motion_control_version || ''
-        formData.server_version = r.server_version || ''
-        formData.role_id = r.role_id || ''
-        formData.sn = r.sn || ''
-        formData.ip = r.ip || r.robot_ip || ''
-        tags.value = Array.isArray(r.tags) ? r.tags : []
-        status.connected = Boolean(
-          r.connected ??
-            r.is_connected ??
-            (typeof r.status === 'string' && ['online', 'connected'].includes(r.status))
-        )
-      }
-      const lipRes = await fetch('/api/v1/network/local-ip')
-      const lipJson = await lipRes.json().catch(() => ({}))
-      if (lipRes.ok && lipJson.success) {
-        formData.local_ip = lipJson.data?.ip || ''
-      }
-
-      // 加载音量信息
-      if (status.connected) {
-        await loadVolume()
-      }
-    }
-  } catch {
-    ElMessage.error('加载数据失败')
-  } finally {
-    loading.value = false
-  }
-
-  // 加载角色列表
-  try {
-    const rolesRes = await fetch('/api/v1/roles')
-    const rolesJson = await rolesRes.json().catch(() => ({}))
-    if (rolesRes.ok && rolesJson.success) {
-      roles.value = rolesJson.data || []
-    }
+    roles.value = await getRoles()
   } catch {
     // 角色列表加载失败不影响当前页面编辑
   }
 }
 
+const loadData = async () => {
+  const currentUuid = uuid.value
+  const rolesPromise = loadRoles()
+  if (!currentUuid) {
+    await rolesPromise
+    return
+  }
+
+  loading.value = true
+  try {
+    const [robotResponse, localIpResponse] = await Promise.all([
+      getRobotDetail(currentUuid),
+      getLocalNetworkIp().catch(() => null),
+    ])
+
+    const robotState = buildRobotSettingsState(robotResponse.data)
+    Object.assign(formData, robotState.form)
+    tags.value = robotState.tags
+    status.connected = robotState.connected
+    status.battery = robotState.battery
+
+    if (localIpResponse?.data?.ip) {
+      formData.local_ip = localIpResponse.data.ip
+    }
+
+    if (status.connected) {
+      await loadVolume()
+    }
+  } catch (error) {
+    ElMessage.error(getRobotErrorMessage(error, '加载数据失败'))
+  } finally {
+    loading.value = false
+  }
+
+  await rolesPromise
+}
+
 // Auto Save
-const autoSave = async (field: string) => {
-  if (!uuid.value) {
+const autoSave = async (field: RobotSettingsField) => {
+  const currentUuid = uuid.value
+  if (!currentUuid) {
     ElMessage.warning('请先选择机器人')
     return
   }
+
+  const { payload, errorMessage } = buildRobotAutoSavePayload(field, formData, tags.value)
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
+  }
+  if (!payload) {
+    return
+  }
+
   try {
-    const payload: any = {}
-    if (field === 'name') payload.name = formData.name
-    if (field === 'role_id') payload.role_id = formData.role_id || null
-    if (field === 'group_name') payload.group_name = formData.group_name
-    if (field.startsWith('ai_')) payload[field] = (formData as any)[field]
-    if (field === 'tags') payload.tags = tags.value
-    if (field === 'ip') {
-      if (!formData.ip || !isValidIP(formData.ip)) {
-        ElMessage.warning('IP格式不正确')
-        return
-      }
-      payload.ip = formData.ip
-      payload.robot_ip = formData.ip
-    }
-    const res = await fetch(`/api/v1/robots/${uuid.value}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`)
+    await updateRobotDetail(currentUuid, payload)
     ElMessage.success({ message: '保存成功', duration: 1000 })
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (error) {
+    ElMessage.error(getRobotErrorMessage(error, '保存失败'))
   }
 }
 
@@ -780,7 +763,7 @@ const handleCloseTag = (tag: string) => {
 const showInput = () => {
   inputVisible.value = true
   nextTick(() => {
-    InputRef.value!.input!.focus()
+    InputRef.value?.input?.focus()
   })
 }
 
@@ -800,26 +783,30 @@ const copyText = (text: string) => {
 }
 
 const testConnection = async () => {
-  if (!uuid.value) {
+  const currentUuid = uuid.value
+  if (!currentUuid) {
     ElMessage.warning('请先选择机器人')
     return
   }
   testingNetwork.value = true
   networkResult.value = null
   try {
-    const res = await fetch(`/api/v1/robots/${uuid.value}/test-connection`, { method: 'POST' })
-    const json = await res.json().catch(() => ({}))
-    testingNetwork.value = false
-    if (res.ok) {
-      const connected = !!json.connected
-      status.connected = connected
-      networkResult.value = { success: connected, message: json.message || (connected ? '连接成功' : '连接失败') }
-    } else {
-      networkResult.value = { success: false, message: json.error || `HTTP ${res.status}` }
+    const result = await runRobotConnectionTest(currentUuid)
+    status.connected = result.connected
+    networkResult.value = {
+      success: result.connected,
+      message: result.message || (result.connected ? '连接成功' : '连接失败'),
     }
-  } catch (e: any) {
+    if (result.connected) {
+      await loadVolume()
+    }
+  } catch (error) {
+    networkResult.value = {
+      success: false,
+      message: getRobotErrorMessage(error, '测试失败'),
+    }
+  } finally {
     testingNetwork.value = false
-    networkResult.value = { success: false, message: e?.message || '测试失败' }
   }
 }
 
@@ -851,29 +838,39 @@ const uploadLogs = () => {
 
 // AI
 const saveAIConfig = () => {
-    ElMessage.success('AI配置已保存')
+  if (!uuid.value) {
+    ElMessage.warning('请先选择机器人')
+    return
+  }
+
+  updateRobotDetail(uuid.value, {
+    ai_temperature: formData.ai_temperature,
+    ai_model: formData.ai_model,
+    ai_voice: formData.ai_voice,
+    ai_intent: formData.ai_intent,
+    ai_role_name: formData.ai_role_name,
+    ai_system_prompt: formData.ai_system_prompt,
+  })
+    .then(() => {
+      ElMessage.success('AI配置已保存')
+    })
+    .catch((error: unknown) => {
+      ElMessage.error(getRobotErrorMessage(error, 'AI配置保存失败'))
+    })
 }
 
 const markLog = async () => {
-  if (!uuid.value) {
+  const currentUuid = uuid.value
+  if (!currentUuid) {
     ElMessage.warning('请先选择机器人')
     return
   }
   markingLog.value = true
   try {
-    const response = await fetch(`/api/v1/robots/${uuid.value}/logs/mark`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: markMessage.value })
-    })
-    const json = await response.json().catch(() => ({}))
-    if (response.ok && json.success) {
-      ElMessage.success('日志标记已写入')
-    } else {
-      ElMessage.error('写入标记失败: ' + (json.error || '未知错误'))
-    }
-  } catch (e: any) {
-    ElMessage.error('写入标记失败: ' + (e?.message || '网络错误'))
+    await markRobotLog(currentUuid, markMessage.value)
+    ElMessage.success('日志标记已写入')
+  } catch (error) {
+    ElMessage.error(`写入标记失败: ${getRobotErrorMessage(error, '网络错误')}`)
   } finally {
     markingLog.value = false
   }
@@ -893,19 +890,18 @@ const openWifiSettings = () => {
 }
 
 // Volume Control
-let volumeDebounceTimer: number | null = null
+let volumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const loadVolume = async () => {
-  if (!uuid.value || !status.connected) return
+  const currentUuid = uuid.value
+  if (!currentUuid || !status.connected) return
 
   volumeData.loading = true
   try {
-    const response = await fetch(`/api/v1/robots/${uuid.value}/volume`)
-    const json = await response.json().catch(() => ({}))
-
-    if (response.ok && json.success && json.data) {
-      volumeData.volume = json.data.volume || 50
-      volumeData.muted = json.data.muted || false
+    const response = await getRobotVolume(currentUuid)
+    if (response.data) {
+      volumeData.volume = response.data.volume || 50
+      volumeData.muted = response.data.muted || false
     }
   } catch (error) {
     console.error('加载音量失败:', error)
@@ -914,32 +910,23 @@ const loadVolume = async () => {
   }
 }
 
-const handleVolumeChange = (value: number) => {
+const handleVolumeChange = (value?: number) => {
   // 防抖处理
   if (volumeDebounceTimer) {
     clearTimeout(volumeDebounceTimer)
   }
 
-  volumeDebounceTimer = window.setTimeout(async () => {
-    if (!uuid.value) return
+  const nextVolume = typeof value === 'number' ? value : volumeData.volume
+  volumeDebounceTimer = setTimeout(async () => {
+    const currentUuid = uuid.value
+    if (!currentUuid) return
 
     volumeData.loading = true
     try {
-      const response = await fetch(`/api/v1/robots/${uuid.value}/volume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ volume: value })
-      })
-
-      const json = await response.json().catch(() => ({}))
-
-      if (response.ok && json.success) {
-        ElMessage.success({ message: `音量已设置为 ${value}`, duration: 1000 })
-      } else {
-        ElMessage.error('设置音量失败: ' + (json.error || '未知错误'))
-      }
-    } catch (error: any) {
-      ElMessage.error('设置音量失败: ' + (error?.message || '网络错误'))
+      await setRobotVolume(currentUuid, nextVolume)
+      ElMessage.success({ message: `音量已设置为 ${nextVolume}`, duration: 1000 })
+    } catch (error) {
+      ElMessage.error(`设置音量失败: ${getRobotErrorMessage(error, '网络错误')}`)
     } finally {
       volumeData.loading = false
     }
@@ -947,42 +934,48 @@ const handleVolumeChange = (value: number) => {
 }
 
 const handleMuteToggle = async () => {
-  if (!uuid.value) return
+  const currentUuid = uuid.value
+  if (!currentUuid) return
 
   const newMuteState = !volumeData.muted
   volumeData.loading = true
 
   try {
-    const response = await fetch(`/api/v1/robots/${uuid.value}/volume/mute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mute: newMuteState })
-    })
-
-    const json = await response.json().catch(() => ({}))
-
-    if (response.ok && json.success) {
-      volumeData.muted = newMuteState
-      ElMessage.success(newMuteState ? '已静音' : '已取消静音')
-    } else {
-      ElMessage.error('设置静音失败: ' + (json.error || '未知错误'))
-    }
-  } catch (error: any) {
-    ElMessage.error('设置静音失败: ' + (error?.message || '网络错误'))
+    await setRobotMute(currentUuid, newMuteState)
+    volumeData.muted = newMuteState
+    ElMessage.success(newMuteState ? '已静音' : '已取消静音')
+  } catch (error) {
+    ElMessage.error(`设置静音失败: ${getRobotErrorMessage(error, '网络错误')}`)
   } finally {
     volumeData.loading = false
   }
 }
 
+onBeforeUnmount(() => {
+  if (volumeDebounceTimer) {
+    clearTimeout(volumeDebounceTimer)
+    volumeDebounceTimer = null
+  }
+})
+
 // Unbind
-const handleUnbind = () => {
-  if (!uuid.value) {
+const handleUnbind = async () => {
+  const currentUuid = uuid.value
+  if (!currentUuid) {
     ElMessage.warning('请先选择机器人')
     return
   }
-  // Call API
-  ElMessage.success('解除绑定成功')
-  router.push('/robots')
+
+  loading.value = true
+  try {
+    await removeRobot(currentUuid)
+    ElMessage.success('解除绑定成功')
+    router.push('/robots')
+  } catch (error) {
+    ElMessage.error(`解除绑定失败: ${getRobotErrorMessage(error, '网络错误')}`)
+  } finally {
+    loading.value = false
+  }
 }
 
 watch(

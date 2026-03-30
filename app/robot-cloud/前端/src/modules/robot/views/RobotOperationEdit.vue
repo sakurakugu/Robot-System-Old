@@ -151,13 +151,17 @@
 import { ElMessage } from 'element-plus'
 import { Check, Close, EditPen } from '@element-plus/icons-vue'
 import { Bot } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import RobotOperation from '@/modules/robot/views/RobotOperation.vue'
 import RobotSettings from '@/modules/robot/views/RobotSettings.vue'
+import { useRobotStore } from '../store'
 
 const route = useRoute()
 const router = useRouter()
+const robotStore = useRobotStore()
+const { robots } = storeToRefs(robotStore)
 
 const tabKeys = ['layout', 'basic', 'network', 'logs', 'ai', 'upgrade'] as const
 type TabKey = (typeof tabKeys)[number]
@@ -172,20 +176,15 @@ const selectedUuid = ref('')
 const layoutEditMode = ref(false)
 const operationRef = ref<any>(null)
 
-type RobotItem = { uuid: string; name?: string; status?: string }
-const robots = ref<RobotItem[]>([])
-
-const fetchRobots = async () => {
+const loadRobots = async () => {
   try {
-    const res = await fetch('/api/v1/robots')
-    const json = await res.json()
-    const list: any[] = json?.data?.robots || []
-    robots.value = list.map((r) => ({ uuid: r.uuid, name: r.name || '', status: r.status || 'offline' }))
+    await robotStore.fetchRobots()
     if (robots.value.length > 0 && !selectedUuid.value) {
       selectedUuid.value = robots.value[0].uuid
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error('加载机器人列表失败:', error)
+    ElMessage.error('加载机器人列表失败')
   }
 }
 
@@ -246,7 +245,7 @@ const saveLayout = async () => {
 }
 
 onMounted(() => {
-  fetchRobots()
+  loadRobots()
 })
 </script>
 

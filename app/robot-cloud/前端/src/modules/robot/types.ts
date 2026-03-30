@@ -38,6 +38,7 @@ export interface Robot {
 
   // AI配置
   ai_temperature?: number
+  ai_model?: string | null
   ai_system_prompt?: string
   ai_voice?: string
   ai_intent?: string
@@ -63,11 +64,14 @@ export interface UpdateRobotDTO {
   name?: string
   model?: string
   ip?: string
+  robot_ip?: string
   status?: string
+  role_id?: string | null
   group_name?: string
   sn?: string
   tags?: string[] | string
   ai_temperature?: number
+  ai_model?: string
   ai_system_prompt?: string
   ai_voice?: string
   ai_intent?: string
@@ -98,6 +102,21 @@ export interface ConnectionTestResult {
   success: boolean
   connected: boolean
   message: string
+}
+
+export interface LocalIpResponse {
+  success: boolean
+  data: {
+    ip: string
+  }
+}
+
+export interface RobotVolumeResponse {
+  success: boolean
+  data: {
+    volume: number
+    muted: boolean
+  }
 }
 
 export interface LogUploadRecord {

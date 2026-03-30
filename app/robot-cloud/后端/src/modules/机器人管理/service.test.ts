@@ -1,3 +1,6 @@
+import type { 机器人包服务 } from '../机器人包管理/service';
+import type { RobotPackageInfo } from '../机器人包管理/types';
+import type { 机器人命令服务接口 } from '../websocket/robot-command-gateway';
 import type { RoleRecord } from '../角色管理/types';
 import type { RobotRepository } from './repository';
 import { 机器人服务 } from './service';
@@ -39,6 +42,46 @@ function 创建角色记录(partial: Partial<RoleRecord> = {}): RoleRecord {
     is_default: 0,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+    ...partial,
+  };
+}
+
+function 创建机器人命令服务Mock(): jest.Mocked<机器人命令服务接口> {
+  return {
+    请求机器人拍照: jest.fn(),
+    请求获取机器人音量: jest.fn(),
+    请求设置机器人音量: jest.fn(),
+    请求设置机器人静音: jest.fn(),
+    请求获取机器人配置: jest.fn(),
+    请求更新机器人配置: jest.fn(),
+    请求设置SDK模式: jest.fn(),
+    请求获取SDK模式: jest.fn(),
+    请求日志标记: jest.fn(),
+    请求推送安装包: jest.fn(),
+  };
+}
+
+function 创建机器人包服务Mock(): jest.Mocked<Pick<机器人包服务, 'getActive'>> {
+  return {
+    getActive: jest.fn(),
+  };
+}
+
+function 创建机器人包信息(partial: Partial<RobotPackageInfo> = {}): RobotPackageInfo {
+  return {
+    id: 1,
+    versionCode: 1000,
+    channel: 'stable',
+    changelog: null,
+    isActive: true,
+    uploadedAt: '2026-01-01T00:00:00.000Z',
+    agent: {
+      fileName: 'agent.tar.gz',
+      fileSize: 1024,
+      fileHash: 'agent-hash',
+    },
+    server: null,
+    common: null,
     ...partial,
   };
 }
@@ -122,6 +165,72 @@ describe('机器人服务', () => {
     const service = new 机器人服务(repository);
 
     await expect(service.更新机器人('robot-404', { name: '新名字' })).rejects.toThrow('机器人不存在');
+  });
+
+  it('获取音量 应通过机器人命令服务查询机器人状态', async () => {
+    const repository = 创建机器人仓库Mock();
+    const 机器人命令服务 = 创建机器人命令服务Mock();
+    repository.getRobot.mockResolvedValue(创建机器人记录());
+    机器人命令服务.请求获取机器人音量.mockResolvedValue({
+      success: true,
+      data: {
+        volume: 42,
+        muted: true,
+      },
+    });
+
+    const service = new 机器人服务(repository, { 机器人命令服务 });
+    const result = await service.获取音量('robot-1');
+
+    expect(result).toEqual({
+      volume: 42,
+      muted: true,
+    });
+    expect(机器人命令服务.请求获取机器人音量).toHaveBeenCalledWith('robot-1');
+  });
+
+  it('更新固件 应通过机器人命令服务推送安装包', async () => {
+    const repository = 创建机器人仓库Mock();
+    const 机器人命令服务 = 创建机器人命令服务Mock();
+    const 机器人包服务Mock = 创建机器人包服务Mock();
+    repository.getRobot.mockResolvedValue(创建机器人记录());
+    机器人包服务Mock.getActive.mockResolvedValue(创建机器人包信息({
+      agent: {
+        fileName: 'agent.tar.gz',
+        fileSize: 1024,
+        fileHash: 'agent-hash',
+      },
+      common: {
+        fileName: 'common.tar.gz',
+        fileSize: 2048,
+        fileHash: 'common-hash',
+      },
+    }));
+    机器人命令服务.请求推送安装包.mockResolvedValue({
+      success: true,
+      downloaded: ['agent', 'common'],
+    });
+
+    const service = new 机器人服务(repository, {
+      机器人命令服务,
+      机器人包服务: 机器人包服务Mock,
+    });
+    const result = await service.更新固件('robot-1');
+
+    expect(result).toEqual({
+      downloaded: ['agent', 'common'],
+    });
+    expect(机器人命令服务.请求推送安装包).toHaveBeenCalledWith(
+      'robot-1',
+      {
+        agent: '/api/v1/robot-packages/download/agent?channel=stable',
+        common: '/api/v1/robot-packages/download/common?channel=stable',
+      },
+      {
+        agent: 'agent-hash',
+        common: 'common-hash',
+      },
+    );
   });
 
   it('更新音频路由配置 在 phone 模式缺少目标设备时应报错', async () => {

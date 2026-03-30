@@ -4,7 +4,11 @@ import path from 'path';
 import { v7 as uuidv7, validate as validUUID } from 'uuid';
 import { logger } from '../../core/logger';
 import { formatTimestamp } from '../../core/utils/datetime';
-import type WebSocketService from '../websocket/service';
+import type {
+  机器人命令服务接口,
+  机器人安装包下载路径,
+  机器人安装包哈希,
+} from '../websocket/robot-command-gateway';
 import type { 机器人包服务 } from '../机器人包管理/service';
 import type { RobotRepository } from './repository';
 import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto, 音频路由配置 } from './types';
@@ -16,31 +20,26 @@ const 默认音频路由配置: 音频路由配置 = {
   updatedAt: '',
 };
 
+export interface 机器人服务依赖 {
+  机器人命令服务?: 机器人命令服务接口;
+  机器人包服务?: 机器人包查询服务;
+}
+
+type 机器人包查询服务 = Pick<机器人包服务, 'getActive'>;
+
 /**
  * 机器人服务
  */
 export class 机器人服务 {
   private pythonCommand: string;
-  private websocketService?: WebSocketService;
-  private packageService?: 机器人包服务;
+  private 机器人命令服务?: 机器人命令服务接口;
+  private packageService?: 机器人包查询服务;
 
-  constructor(private repository: RobotRepository) {
+  constructor(private repository: RobotRepository, 依赖: 机器人服务依赖 = {}) {
     // Windows 上通常是 python，Linux/Mac 上通常是 python3
     this.pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
-  }
-
-  /**
-   * 设置WebSocket服务（延迟注入，避免循环依赖）
-   */
-  setWebSocketService(service: WebSocketService): void {
-    this.websocketService = service;
-  }
-
-  /**
-   * 设置机器人包服务（延迟注入，避免循环依赖）
-   */
-  set机器人包服务(service: 机器人包服务): void {
-    this.packageService = service;
+    this.机器人命令服务 = 依赖.机器人命令服务;
+    this.packageService = 依赖.机器人包服务;
   }
 
   /**
@@ -75,6 +74,13 @@ export class 机器人服务 {
 
   private 获取机器人记录(uuid: string): Promise<RobotRecord | undefined> {
     return this.repository.getRobot(uuid);
+  }
+
+  private 获取必需机器人命令服务(): 机器人命令服务接口 {
+    if (!this.机器人命令服务) {
+      throw new Error('机器人命令服务未初始化');
+    }
+    return this.机器人命令服务;
   }
 
   /**
@@ -418,14 +424,11 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
     if (!this.packageService) {
       throw new Error('机器人包服务未初始化');
     }
 
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     const releaseChannel = channel as 'stable' | 'beta';
     const pkgInfo = await this.packageService.getActive(releaseChannel);
     if (!pkgInfo) {
@@ -433,8 +436,8 @@ export class 机器人服务 {
     }
 
     // 构建各包的下载路径和哈希（机器人收到后自行拼接HTTP基础URL）
-    const downloadPaths: { agent?: string; server?: string; common?: string } = {};
-    const hashes: { agent?: string; server?: string; common?: string } = {};
+    const downloadPaths: 机器人安装包下载路径 = {};
+    const hashes: 机器人安装包哈希 = {};
 
     if (pkgInfo.agent) {
       downloadPaths.agent = `/api/v1/robot-packages/download/agent?channel=${channel}`;
@@ -451,7 +454,7 @@ export class 机器人服务 {
 
     logger.info(`开始推送安装包到机器人 ${uuid}，包含: ${Object.keys(downloadPaths).join(', ')}`);
 
-    const result = await this.websocketService.请求推送安装包(uuid, downloadPaths, hashes);
+    const result = await 机器人命令服务.请求推送安装包(uuid, downloadPaths, hashes);
     if (!result.success) {
       throw new Error(result.error || '推送安装包失败');
     }
@@ -466,12 +469,9 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      const result = await this.websocketService.请求日志标记(uuid, message);
+      const result = await 机器人命令服务.请求日志标记(uuid, message);
       if (!result.success) {
         throw new Error(result.error || '写入日志标记失败');
       }
@@ -490,13 +490,10 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      // 通过WebSocket发送获取音量命令并等待响应
-      const result = await this.websocketService.请求获取机器人音量(uuid);
+      // 通过机器人命令服务发送获取音量命令并等待响应
+      const result = await 机器人命令服务.请求获取机器人音量(uuid);
 
       if (!result.success || !result.data) {
         throw new Error(result.error || '获取音量失败');
@@ -517,17 +514,14 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
     if (volume < 0 || volume > 100) {
       throw new Error('音量值必须在 0-100 之间');
     }
 
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      // 通过WebSocket发送设置音量命令并等待响应
-      const result = await this.websocketService.请求设置机器人音量(uuid, volume);
+      // 通过机器人命令服务发送设置音量命令并等待响应
+      const result = await 机器人命令服务.请求设置机器人音量(uuid, volume);
 
       if (!result.success) {
         throw new Error(result.error || '设置音量失败');
@@ -546,13 +540,10 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      // 通过WebSocket发送设置静音命令并等待响应
-      const result = await this.websocketService.请求设置机器人静音(uuid, mute);
+      // 通过机器人命令服务发送设置静音命令并等待响应
+      const result = await 机器人命令服务.请求设置机器人静音(uuid, mute);
 
       if (!result.success) {
         throw new Error(result.error || '设置静音失败');
@@ -571,13 +562,10 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      // 通过WebSocket发送拍照命令并等待响应
-      const result = await this.websocketService.请求机器人拍照(uuid);
+      // 通过机器人命令服务发送拍照命令并等待响应
+      const result = await 机器人命令服务.请求机器人拍照(uuid);
 
       if (!result.success || !result.image) {
         throw new Error(result.error || '拍照失败');
@@ -601,13 +589,10 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      // 通过WebSocket发送获取配置命令并等待响应
-      const result = await this.websocketService.请求获取机器人配置(uuid);
+      // 通过机器人命令服务发送获取配置命令并等待响应
+      const result = await 机器人命令服务.请求获取机器人配置(uuid);
 
       if (!result.success || !result.data) {
         throw new Error(result.error || '获取配置失败');
@@ -628,13 +613,10 @@ export class 机器人服务 {
       throw new Error('机器人不存在');
     }
 
-    if (!this.websocketService) {
-      throw new Error('WebSocket服务未初始化');
-    }
-
+    const 机器人命令服务 = this.获取必需机器人命令服务();
     try {
-      // 通过WebSocket发送更新配置命令并等待响应
-      const result = await this.websocketService.请求更新机器人配置(uuid, config);
+      // 通过机器人命令服务发送更新配置命令并等待响应
+      const result = await 机器人命令服务.请求更新机器人配置(uuid, config);
 
       if (!result.success) {
         throw new Error(result.error || '更新配置失败');

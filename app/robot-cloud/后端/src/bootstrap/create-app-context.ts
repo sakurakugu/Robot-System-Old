@@ -111,9 +111,13 @@ export async function createAppContext(): Promise<应用上下文> {
   logger.info('已重置所有机器人状态为离线');
 
   const WebSocket服务 = new WebSocketService();
+  const 机器人包服务实例 = new 机器人包服务(机器人包仓库);
 
   const 服务 = {
-    机器人服务: new 机器人服务(机器人仓库),
+    机器人服务: new 机器人服务(机器人仓库, {
+      机器人命令服务: WebSocket服务.获取机器人命令服务(),
+      机器人包服务: 机器人包服务实例,
+    }),
     对话服务: new 对话服务(对话仓库),
     大模型配置服务: new 大模型配置服务(设置仓库),
     设置服务: new 设置服务(设置仓库),
@@ -122,7 +126,7 @@ export async function createAppContext(): Promise<应用上下文> {
       机器人仓库,
     }),
     更新服务: new 更新服务(应用版本仓库),
-    机器人包服务: new 机器人包服务(机器人包仓库),
+    机器人包服务: 机器人包服务实例,
     账号服务: new AccountService(
       new PostgresAccountRepository(异步数据库),
     ),
@@ -149,14 +153,14 @@ export async function createAppContext(): Promise<应用上下文> {
   };
 
   服务.编舞服务.setWebSocketService(WebSocket服务);
-  服务.机器人服务.setWebSocketService(WebSocket服务);
-  服务.机器人服务.set机器人包服务(服务.机器人包服务);
-  WebSocket服务.set账号服务(服务.账号服务);
-  WebSocket服务.set机器人服务(服务.机器人服务);
-  WebSocket服务.set对话服务(服务.对话服务);
-  WebSocket服务.set对话仓库(对话仓库);
-  WebSocket服务.set角色仓库(角色仓库);
-  WebSocket服务.set机器人仓库(机器人仓库);
+  WebSocket服务.配置依赖({
+    账号服务: 服务.账号服务,
+    机器人服务: 服务.机器人服务,
+    对话服务: 服务.对话服务,
+    对话仓库,
+    角色仓库,
+    机器人仓库,
+  });
   await 服务.编舞服务.初始化();
 
   return {

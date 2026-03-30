@@ -50,11 +50,40 @@ export type 机器人日志标记结果 = {
   error?: string;
 };
 
+export type 机器人安装包下载路径 = {
+  agent?: string;
+  server?: string;
+  common?: string;
+};
+
+export type 机器人安装包哈希 = {
+  agent?: string;
+  server?: string;
+  common?: string;
+};
+
 export type 机器人安装包推送结果 = {
   success: boolean;
   downloaded?: string[];
   error?: string;
 };
+
+export interface 机器人命令服务接口 {
+  请求机器人拍照(robotId: string): Promise<机器人拍照结果>;
+  请求获取机器人音量(robotId: string): Promise<机器人音量结果>;
+  请求设置机器人音量(robotId: string, volume: number): Promise<机器人命令通用结果>;
+  请求设置机器人静音(robotId: string, mute: boolean): Promise<机器人命令通用结果>;
+  请求获取机器人配置(robotId: string): Promise<机器人命令通用结果>;
+  请求更新机器人配置(robotId: string, config: unknown): Promise<机器人命令通用结果>;
+  请求设置SDK模式(robotId: string, sdkMode: boolean): Promise<机器人SDK模式结果>;
+  请求获取SDK模式(robotId: string): Promise<机器人SDK模式结果>;
+  请求日志标记(robotId: string, message?: string): Promise<机器人日志标记结果>;
+  请求推送安装包(
+    robotId: string,
+    downloadPaths: 机器人安装包下载路径,
+    hashes: 机器人安装包哈希,
+  ): Promise<机器人安装包推送结果>;
+}
 
 export interface 机器人命令网关依赖 {
   获取业务连接(robotId: string): RobotConnection;
@@ -68,7 +97,7 @@ export interface 机器人命令网关依赖 {
  * 机器人命令请求/响应网关
  * 统一封装通过 business 通道发送命令并等待机器人响应的逻辑
  */
-export class 机器人命令网关 {
+export class 机器人命令网关 implements 机器人命令服务接口 {
   private readonly 请求响应跟踪器: WebSocket请求响应跟踪器;
   private readonly 生成请求ID: () => string;
   private readonly 获取当前时间: () => number;
@@ -223,8 +252,8 @@ export class 机器人命令网关 {
 
   请求推送安装包(
     robotId: string,
-    downloadPaths: { agent?: string; server?: string; common?: string },
-    hashes: { agent?: string; server?: string; common?: string },
+    downloadPaths: 机器人安装包下载路径,
+    hashes: 机器人安装包哈希,
   ): Promise<机器人安装包推送结果> {
     return this.发送请求并等待机器人响应(robotId, {
       请求类型: 'package_download',

@@ -1,7 +1,5 @@
 import { Server } from 'http';
-import type { Duplex } from 'stream';
-import { WebSocket, WebSocketServer } from 'ws';
-import { logger } from '../../core/logger';
+import { WebSocket } from 'ws';
 import type { RobotConnection, ServerMessage } from '../../types';
 import type { AccountService } from '../account/service';
 import 语音识别服务 from '../大模型交互/asr-service';
@@ -22,14 +20,10 @@ import { WebSocket手动命令网关 } from './manual-command-gateway';
 import { WebSocket消息路由器 } from './message-router';
 import { WebSocket机器人运行网关 } from './robot-runtime-gateway';
 import { WebSocketSDK模式网关 } from './sdk-mode-gateway';
+import { WebSocket服务端宿主, type WebSocket默认通道路径配置 } from './server-host';
 import {
   机器人命令网关,
-  type 机器人命令通用结果,
-  type 机器人安装包推送结果,
-  type 机器人SDK模式结果,
-  type 机器人日志标记结果,
-  type 机器人拍照结果,
-  type 机器人音量结果,
+  type 机器人命令服务接口,
 } from './robot-command-gateway';
 import { WebSocket连接注册表 } from './connection-registry';
 import { WebSocketUI鉴权器 } from './ui-auth';
@@ -38,9 +32,6 @@ import { WebSocketUI鉴权器 } from './ui-auth';
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
 
 class WebSocket服务 {
-  private wssMap: Map<Channel, WebSocketServer> = new Map();
-  private pathToChannelMap: Map<string, Channel> = new Map();
-  private upgradeHandlerInstalled = false;
   private 账号服务?: AccountService;
   private 对话服务?: 对话服务;
   private 对话仓库?: ConversationRepository;
@@ -50,6 +41,7 @@ class WebSocket服务 {
   private 连接注册表: WebSocket连接注册表;
   private 机器人命令网关: 机器人命令网关;
   private UI鉴权器: WebSocketUI鉴权器;
+  private 服务端宿主: WebSocket服务端宿主;
   private 心跳管理器: WebSocket心跳管理器;
   private 连接生命周期管理器: WebSocket连接生命周期管理器;
   private 音频路由网关: 音频路由网关;
@@ -70,6 +62,10 @@ class WebSocket服务 {
       发送消息: (robotId, message) => this.sendToRobot(robotId, message as any, 'business'),
     });
     this.UI鉴权器 = new WebSocketUI鉴权器(() => this.账号服务);
+    this.服务端宿主 = new WebSocket服务端宿主({
+      UI鉴权器: this.UI鉴权器,
+      处理连接: (ws, req, channel) => this.handleConnection(ws, req, channel),
+    });
     this.心跳管理器 = new WebSocket心跳管理器({
       连接注册表: this.连接注册表,
     });
@@ -181,6 +177,34 @@ class WebSocket服务 {
     this.机器人仓库 = 机器人仓库;
   }
 
+  配置依赖(依赖: {
+    账号服务?: AccountService;
+    机器人服务?: 机器人服务;
+    对话服务?: 对话服务;
+    对话仓库?: ConversationRepository;
+    角色仓库?: RoleRepository;
+    机器人仓库?: RobotRepository;
+  }): void {
+    if (依赖.账号服务) {
+      this.账号服务 = 依赖.账号服务;
+    }
+    if (依赖.机器人服务) {
+      this.机器人服务 = 依赖.机器人服务;
+    }
+    if (依赖.对话服务) {
+      this.对话服务 = 依赖.对话服务;
+    }
+    if (依赖.对话仓库) {
+      this.对话仓库 = 依赖.对话仓库;
+    }
+    if (依赖.角色仓库) {
+      this.角色仓库 = 依赖.角色仓库;
+    }
+    if (依赖.机器人仓库) {
+      this.机器人仓库 = 依赖.机器人仓库;
+    }
+  }
+
   private 获取必需机器人仓库(): RobotRepository {
     if (!this.机器人仓库) {
       throw new Error('机器人仓库未初始化');
@@ -247,68 +271,15 @@ class WebSocket服务 {
     await this.机器人运行网关.标记机器人离线(robotId);
   }
 
-  private async 处理Upgrade请求(request: any, socket: Duplex, head: Buffer): Promise<void> {
-    try {
-      const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
-      const targetChannel = this.pathToChannelMap.get(pathname);
-
-      if (!targetChannel) {
-        socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-
-      if (this.UI鉴权器.需要校验连接(pathname) && !(await this.UI鉴权器.已认证(request))) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-
-      const targetWss = this.wssMap.get(targetChannel);
-      if (!targetWss) {
-        socket.destroy();
-        return;
-      }
-
-      targetWss.handleUpgrade(request, socket, head, (ws) => {
-        targetWss.emit('connection', ws, request);
-      });
-    } catch (error) {
-      logger.error('处理 WebSocket upgrade 失败', error as Error);
-      try {
-        socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
-      } catch {
-        // 忽略写回失败
-      }
-      socket.destroy();
-    }
-  }
-
   /**
    * 初始化WebSocket服务器
    */
   init(server: Server, options: { path: string; channel: Channel }): void {
-    const { path, channel } = options;
-    const wss = new WebSocketServer({
-      noServer: true,
-    });
+    this.服务端宿主.init(server, options);
+  }
 
-    wss.on('connection', (ws: WebSocket, req) => {
-      this.handleConnection(ws, req, channel);
-    });
-
-    this.wssMap.set(channel, wss);
-    this.pathToChannelMap.set(path, channel);
-
-    // 只在第一次调用时安装 upgrade 处理器
-    if (!this.upgradeHandlerInstalled) {
-      this.upgradeHandlerInstalled = true;
-      server.on('upgrade', (request, socket, head) => {
-        void this.处理Upgrade请求(request, socket, head);
-      });
-    }
-
-    logger.info('WebSocket服务已启动', { path, channel });
+  初始化默认通道(server: Server, 路径配置: WebSocket默认通道路径配置): void {
+    this.服务端宿主.初始化默认通道(server, 路径配置);
   }
 
   /**
@@ -501,10 +472,11 @@ class WebSocket服务 {
    */
   close(): void {
     this.心跳管理器.clearAll();
-    for (const wss of this.wssMap.values()) {
-      wss.close();
-    }
-    logger.info('WebSocket服务已关闭');
+    this.服务端宿主.close();
+  }
+
+  获取机器人命令服务(): 机器人命令服务接口 {
+    return this.机器人命令网关;
   }
 
   /**
@@ -530,48 +502,6 @@ class WebSocket服务 {
   }
 
   /**
-   * 请求机器人拍照（用于API调用）
-   */
-  请求机器人拍照(robotId: string): Promise<机器人拍照结果> {
-    return this.机器人命令网关.请求机器人拍照(robotId);
-  }
-
-  /**
-   * 请求获取机器人音量（用于API调用）
-   */
-  请求获取机器人音量(robotId: string): Promise<机器人音量结果> {
-    return this.机器人命令网关.请求获取机器人音量(robotId);
-  }
-
-  /**
-   * 请求设置机器人音量（用于API调用）
-   */
-  请求设置机器人音量(robotId: string, volume: number): Promise<机器人命令通用结果> {
-    return this.机器人命令网关.请求设置机器人音量(robotId, volume);
-  }
-
-  /**
-   * 请求设置机器人静音（用于API调用）
-   */
-  请求设置机器人静音(robotId: string, mute: boolean): Promise<机器人命令通用结果> {
-    return this.机器人命令网关.请求设置机器人静音(robotId, mute);
-  }
-
-  /**
-   * 请求获取机器人配置（用于API调用）
-   */
-  请求获取机器人配置(robotId: string): Promise<机器人命令通用结果> {
-    return this.机器人命令网关.请求获取机器人配置(robotId);
-  }
-
-  /**
-   * 请求更新机器人配置（用于API调用）
-   */
-  请求更新机器人配置(robotId: string, config: unknown): Promise<机器人命令通用结果> {
-    return this.机器人命令网关.请求更新机器人配置(robotId, config);
-  }
-
-  /**
    * 处理SDK模式设置（来自UI）
    */
   private async handleSdkModeSet(robotId: string, data: any): Promise<void> {
@@ -590,38 +520,6 @@ class WebSocket服务 {
    */
   private async handleSdkModeResponse(robotId: string, data: any): Promise<void> {
     await this.SDK模式网关.handleSdkModeResponse(robotId, data);
-  }
-
-  /**
-   * 请求设置SDK模式（用于API调用）
-   */
-  请求设置SDK模式(robotId: string, sdkMode: boolean): Promise<机器人SDK模式结果> {
-    return this.机器人命令网关.请求设置SDK模式(robotId, sdkMode);
-  }
-
-  /**
-   * 请求获取SDK模式（用于API调用）
-   */
-  请求获取SDK模式(robotId: string): Promise<机器人SDK模式结果> {
-    return this.机器人命令网关.请求获取SDK模式(robotId);
-  }
-
-  /**
-   * 请求写入日志标记（用于API调用）
-   */
-  请求日志标记(robotId: string, message: string = ''): Promise<机器人日志标记结果> {
-    return this.机器人命令网关.请求日志标记(robotId, message);
-  }
-
-  /**
-   * 请求机器人通过 HTTP 下载安装包（用于API调用）
-   */
-  请求推送安装包(
-    robotId: string,
-    downloadPaths: { agent?: string; server?: string; common?: string },
-    hashes: { agent?: string; server?: string; common?: string },
-  ): Promise<机器人安装包推送结果> {
-    return this.机器人命令网关.请求推送安装包(robotId, downloadPaths, hashes);
   }
 }
 

@@ -21,6 +21,7 @@ export class 应用程序 {
   }
 
   async close(): Promise<void> {
+    this.WebSocket服务.close();
     await this.上下文.异步数据库.close();
   }
 }

@@ -153,30 +153,6 @@ class WebSocket服务 {
   /**
    * 设置 机器人服务 引用（用于拍照等功能）
    */
-  set机器人服务(机器人服务: 机器人服务): void {
-    this.机器人服务 = 机器人服务;
-  }
-
-  set账号服务(账号服务: AccountService): void {
-    this.账号服务 = 账号服务;
-  }
-
-  set对话服务(对话服务: 对话服务): void {
-    this.对话服务 = 对话服务;
-  }
-
-  set对话仓库(对话仓库: ConversationRepository): void {
-    this.对话仓库 = 对话仓库;
-  }
-
-  set角色仓库(角色仓库: RoleRepository): void {
-    this.角色仓库 = 角色仓库;
-  }
-
-  set机器人仓库(机器人仓库: RobotRepository): void {
-    this.机器人仓库 = 机器人仓库;
-  }
-
   配置依赖(依赖: {
     账号服务?: AccountService;
     机器人服务?: 机器人服务;

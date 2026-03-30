@@ -76,73 +76,86 @@ function 构建元数据(rest: Record<string, any>): string {
  */
 class Logger {
   private 日志: winston.Logger;
+  private 文件输出初始化任务?: Promise<void>;
+  private 文件输出已初始化 = false;
+  private readonly 日志目录 = 配置.logging.dir;
+  private readonly 文件格式 = winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.splat(),
+    winston.format.printf((信息) => {
+      const { timestamp, level, message, service, ...rest } = 信息 as any;
+      const time = 格式化文件时间(new Date(timestamp || Date.now()));
+      const levelCN = 获取中文等级(level);
+      const serviceTag = `${service ?? ''}`;
+      const meta = 构建元数据(rest);
+      return `[${time}] [${levelCN}] [${serviceTag}] ${message}${meta}`;
+    })
+  );
+  private readonly 控制台格式 = winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.splat(),
+    winston.format.printf((信息) => {
+      const { timestamp, level, message, service, ...rest } = 信息 as any;
+      const time = 格式化本地时间(new Date(timestamp || Date.now()));
+      const levelCN = 获取中文等级(level);
+      const color = LEVEL_COLOR[level.toLowerCase()] ?? '';
+      const coloredLevel = color ? `${color}${levelCN}${RESET_COLOR}` : `${levelCN}`;
+      const serviceTag = `${service ?? ''}`;
+      const meta = 构建元数据(rest);
+      return `[${time}] [${coloredLevel}] [${serviceTag}] ${message}${meta}`;
+    })
+  );
 
   constructor() {
-    const 日志目录 = 配置.logging.dir;
-
-    // 确保日志目录存在
-    if (!fs.existsSync(日志目录)) {
-      fs.mkdirSync(日志目录, { recursive: true });
-    }
-
-    const 文件格式 = winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.errors({ stack: true }),
-      winston.format.splat(),
-      winston.format.printf((信息) => {
-        const { timestamp, level, message, service, ...rest } = 信息 as any;
-        const time = 格式化文件时间(new Date(timestamp || Date.now()));
-        const levelCN = 获取中文等级(level);
-        const serviceTag = `${service ?? ''}`;
-        const meta = 构建元数据(rest);
-        return `[${time}] [${levelCN}] [${serviceTag}] ${message}${meta}`;
-      })
-    );
-
-    const 控制台格式 = winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.errors({ stack: true }),
-      winston.format.splat(),
-      winston.format.printf((信息) => {
-        const { timestamp, level, message, service, ...rest } = 信息 as any;
-        const time = 格式化本地时间(new Date(timestamp || Date.now()));
-        const levelCN = 获取中文等级(level);
-        const color = LEVEL_COLOR[level.toLowerCase()] ?? '';
-        const coloredLevel = color ? `${color}${levelCN}${RESET_COLOR}` : `${levelCN}`;
-        const serviceTag = `${service ?? ''}`;
-        const meta = 构建元数据(rest);
-        return `[${time}] [${coloredLevel}] [${serviceTag}] ${message}${meta}`;
-      })
-    );
-
     this.日志 = winston.createLogger({
       level: 配置.logging.level,
-      format: 文件格式,
+      format: this.文件格式,
       defaultMeta: { service: 'robot-cloud' },
       transports: [
-        new winston.transports.File({
-          filename: path.join(日志目录, 'error.log'),
-          level: 'error',
-          maxsize: 10 * 1024 * 1024,
-          maxFiles: 5,
-          format: 文件格式,
-        }),
-        new winston.transports.File({
-          filename: path.join(日志目录, 'combined.log'),
-          maxsize: 10 * 1024 * 1024,
-          maxFiles: 10,
-          format: 文件格式,
+        new winston.transports.Console({
+          format: this.控制台格式,
+          silent: !解析控制台输出(),
         }),
       ],
     });
+  }
 
-    if (解析控制台输出()) {
-      this.日志.add(
-        new winston.transports.Console({
-          format: 控制台格式,
-        })
-      );
+  async 初始化(): Promise<void> {
+    if (this.文件输出已初始化) {
+      return;
     }
+
+    if (!this.文件输出初始化任务) {
+      this.文件输出初始化任务 = this.初始化文件输出();
+    }
+
+    await this.文件输出初始化任务;
+  }
+
+  private async 初始化文件输出(): Promise<void> {
+    await fs.promises.mkdir(this.日志目录, { recursive: true });
+
+    this.日志.add(
+      new winston.transports.File({
+        filename: path.join(this.日志目录, 'error.log'),
+        level: 'error',
+        maxsize: 10 * 1024 * 1024,
+        maxFiles: 5,
+        format: this.文件格式,
+      })
+    );
+    this.日志.add(
+      new winston.transports.File({
+        filename: path.join(this.日志目录, 'combined.log'),
+        maxsize: 10 * 1024 * 1024,
+        maxFiles: 10,
+        format: this.文件格式,
+      })
+    );
+
+    this.文件输出已初始化 = true;
   }
 
   info(消息: string, 元数据?: any): void {

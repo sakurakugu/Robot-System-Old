@@ -26,6 +26,7 @@ import { 机器人控制器 } from '../modules/机器人管理/controller';
 import { PostgresRobotRepository } from '../modules/机器人管理/repository';
 import { 机器人服务 } from '../modules/机器人管理/service';
 import { ChoreoController } from '../modules/编舞系统/controller';
+import { 创建编舞执行消息网关 } from '../modules/编舞系统/execution-message-gateway';
 import { ChoreoService } from '../modules/编舞系统/service';
 import { 角色控制器 } from '../modules/角色管理/controller';
 import { PostgresRoleRepository } from '../modules/角色管理/repository';
@@ -124,6 +125,7 @@ export async function createAppContext(): Promise<应用上下文> {
     角色服务: new 角色服务(角色仓库),
     编舞服务: new ChoreoService({
       机器人仓库,
+      执行消息网关: 创建编舞执行消息网关(WebSocket服务),
     }),
     更新服务: new 更新服务(应用版本仓库),
     机器人包服务: 机器人包服务实例,
@@ -152,7 +154,6 @@ export async function createAppContext(): Promise<应用上下文> {
     反馈控制器: new 反馈控制器(服务.反馈服务),
   };
 
-  服务.编舞服务.setWebSocketService(WebSocket服务);
   WebSocket服务.配置依赖({
     账号服务: 服务.账号服务,
     机器人服务: 服务.机器人服务,

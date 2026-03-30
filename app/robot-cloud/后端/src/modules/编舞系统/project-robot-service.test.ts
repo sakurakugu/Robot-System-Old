@@ -183,4 +183,48 @@ describe('编舞项目机器人服务', () => {
     expect(结果.connected).toBe(true);
     expect((await 服务.getProjectRobotsConfig(环境.项目.uuid))[0].status).toBe('online');
   });
+
+  it('关联机器人与直连机器人配置应写入不同文件且互不覆盖', async () => {
+    const 机器人仓库 = 创建机器人仓库Mock();
+    机器人仓库.getRobot.mockResolvedValue({
+      uuid: 'robot-main-1',
+      name: '主机器人',
+    });
+
+    const 服务 = new 编舞项目机器人服务(
+      () => 环境.项目,
+      环境.存储,
+      机器人仓库 as any,
+      创建机器人控制桥接Mock() as any,
+    );
+
+    await 服务.addRobotToProject(环境.项目.uuid, {
+      robot_id: 'robot-main-1',
+    });
+    await 服务.addRobotToProjectDirect(环境.项目.uuid, {
+      name: '直连机器人',
+      robot_ip: '192.168.1.20',
+      local_ip: '192.168.1.2',
+      local_port: 9000,
+    });
+
+    expect(await 服务.getProjectRobots(环境.项目.uuid)).toHaveLength(1);
+    expect(await 服务.getProjectRobotsConfig(环境.项目.uuid)).toHaveLength(1);
+
+    const 关联机器人文件 = path.join(环境.项目.folder_path, 'project-robots.json');
+    const 直连机器人配置文件 = path.join(环境.项目.folder_path, 'project-robot-configs.json');
+    const 关联机器人数据 = JSON.parse(fs.readFileSync(关联机器人文件, 'utf-8'));
+    const 直连机器人配置数据 = JSON.parse(fs.readFileSync(直连机器人配置文件, 'utf-8'));
+
+    expect(关联机器人数据).toEqual([
+      expect.objectContaining({
+        robot_id: 'robot-main-1',
+      }),
+    ]);
+    expect(直连机器人配置数据).toEqual([
+      expect.objectContaining({
+        robot_ip: '192.168.1.20',
+      }),
+    ]);
+  });
 });

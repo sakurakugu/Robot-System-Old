@@ -1,22 +1,39 @@
-import { execFileSync } from "child_process";
+import { spawn } from "child_process";
 import { createServer } from "http";
 import path from "path";
 import { 应用程序 } from "./app";
 import 配置 from "./config";
 import { logger } from "./core/logger";
 
-function 执行数据库迁移(): void {
+function 执行子进程(command: string, args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const 子进程 = spawn(command, args, {
+      stdio: "inherit",
+      cwd,
+    });
+
+    子进程.once("error", reject);
+    子进程.once("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(`子进程退出码异常: ${code ?? "unknown"}`));
+    });
+  });
+}
+
+async function 执行数据库迁移(): Promise<void> {
   const 脚本路径 = path.resolve(__dirname, "../scripts/node-pg-migrate.cjs");
   logger.info("开始执行数据库迁移...");
-  execFileSync(process.execPath, [脚本路径, "up"], {
-    stdio: "inherit",
-    cwd: path.resolve(__dirname, ".."),
-  });
+  await 执行子进程(process.execPath, [脚本路径, "up"], path.resolve(__dirname, ".."));
   logger.info("数据库迁移执行完成");
 }
 
 async function main(): Promise<void> {
-  执行数据库迁移();
+  await logger.初始化();
+  await 执行数据库迁移();
 
   const 应用 = await 应用程序.create();
   const HTTP服务 = createServer(应用.应用);

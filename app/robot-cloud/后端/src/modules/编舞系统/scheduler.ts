@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../../core/logger';
-import type WebSocketService from '../websocket/service';
+import type { 编舞执行消息网关 } from './execution-message-gateway';
 import type {
     ChoreoWSMessage,
     ExecutionPlan,
@@ -30,7 +30,7 @@ export class ChoreoScheduler {
   // 进度回调
   private onBroadcast: ((message: ChoreoWSMessage) => void) | null = null;
 
-  constructor(private wsService: WebSocketService) {}
+  constructor(private readonly 消息网关: 编舞执行消息网关) {}
 
   /**
    * 获取当前状态
@@ -91,12 +91,12 @@ export class ChoreoScheduler {
 
     // 禁用涉及机器人的收音
     for (const robotId of plan.robotIds) {
-      this.wsService.sendToRobot(robotId, {
+      this.消息网关.发送到机器人(robotId, {
         type: 'audio_control',
         robotId,
         timestamp: Date.now(),
         data: { enabled: false, source: 'system' },
-      }, 'business');
+      });
     }
 
     // 安排所有动作
@@ -238,7 +238,7 @@ export class ChoreoScheduler {
     const { robotId, action: actionName, parameters } = action;
 
     // 通过 WebSocket 发送动作指令到机器人
-    this.wsService.sendToRobot(robotId, {
+    this.消息网关.发送到机器人(robotId, {
       type: 'action_command',
       robotId,
       timestamp: Date.now(),
@@ -246,7 +246,7 @@ export class ChoreoScheduler {
         action: actionName,
         parameters: parameters || {},
       },
-    }, 'business');
+    });
 
     // 广播当前执行的动作（给 UI 显示）
     if (this.plan) {

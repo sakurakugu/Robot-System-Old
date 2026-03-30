@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from 'uuid';
 import type { RobotRepository } from '../机器人管理/repository';
 import { 编舞机器人控制桥接 } from './bridges/robot-control-bridge';
+import { 编舞项目机器人仓库 } from './project-robot-repository';
 import { 编舞项目存储 } from './storage/project-storage';
 import type {
   AddProjectRobotDirectDto,
@@ -26,14 +27,15 @@ type 项目获取器 = (projectUuid: string) => ChoreoProject;
 export class 编舞项目机器人服务 {
   constructor(
     private readonly 获取项目记录: 项目获取器,
-    private readonly 存储: 编舞项目存储,
+    存储: 编舞项目存储,
     private readonly 机器人仓库: 编舞机器人查询仓库,
     private readonly 机器人控制桥接: 编舞机器人控制桥接接口,
+    private readonly 项目机器人仓库: 编舞项目机器人仓库 = new 编舞项目机器人仓库(存储),
   ) {}
 
   async getProjectRobots(projectUuid: string): Promise<ChoreoRobot[]> {
     const project = this.获取项目记录(projectUuid);
-    return this.存储.读取项目机器人<ChoreoRobot>(project);
+    return this.项目机器人仓库.读取关联机器人(project);
   }
 
   async addRobotToProject(projectUuid: string, dto: AddRobotToProjectDto): Promise<ChoreoRobot> {
@@ -60,7 +62,7 @@ export class 编舞项目机器人服务 {
     };
 
     robots.push(robot);
-    await this.存储.写入项目机器人(project, robots);
+    await this.项目机器人仓库.写入关联机器人(project, robots);
     return robot;
   }
 
@@ -73,7 +75,7 @@ export class 编舞项目机器人服务 {
     }
 
     robots.splice(index, 1);
-    await this.存储.写入项目机器人(project, robots);
+    await this.项目机器人仓库.写入关联机器人(project, robots);
   }
 
   async addRobotToProjectDirect(
@@ -94,13 +96,13 @@ export class 编舞项目机器人服务 {
     };
 
     robots.push(robot);
-    await this.存储.写入项目机器人(project, robots);
+    await this.项目机器人仓库.写入项目机器人配置(project, robots);
     return robot;
   }
 
   async getProjectRobotsConfig(projectUuid: string): Promise<ProjectRobotConfig[]> {
     const project = this.获取项目记录(projectUuid);
-    return this.存储.读取项目机器人<ProjectRobotConfig>(project);
+    return this.项目机器人仓库.读取项目机器人配置(project);
   }
 
   async updateProjectRobot(
@@ -123,7 +125,7 @@ export class 编舞项目机器人服务 {
     if (dto.group_name !== undefined) robot.group_name = dto.group_name;
     if (dto.status !== undefined) robot.status = dto.status;
 
-    await this.存储.写入项目机器人(project, robots);
+    await this.项目机器人仓库.写入项目机器人配置(project, robots);
     return robot;
   }
 
@@ -136,7 +138,7 @@ export class 编舞项目机器人服务 {
     }
 
     robots.splice(index, 1);
-    await this.存储.写入项目机器人(project, robots);
+    await this.项目机器人仓库.写入项目机器人配置(project, robots);
   }
 
   async testRobotConnection(projectUuid: string, robotUuid: string): Promise<ConnectionTestResult> {

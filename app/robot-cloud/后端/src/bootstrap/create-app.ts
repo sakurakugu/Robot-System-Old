@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import type { 应用上下文 } from './create-app-context';
+import { 发送Http错误 } from '../core/http/controller';
 import { logger } from '../core/logger';
 import { requireAuth, requireRole, withAuthContext } from '../modules/account/middleware';
 import { createAccountRoutes } from '../modules/account/routes';
@@ -90,18 +91,13 @@ export async function createApp(context: 应用上下文): Promise<express.Appli
   }));
   路由器.use(受保护路由器);
 
-  路由器.post('/robot/:robotId/command', requireAuth, (请求, 响应) => {
-    context.控制器.对话控制器.sendCommand(请求, 响应);
-  });
+  路由器.post('/robot/:robotId/command', requireAuth, context.控制器.对话控制器.sendCommand);
 
   app.use('/api/v1', 路由器);
 
   app.use((错误: any, _请求: express.Request, 响应: express.Response, _下一步: express.NextFunction) => {
     logger.error('未处理的错误', 错误);
-    响应.status(500).json({
-      success: false,
-      error: 错误.message || '服务器内部错误',
-    });
+    发送Http错误(响应, 错误);
   });
 
   return app;

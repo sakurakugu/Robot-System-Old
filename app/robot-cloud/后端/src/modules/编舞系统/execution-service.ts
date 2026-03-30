@@ -1,5 +1,5 @@
 import { logger } from '../../core/logger';
-import type WebSocketService from '../websocket/service';
+import type { 编舞执行消息网关 } from './execution-message-gateway';
 import { ChoreoScheduler } from './scheduler';
 import type {
   ChoreoWSMessage,
@@ -19,22 +19,14 @@ type 编舞调度器 = Pick<
 export class 编舞执行服务 {
   private readonly executions: Map<string, ExecutionStatus> = new Map();
   private readonly schedulers: Map<string, 编舞调度器> = new Map();
-  private wsService?: WebSocketService;
 
   constructor(
-    private readonly 创建调度器: (wsService: WebSocketService) => 编舞调度器 =
-      (wsService) => new ChoreoScheduler(wsService),
+    private readonly 消息网关: 编舞执行消息网关,
+    private readonly 创建调度器: (消息网关: 编舞执行消息网关) => 编舞调度器 =
+      (消息网关) => new ChoreoScheduler(消息网关),
   ) {}
 
-  setWebSocketService(wsService: WebSocketService): void {
-    this.wsService = wsService;
-  }
-
   startExecution(plan: ExecutionPlan): ExecutionStatus {
-    if (!this.wsService) {
-      throw new Error('WebSocket 服务未初始化');
-    }
-
     if (plan.actions.length === 0) {
       throw new Error('时间轴中没有可执行的动作（请确保动作块已绑定机器人且已选择动作类型）');
     }
@@ -43,7 +35,7 @@ export class 编舞执行服务 {
       throw new Error('没有绑定机器人的轨道，无法执行');
     }
 
-    const scheduler = this.创建调度器(this.wsService);
+    const scheduler = this.创建调度器(this.消息网关);
     const executionId = plan.scheduleId;
     const status: ExecutionStatus = {
       executionId,
@@ -137,10 +129,7 @@ export class 编舞执行服务 {
     status: ExecutionStatus,
     message: ChoreoWSMessage,
   ): void {
-    this.wsService!.broadcast(
-      message as unknown as import('../../types').ServerMessage,
-      'business',
-    );
+    this.消息网关.广播执行消息(message);
 
     if (message.type === 'choreo_progress') {
       status.currentTime = message.data.currentTime;

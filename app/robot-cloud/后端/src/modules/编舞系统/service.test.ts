@@ -19,13 +19,17 @@ type 机器人控制桥接Mock = {
 };
 
 type 执行服务Mock = {
-  setWebSocketService: jest.Mock;
   startExecution: jest.Mock;
   pauseExecution: jest.Mock;
   resumeExecution: jest.Mock;
   stopExecution: jest.Mock;
   getExecutionStatus: jest.Mock;
   getRunningExecutions: jest.Mock;
+};
+
+type 执行消息网关Mock = {
+  发送到机器人: jest.Mock;
+  广播执行消息: jest.Mock;
 };
 
 type 时间轴编译器Mock = {
@@ -83,6 +87,7 @@ type 时间轴内容服务Mock = {
 type 创建编舞服务选项 = {
   机器人仓库?: 机器人仓库Mock;
   机器人控制桥接?: 机器人控制桥接Mock;
+  执行消息网关?: 执行消息网关Mock;
   执行服务?: 执行服务Mock;
   时间轴编译器?: 时间轴编译器Mock;
   项目机器人服务?: 项目机器人服务Mock;
@@ -116,13 +121,19 @@ function 创建机器人控制桥接Mock(): 机器人控制桥接Mock {
 
 function 创建执行服务Mock(): 执行服务Mock {
   return {
-    setWebSocketService: jest.fn(),
     startExecution: jest.fn(),
     pauseExecution: jest.fn(),
     resumeExecution: jest.fn(),
     stopExecution: jest.fn(),
     getExecutionStatus: jest.fn(),
     getRunningExecutions: jest.fn(),
+  };
+}
+
+function 创建执行消息网关Mock(): 执行消息网关Mock {
+  return {
+    发送到机器人: jest.fn(),
+    广播执行消息: jest.fn(),
   };
 }
 
@@ -222,6 +233,7 @@ async function 创建编舞服务(
   const {
     机器人仓库 = 创建机器人仓库Mock(),
     机器人控制桥接,
+    执行消息网关 = 创建执行消息网关Mock(),
     执行服务,
     时间轴编译器,
     项目机器人服务,
@@ -233,6 +245,7 @@ async function 创建编舞服务(
   return new 编舞服务({
     机器人仓库: 机器人仓库 as any,
     机器人控制桥接: 机器人控制桥接 as any,
+    执行消息网关: 执行消息网关 as any,
     执行服务: 执行服务 as any,
     时间轴编译器: 时间轴编译器 as any,
     项目机器人服务: 项目机器人服务 as any,
@@ -465,8 +478,10 @@ describe('编舞服务', () => {
     });
     expect(直接机器人.uuid).toBe('32345678-1234-1234-1234-123456789abc');
 
+    const 关联机器人列表 = await 服务.getProjectRobots(项目.uuid);
     const 配置列表 = await 服务.getProjectRobotsConfig(项目.uuid);
-    expect(配置列表).toHaveLength(2);
+    expect(关联机器人列表).toHaveLength(1);
+    expect(配置列表).toHaveLength(1);
 
     const 更新后 = await 服务.updateProjectRobot(项目.uuid, 直接机器人.uuid, {
       status: 'online',
@@ -477,7 +492,7 @@ describe('编舞服务', () => {
 
     await 服务.deleteProjectRobot(项目.uuid, 直接机器人.uuid);
     const 删除后列表 = await 服务.getProjectRobotsConfig(项目.uuid);
-    expect(删除后列表).toHaveLength(1);
+    expect(删除后列表).toHaveLength(0);
 
     await 服务.removeRobotFromProject(项目.uuid, 主机器人.uuid);
     const 删除主机器人后 = await 服务.getProjectRobots(项目.uuid);
@@ -715,17 +730,28 @@ describe('编舞服务', () => {
     expect(计划.scheduleId).toBe('compiled-1');
   });
 
-  it('设置 WebSocket 服务应委托执行服务', async () => {
-    const 执行服务 = 创建执行服务Mock();
-    const 服务 = await 创建编舞服务(环境, {
-      机器人仓库: 创建机器人仓库Mock(),
-      执行服务,
-    });
-    const ws服务 = { broadcast: jest.fn() };
+  it('缺少执行服务与执行消息网关时应拒绝构造', async () => {
+    jest.resetModules();
+    jest.doMock('uuid', () => ({
+      v7: jest.fn(() => '12345678-1234-1234-1234-123456789abc'),
+    }));
+    jest.doMock('../../core/services/python-executor', () => ({
+      PythonExecutor: jest.fn().mockImplementation(() => ({})),
+    }));
+    jest.doMock('../../core/logger', () => ({
+      logger: {
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn(),
+      },
+    }));
 
-    服务.setWebSocketService(ws服务 as any);
+    const { 编舞服务 } = await import('./service');
 
-    expect(执行服务.setWebSocketService).toHaveBeenCalledWith(ws服务);
+    expect(() => new 编舞服务({
+      机器人仓库: 创建机器人仓库Mock() as any,
+    })).toThrow('编舞执行消息网关未初始化');
   });
 
   it('项目机器人相关接口应委托独立项目机器人服务', async () => {

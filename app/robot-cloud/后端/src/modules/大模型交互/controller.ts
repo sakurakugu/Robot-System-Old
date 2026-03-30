@@ -1,4 +1,10 @@
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
+import {
+  处理控制器,
+  返回数据,
+  返回消息,
+} from '../../core/http/controller';
+import { Http错误工厂 } from '../../core/http/errors';
 import type { 对话服务 } from './chat-service';
 import type { ConversationRepository } from './repository';
 
@@ -16,39 +22,26 @@ export class 对话控制器 {
   /**
    * 获取对话历史
    */
-  getHistory = async (req: Request, res: Response) => {
-    try {
-      const robotId = this.获取参数(req, 'robotId');
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = parseInt(req.query.offset as string) || 0;
+  getHistory = 处理控制器((req: Request) => {
+    const robotId = this.获取参数(req, 'robotId');
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
 
-      const conversations = await this.conversationService.获取历史(robotId, limit, offset);
-
-      res.json({
-        success: true,
-        data: {
-          conversations,
-          limit,
-          offset,
-        },
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  };
+    return this.conversationService.获取历史(robotId, limit, offset).then((conversations) => 返回数据({
+      conversations,
+      limit,
+      offset,
+    }));
+  });
 
   /**
    * 发送文本到指定机器人（由前端控制面调用）
    */
-  sendCommand = async (req: Request, res: Response) => {
-    try {
+  sendCommand = 处理控制器(async (req: Request) => {
       const robotId = this.获取参数(req, 'robotId');
       const { text } = req.body || {};
       if (typeof text !== 'string' || text.trim().length === 0) {
-        return res.status(400).json({ success: false, error: '缺少文本内容' });
+        throw Http错误工厂.参数错误('缺少文本内容');
       }
 
       // 记录到对话历史（标记为控制端直接下发）
@@ -62,9 +55,6 @@ export class 对话控制器 {
         metadata: { from: 'controller' },
       });
 
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  };
+      return 返回消息('已发送');
+  });
 }

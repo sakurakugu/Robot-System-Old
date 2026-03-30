@@ -250,24 +250,6 @@ watch(
   padding: 0;
 }
 
-.network-result {
-  margin-left: 10px;
-  font-size: 13px;
-}
-.network-result.success { color: #67c23a; }
-.network-result.error { color: #f56c6c; }
-
-.log-history {
-  margin-top: 30px;
-}
-.log-history h4 {
-  margin-bottom: 10px;
-}
-
-.log-mark-section {
-  margin-bottom: 10px;
-}
-
 .custom-tab-label {
   position: relative;
 }

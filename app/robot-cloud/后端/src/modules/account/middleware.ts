@@ -1,4 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
+import { 发送Http错误 } from '../../core/http/controller';
+import { Http错误工厂 } from '../../core/http/errors';
 import type { AccountService } from './service';
 import type { AccountRole } from './types';
 
@@ -24,7 +26,8 @@ export function withAuthContext(accountService: AccountService) {
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-    return res.status(401).json({ success: false, error: '请先登录' });
+    发送Http错误(res, Http错误工厂.未授权('请先登录'));
+    return;
   }
   next();
 }
@@ -32,11 +35,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 export function requireRole(...roles: AccountRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-      return res.status(401).json({ success: false, error: '请先登录' });
+      发送Http错误(res, Http错误工厂.未授权('请先登录'));
+      return;
     }
 
     if (!roles.includes(req.authContext.user.role)) {
-      return res.status(403).json({ success: false, error: '权限不足' });
+      发送Http错误(res, Http错误工厂.禁止访问('权限不足'));
+      return;
     }
 
     next();

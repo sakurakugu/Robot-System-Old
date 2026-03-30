@@ -118,17 +118,6 @@ export class 编舞项目存储 {
     await 异步文件系统.rm(project.folder_path, { recursive: true, force: true });
   }
 
-  async 读取项目机器人<T>(project: ChoreoProject): Promise<T[]> {
-    return this.读取JSON文件<T[]>(this.获取项目机器人文件路径(project), []);
-  }
-
-  async 写入项目机器人<T>(project: ChoreoProject, robots: T): Promise<void> {
-    await 异步文件系统.writeFile(
-      this.获取项目机器人文件路径(project),
-      JSON.stringify(robots, null, 2),
-    );
-  }
-
   async 读取时间轴(project: ChoreoProject, fallbackValue: TimelineData): Promise<TimelineData> {
     const timelinePath = path.join(project.folder_path, 'timeline.json');
 
@@ -327,10 +316,6 @@ export class 编舞项目存储 {
 
   async 删除目录(targetPath: string): Promise<void> {
     await 异步文件系统.rm(targetPath, { recursive: true, force: true });
-  }
-
-  private 获取项目机器人文件路径(project: ChoreoProject): string {
-    return path.join(project.folder_path, 'robots.json');
   }
 
   private 解析项目内路径(project: ChoreoProject, relativePath: string): string {

@@ -176,7 +176,7 @@ describe('WebSocket服务', () => {
     repository.getRobot.mockResolvedValue(创建机器人记录());
 
     const service = new WebSocket服务();
-    service.set机器人仓库(repository);
+    service.配置依赖({ 机器人仓库: repository });
     (service as any).setupHeartbeat = jest.fn();
 
     (service as any).handleConnection(
@@ -195,7 +195,7 @@ describe('WebSocket服务', () => {
     repository.getRobot.mockResolvedValue(undefined);
 
     const service = new WebSocket服务();
-    service.set机器人仓库(repository);
+    service.配置依赖({ 机器人仓库: repository });
     (service as any).setupHeartbeat = jest.fn();
 
     (service as any).handleConnection(
@@ -222,7 +222,7 @@ describe('WebSocket服务', () => {
     }));
 
     const service = new WebSocket服务();
-    service.set机器人仓库(repository);
+    service.配置依赖({ 机器人仓库: repository });
     (service as any).sendToRobot = jest.fn();
     (service as any).sendError = jest.fn();
 
@@ -254,8 +254,10 @@ describe('WebSocket服务', () => {
     角色仓库.getRole.mockResolvedValue(创建角色记录());
 
     const service = new WebSocket服务();
-    service.set机器人仓库(机器人仓库);
-    service.set角色仓库(角色仓库);
+    service.配置依赖({
+      机器人仓库,
+      角色仓库,
+    });
 
     await (service as any).handleAudioStart('robot-1', {
       sessionId: 'session-1',
@@ -285,7 +287,7 @@ describe('WebSocket服务', () => {
     }));
 
     const service = new WebSocket服务();
-    service.set机器人仓库(机器人仓库);
+    service.配置依赖({ 机器人仓库 });
 
     const route = await (service as any).getAudioRouteConfig('robot-1');
 
@@ -302,7 +304,7 @@ describe('WebSocket服务', () => {
     const 对话仓库 = 创建对话仓库Mock();
 
     const service = new WebSocket服务();
-    service.set对话仓库(对话仓库);
+    service.配置依赖({ 对话仓库 });
     (service as any).sendToRobot = jest.fn();
     (service as any).broadcastMessage = jest.fn();
 
@@ -325,7 +327,7 @@ describe('WebSocket服务', () => {
     const 对话仓库 = 创建对话仓库Mock();
 
     const service = new WebSocket服务();
-    service.set对话仓库(对话仓库);
+    service.配置依赖({ 对话仓库 });
 
     await (service as any).写入对话记录({
       robot_id: 'robot-1',
@@ -355,7 +357,7 @@ describe('WebSocket服务', () => {
     const ws = new 假WebSocket();
 
     const service = new WebSocket服务();
-    service.set机器人仓库(repository);
+    service.配置依赖({ 机器人仓库: repository });
     service.getConnections().set('robot-1', new Map([
       ['business', {
         robotId: 'robot-1',

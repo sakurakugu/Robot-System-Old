@@ -1,6 +1,7 @@
 import type { Request, RequestHandler, Response } from 'express';
 import { Router } from 'express';
 import os from 'os';
+import { 发送Http错误 } from '../../core/http/controller';
 import { formatTimestamp } from '../../core/utils/datetime';
 
 export interface 系统路由依赖 {
@@ -31,10 +32,7 @@ export function createSystemRoutes(
         },
       });
     } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      发送Http错误(res, error);
     }
   };
   if (guards?.protectedRead) {
@@ -72,7 +70,7 @@ export function createSystemRoutes(
       const ip = addresses[0] || '';
       res.json({ success: true, data: { ip, all: addresses } });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      发送Http错误(res, error);
     }
   };
   if (guards?.protectedRead) {

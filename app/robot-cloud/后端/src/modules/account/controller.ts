@@ -1,6 +1,19 @@
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
+import {
+  处理控制器,
+  返回数据,
+} from '../../core/http/controller';
+import {
+  Http错误工厂,
+  type Http错误映射规则,
+} from '../../core/http/errors';
 import type { AccountService } from './service';
 import type { AccountRole, ClientType } from './types';
+
+const 账号权限错误映射: Http错误映射规则[] = [
+  { 匹配: '不存在', 状态码: 404 },
+  { 匹配: [/权限/, /禁止/, /无权/], 状态码: 403 },
+];
 
 function resolveClientType(req: Request): ClientType {
   const value = String(req.headers['x-client-type'] || '').toLowerCase();
@@ -38,114 +51,89 @@ function resolveParam(value: string | string[] | undefined): string {
 export class AccountController {
   constructor(private accountService: AccountService) {}
 
-  register = async (req: Request, res: Response) => {
-    try {
-      const data = await this.accountService.register(req.body || {}, {
-        clientType: resolveClientType(req),
-        deviceName: resolveDeviceName(req),
-        ipAddress: req.ip,
-        userAgent: resolveUserAgent(req),
-      });
-      res.status(201).json({ success: true, data });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
-    }
-  };
-
-  login = async (req: Request, res: Response) => {
-    try {
-      const data = await this.accountService.login(req.body || {}, {
-        clientType: resolveClientType(req),
-        deviceName: resolveDeviceName(req),
-        ipAddress: req.ip,
-        userAgent: resolveUserAgent(req),
-      });
-      res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(400).json({ success: false, error: error.message });
-    }
-  };
-
-  guest = async (_req: Request, res: Response) => {
-    res.json({
-      success: true,
-      data: {
-        mode: 'guest',
-        message: '已进入游客模式',
-      },
-    });
-  };
-
-  me = async (req: Request, res: Response) => {
+  private 获取当前用户(req: Request) {
     if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-      return res.status(401).json({ success: false, error: '未登录' });
+      throw Http错误工厂.未授权('未登录');
     }
+    return req.authContext.user;
+  }
 
-    const user = await this.accountService.getProfile(req.authContext.user.id);
-    res.json({ success: true, data: user });
-  };
+  register = 处理控制器(async (req: Request) => 返回数据(
+    await this.accountService.register(req.body || {}, {
+      clientType: resolveClientType(req),
+      deviceName: resolveDeviceName(req),
+      ipAddress: req.ip,
+      userAgent: resolveUserAgent(req),
+    }),
+    { 状态码: 201 },
+  ), {
+    默认错误状态码: 400,
+  });
 
-  listSessions = async (req: Request, res: Response) => {
-    if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-      return res.status(401).json({ success: false, error: '未登录' });
-    }
+  login = 处理控制器(async (req: Request) => 返回数据(
+    await this.accountService.login(req.body || {}, {
+      clientType: resolveClientType(req),
+      deviceName: resolveDeviceName(req),
+      ipAddress: req.ip,
+      userAgent: resolveUserAgent(req),
+    }),
+  ), {
+    默认错误状态码: 400,
+  });
 
-    const sessions = await this.accountService.listMySessions(req.authContext.user.id, req.authContext.sessionId);
-    res.json({ success: true, data: sessions });
-  };
+  guest = 处理控制器(async () => 返回数据({
+    mode: 'guest',
+    message: '已进入游客模式',
+  }));
 
-  revokeSession = async (req: Request, res: Response) => {
-    if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-      return res.status(401).json({ success: false, error: '未登录' });
-    }
+  me = 处理控制器(async (req: Request) => {
+    const user = this.获取当前用户(req);
+    return 返回数据(await this.accountService.getProfile(user.id));
+  });
 
-    try {
-      await this.accountService.revokeMySession(req.authContext.user.id, resolveParam(req.params.id));
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(404).json({ success: false, error: error.message });
-    }
-  };
+  listSessions = 处理控制器(async (req: Request) => {
+    const user = this.获取当前用户(req);
+    const sessions = await this.accountService.listMySessions(user.id, req.authContext?.sessionId ?? null);
+    return 返回数据(sessions);
+  });
 
-  logout = async (req: Request, res: Response) => {
+  revokeSession = 处理控制器(async (req: Request) => {
+    const user = this.获取当前用户(req);
+    await this.accountService.revokeMySession(user.id, resolveParam(req.params.id));
+  }, {
+    错误映射: [{ 匹配: '不存在', 状态码: 404 }],
+  });
+
+  logout = 处理控制器(async (req: Request) => {
     await this.accountService.logoutCurrent(req.authContext?.sessionId || null);
-    res.json({ success: true });
-  };
+  });
 
-  listUsers = async (req: Request, res: Response) => {
-    if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-      return res.status(401).json({ success: false, error: '未登录' });
+  listUsers = 处理控制器(async (req: Request) => {
+    this.获取当前用户(req);
+    return 返回数据(await this.accountService.listUsers());
+  });
+
+  updateRole = 处理控制器(async (req: Request) => {
+    const user = this.获取当前用户(req);
+    const role = String(req.body?.role || '') as AccountRole;
+    if (!['user', 'admin', 'super_admin'].includes(role)) {
+      throw Http错误工厂.参数错误('角色无效');
     }
-
-    res.json({ success: true, data: await this.accountService.listUsers() });
-  };
-
-  updateRole = async (req: Request, res: Response) => {
-    if (!req.authContext || req.authContext.mode !== 'authenticated' || !req.authContext.user) {
-      return res.status(401).json({ success: false, error: '未登录' });
-    }
-
-    try {
-      const role = String(req.body?.role || '') as AccountRole;
-      if (!['user', 'admin', 'super_admin'].includes(role)) {
-        return res.status(400).json({ success: false, error: '角色无效' });
-      }
-      const data = await this.accountService.updateUserRole(
-        req.authContext.user.role,
-        resolveParam(req.params.id),
-        role
-      );
-      res.json({ success: true, data });
-    } catch (error: any) {
-      const status = error.message.includes('不存在') ? 404 : 403;
-      res.status(status).json({ success: false, error: error.message });
-    }
-  };
+    const data = await this.accountService.updateUserRole(
+      user.role,
+      resolveParam(req.params.id),
+      role
+    );
+    return 返回数据(data);
+  }, {
+    默认错误状态码: 403,
+    错误映射: 账号权限错误映射,
+  });
 
   // 允许前端通过 token 预检
-  resolveContext = async (req: Request, res: Response) => {
+  resolveContext = 处理控制器(async (req: Request) => {
     const token = resolveToken(req);
     const context = await this.accountService.buildUserContext(token);
-    res.json({ success: true, data: context });
-  };
+    return 返回数据(context);
+  });
 }

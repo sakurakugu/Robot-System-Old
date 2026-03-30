@@ -4,9 +4,9 @@
  */
 
 import { logger } from '../../core/logger';
-import type WebSocketService from '../websocket/service';
 import type { RobotRepository } from '../机器人管理/repository';
 import { 编舞机器人控制桥接 } from './bridges/robot-control-bridge';
+import type { 编舞执行消息网关 } from './execution-message-gateway';
 import { 编舞执行服务 } from './execution-service';
 import { 编舞项目文件资源服务 } from './project-file-resource-service';
 import { 编舞项目管理服务 } from './project-management-service';
@@ -92,6 +92,7 @@ export interface 编舞服务依赖 {
   机器人仓库: 编舞机器人查询仓库;
   存储?: 编舞项目存储;
   机器人控制桥接?: 编舞机器人控制桥接接口;
+  执行消息网关?: 编舞执行消息网关;
   执行服务?: 编舞执行服务;
   时间轴编译器?: 编舞时间轴编译器接口;
   项目机器人服务?: 编舞项目机器人服务接口;
@@ -112,14 +113,22 @@ export class 编舞服务 {
     机器人仓库,
     存储 = new 编舞项目存储(),
     机器人控制桥接 = new 编舞机器人控制桥接(),
-    执行服务 = new 编舞执行服务(),
+    执行消息网关,
+    执行服务,
     时间轴编译器 = new 编舞时间轴编译器(),
     项目机器人服务,
     项目文件资源服务,
     项目管理服务,
     时间轴内容服务,
   }: 编舞服务依赖) {
-    this.执行服务 = 执行服务;
+    if (执行服务) {
+      this.执行服务 = 执行服务;
+    } else {
+      if (!执行消息网关) {
+        throw new Error('编舞执行消息网关未初始化');
+      }
+      this.执行服务 = new 编舞执行服务(执行消息网关);
+    }
     this.时间轴编译器 = 时间轴编译器;
 
     const 管理服务 = 项目管理服务 ?? new 编舞项目管理服务(存储);
@@ -145,13 +154,6 @@ export class 编舞服务 {
 
   async 初始化(): Promise<void> {
     await this.项目管理服务.初始化();
-  }
-
-  /**
-   * 设置 WebSocket 服务（延迟注入）
-   */
-  setWebSocketService(wsService: WebSocketService): void {
-    this.执行服务.setWebSocketService(wsService);
   }
 
   private 获取项目记录(projectUuid: string): ChoreoProject {

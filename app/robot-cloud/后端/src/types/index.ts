@@ -54,7 +54,7 @@ export interface SettingRecord {
 /**
  * 标准 API 响应
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -67,12 +67,19 @@ export interface ApiResponse<T = any> {
 
 export type WsChannel = 'control' | 'business' | 'audio_upload' | 'audio_download';
 
+export interface WebSocket连接句柄 {
+  send(data: string): void;
+  close(code?: number, data?: string): void;
+  on?(event: 'message' | 'close' | 'error', listener: (...args: unknown[]) => void): void;
+  off?(event: 'message' | 'close' | 'error', listener: (...args: unknown[]) => void): void;
+}
+
 /**
  * WebSocket 连接信息
  */
 export interface RobotConnection {
   robotId: string;
-  websocket: any;
+  websocket: WebSocket连接句柄;
   connectedAt: Date;
   lastActiveAt: Date;
   channel?: WsChannel;
@@ -151,14 +158,15 @@ export interface AudioEndMessage extends BaseClientMessage {
 
 export interface HeartbeatMessage extends BaseClientMessage {
   type: 'heartbeat';
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface StatusMessage extends BaseClientMessage {
   type: 'status';
-  data: {
-    battery?: number;
-    temperature?: number;
+  data: Record<string, unknown> & {
+    battery?: number | string;
+    level?: number | string;
+    temperature?: number | string;
     position?: string;
   };
 }
@@ -171,9 +179,10 @@ export interface RobotRegisterMessage extends BaseClientMessage {
     version?: string;
     metadata?: {
       version?: string; // robot-agent 版本
+      agent_version?: string;
       motion_control_version?: string;
       robot_server_version?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     };
   };
 }
@@ -199,7 +208,7 @@ export interface ActionInputMessage extends BaseClientMessage {
   type: 'action_input';
   data: {
     action: string;
-    parameters?: Record<string, any>;
+    parameters?: Record<string, unknown>;
   };
 }
 
@@ -207,14 +216,20 @@ export interface ControlInputMessage extends BaseClientMessage {
   type: 'control_input';
   data: {
     command: string;
-    parameters?: Record<string, any>;
+    channel?: 'move' | 'look' | 'pose';
+    mode?: 'move' | 'pose';
+    x?: number;
+    y?: number;
+    speed?: number;
+    joystick?: number[];
   };
 }
 
 export interface AudioControlMessage extends BaseClientMessage {
   type: 'audio_control';
   data: {
-    action: 'start' | 'stop' | 'pause' | 'resume';
+    enabled: boolean;
+    source?: 'ui' | 'system';
   };
 }
 
@@ -239,20 +254,24 @@ export type ClientMessage =
 export interface SdkModeSetMessage extends BaseClientMessage {
   type: 'sdk_mode_set';
   data: {
-    mode: number;
+    sdkMode?: boolean;
+    mode?: number;
+    requestId?: string;
   };
 }
 
 export interface SdkModeGetMessage extends BaseClientMessage {
   type: 'sdk_mode_get';
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface SdkModeResponseMessage extends BaseClientMessage {
   type: 'sdk_mode_response';
-  data: {
-    mode: number;
-    result: 'success' | 'failure';
+  data: Record<string, unknown> & {
+    sdkMode?: boolean;
+    mode?: number;
+    result?: 'success' | 'failure';
+    requestId?: string;
   };
 }
 
@@ -262,7 +281,7 @@ export interface ServerMessage {
   robotId: string;
   timestamp: number;
   conversationId?: string;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 

@@ -6,7 +6,10 @@ jest.mock('../../core/utils/helpers', () => ({
   uuidv7: jest.fn(() => 'generated-request-id'),
 }));
 
-class 假WebSocket extends EventEmitter {}
+class 假WebSocket extends EventEmitter {
+  send = jest.fn();
+  close = jest.fn();
+}
 
 function 创建业务连接(websocket: 假WebSocket): RobotConnection {
   return {

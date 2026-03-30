@@ -177,14 +177,14 @@ describe('WebSocket服务', () => {
 
     const service = new WebSocket服务();
     service.配置依赖({ 机器人仓库: repository });
-    (service as any).setupHeartbeat = jest.fn();
 
-    (service as any).handleConnection(
+    (service as any).连接生命周期管理器.handleConnection(
       new 假WebSocket(),
       创建连接请求('/api/v1/robot?robotId=robot-1'),
       'business',
     );
     await 等待异步任务();
+    service.close();
 
     expect(repository.getRobot).toHaveBeenCalledWith('robot-1');
     expect(repository.updateRobot).toHaveBeenCalledWith('robot-1', { status: 'online' });
@@ -196,14 +196,14 @@ describe('WebSocket服务', () => {
 
     const service = new WebSocket服务();
     service.配置依赖({ 机器人仓库: repository });
-    (service as any).setupHeartbeat = jest.fn();
 
-    (service as any).handleConnection(
+    (service as any).连接生命周期管理器.handleConnection(
       new 假WebSocket(),
       创建连接请求('/api/v1/robot?robotId=robot-1'),
       'business',
     );
     await 等待异步任务();
+    service.close();
 
     expect(repository.upsertRobot).toHaveBeenCalledWith({
       uuid: 'robot-1',
@@ -226,7 +226,7 @@ describe('WebSocket服务', () => {
     (service as any).sendToRobot = jest.fn();
     (service as any).sendError = jest.fn();
 
-    await (service as any).handleRobotRegister('robot-1', {
+    await (service as any).机器人运行网关.handleRobotRegister('robot-1', {
       name: '新名字',
       metadata: {
         motion_control_version: '2.1.0',
@@ -259,7 +259,7 @@ describe('WebSocket服务', () => {
       角色仓库,
     });
 
-    await (service as any).handleAudioStart('robot-1', {
+    await (service as any).音频会话管理器.handleAudioStart('robot-1', {
       sessionId: 'session-1',
       format: 'pcm',
       sampleRate: 16000,
@@ -289,7 +289,7 @@ describe('WebSocket服务', () => {
     const service = new WebSocket服务();
     service.配置依赖({ 机器人仓库 });
 
-    const route = await (service as any).getAudioRouteConfig('robot-1');
+    const route = await (service as any).音频路由网关.getAudioRouteConfig('robot-1');
 
     expect(route).toEqual({
       mode: 'phone',
@@ -308,7 +308,7 @@ describe('WebSocket服务', () => {
     (service as any).sendToRobot = jest.fn();
     (service as any).broadcastMessage = jest.fn();
 
-    await (service as any).handleActionInput('robot-1', 'sit_down', { speed: 1 });
+    await (service as any).手动命令网关.handleActionInput('robot-1', 'sit_down', { speed: 1 });
 
     expect(对话仓库.createActionLog).toHaveBeenCalledWith({
       robot_id: 'robot-1',
@@ -329,7 +329,7 @@ describe('WebSocket服务', () => {
     const service = new WebSocket服务();
     service.配置依赖({ 对话仓库 });
 
-    await (service as any).写入对话记录({
+    await (service as any).运行依赖.写入对话记录({
       robot_id: 'robot-1',
       conversation_id: 'conv-1',
       type: 'text',
@@ -369,7 +369,7 @@ describe('WebSocket服务', () => {
       }],
     ]));
 
-    (service as any).handleDisconnection('robot-1', 'business', ws);
+    (service as any).连接生命周期管理器.handleDisconnection('robot-1', 'business', ws);
     await 等待异步任务();
 
     expect(repository.updateRobot).toHaveBeenCalledWith('robot-1', { status: 'offline' });

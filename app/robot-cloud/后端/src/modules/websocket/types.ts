@@ -1,8 +1,15 @@
 // WebSocket消息类型定义
 
+export interface WebSocket连接句柄 {
+  send(data: string): void;
+  close(code?: number, data?: string): void;
+  on?(event: 'message' | 'close' | 'error', listener: (...args: unknown[]) => void): void;
+  off?(event: 'message' | 'close' | 'error', listener: (...args: unknown[]) => void): void;
+}
+
 export interface RobotConnection {
   robotId: string;
-  websocket: any;
+  websocket: WebSocket连接句柄;
   connectedAt: Date;
   lastActiveAt: Date;
   channel?: 'control' | 'business' | 'audio_upload' | 'audio_download';
@@ -70,7 +77,9 @@ export interface SdkModeSetMessage {
   robotId: string;
   timestamp: number;
   data: {
-    mode: number;
+    sdkMode?: boolean;
+    mode?: number;
+    requestId?: string;
   };
 }
 
@@ -78,16 +87,18 @@ export interface SdkModeGetMessage {
   type: 'sdk_mode_get';
   robotId: string;
   timestamp: number;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface SdkModeResponseMessage {
   type: 'sdk_mode_response';
   robotId: string;
   timestamp: number;
-  data: {
-    mode: number;
-    result: 'success' | 'failure';
+  data: Record<string, unknown> & {
+    sdkMode?: boolean;
+    mode?: number;
+    result?: 'success' | 'failure';
+    requestId?: string;
   };
 }
 
@@ -128,16 +139,17 @@ export interface HeartbeatMessage {
   type: 'heartbeat';
   robotId: string;
   timestamp: number;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface StatusMessage {
   type: 'status';
   robotId: string;
   timestamp: number;
-  data: {
-    battery?: number;
-    temperature?: number;
+  data: Record<string, unknown> & {
+    battery?: number | string;
+    level?: number | string;
+    temperature?: number | string;
     position?: string;
   };
 }
@@ -152,9 +164,10 @@ export interface ClientRegisterMessage {
     version?: string;
     metadata?: {
       version?: string; // robot-agent 版本
+      agent_version?: string;
       motion_control_version?: string;
       robot_server_version?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     };
   };
 }
@@ -188,7 +201,7 @@ export interface ActionInputMessage {
   timestamp: number;
   data: {
     action: string;
-    parameters?: Record<string, any>;
+    parameters?: Record<string, unknown>;
   };
 }
 
@@ -197,7 +210,7 @@ export interface ControlInputMessage {
   robotId: string;
   timestamp: number;
   data: {
-    command: 'joystick' | 'joystick_stop' | 'estop';
+    command: string;
     channel?: 'move' | 'look' | 'pose';
     mode?: 'move' | 'pose';
     x?: number;
@@ -213,6 +226,7 @@ export interface AudioControlMessage {
   timestamp: number;
   data: {
     enabled: boolean;
+    source?: 'ui' | 'system';
   };
 }
 
@@ -342,7 +356,7 @@ export interface ErrorMessage {
   data: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
 }
 
@@ -372,7 +386,7 @@ export interface StatusUpdateMessage {
     battery?: number;
     temperature?: number;
     position?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

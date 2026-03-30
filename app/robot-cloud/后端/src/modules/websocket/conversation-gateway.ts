@@ -10,7 +10,7 @@ import {
   uuidv7,
 } from '../../core/utils/helpers';
 import { LLM供应商列表 } from '../../modules/大模型管理/types';
-import type { ServerMessage } from '../../types';
+import type { ServerMessage, TTSOptions } from '../../types';
 import type { 对话服务 } from '../大模型交互/chat-service';
 import type { ConversationRepository } from '../大模型交互/repository';
 import type TTSService from '../大模型交互/tts-service';
@@ -31,7 +31,7 @@ type 音频转写元数据 = {
 
 type 待处理输入 = {
   text: string;
-  ttsOptions?: any;
+  ttsOptions?: TTSOptions;
   inputType: 用户输入类型;
   audioMeta?: 音频转写元数据;
   conversationId: string;
@@ -49,6 +49,8 @@ type 音频流分片 = {
   base64: string;
   format: 'mp3';
 };
+type 对话响应 = Awaited<ReturnType<对话服务['处理消息']>>;
+type 视觉图片 = { base64: string; format?: string };
 
 export interface WebSocket对话网关依赖 {
   获取机器人记录(robotId: string): Promise<RobotRecord | undefined>;
@@ -82,7 +84,7 @@ export class WebSocket对话网关 {
   async handleTextInput(
     robotId: string,
     text: string,
-    ttsOptions?: any,
+    ttsOptions?: TTSOptions,
     conversationId?: string,
   ): Promise<void> {
     await this.queueUserText(robotId, text, ttsOptions, 'text', undefined, conversationId);
@@ -111,7 +113,7 @@ export class WebSocket对话网关 {
   async handleTTSInput(
     robotId: string,
     text: string,
-    ttsOptions?: any,
+    ttsOptions?: TTSOptions,
     conversationId?: string,
   ): Promise<void> {
     try {
@@ -133,16 +135,16 @@ export class WebSocket对话网关 {
         最终响应会话ID: streamSessionId,
         非流式会话ID: conversationId,
       });
-    } catch (error: any) {
-      logger.error('TTS生成失败', error, { robotId });
-      this.依赖.发送错误(robotId, 'TTS_ERROR', error?.message || 'TTS失败', 'business');
+    } catch (error) {
+      logger.error('TTS生成失败', this.转成错误对象(error), { robotId });
+      this.依赖.发送错误(robotId, 'TTS_ERROR', this.提取错误消息(error, 'TTS失败'), 'business');
     }
   }
 
   private async processUserText(
     robotId: string,
     text: string,
-    ttsOptions: any,
+    ttsOptions: TTSOptions | undefined,
     inputType: 用户输入类型,
     audioMeta?: 音频转写元数据,
     conversationId?: string,
@@ -229,8 +231,8 @@ export class WebSocket对话网关 {
         } else {
           logger.info('TTS跳过：回复文本为空或仅包含表情', { robotId });
         }
-      } catch (error: any) {
-        logger.error('TTS生成失败', error, { robotId });
+      } catch (error) {
+        logger.error('TTS生成失败', this.转成错误对象(error), { robotId });
       }
 
       const normalizedActions = this.规范动作(finalResponse.actions);
@@ -288,9 +290,9 @@ export class WebSocket对话网关 {
         processingTime,
         actions: finalResponse.actions,
       });
-    } catch (error: any) {
-      logger.error('处理文本输入失败', error, { robotId });
-      this.依赖.发送错误(robotId, 'PROCESSING_ERROR', error.message, 'business');
+    } catch (error) {
+      logger.error('处理文本输入失败', this.转成错误对象(error), { robotId });
+      this.依赖.发送错误(robotId, 'PROCESSING_ERROR', this.提取错误消息(error, '处理文本输入失败'), 'business');
     }
   }
 
@@ -302,7 +304,7 @@ export class WebSocket对话网关 {
 
     const provider = 配置.llm.provider;
     const allowedModels =
-      LLM供应商列表.find((item) => item.value === (provider as any))?.models.map((item) => item.value) || [];
+      LLM供应商列表.find((item) => item.value === provider)?.models.map((item) => item.value) || [];
     if (robot.model && allowedModels.includes(robot.model)) {
       model = robot.model;
     }
@@ -338,11 +340,11 @@ export class WebSocket对话网关 {
     text: string,
     traceId: string,
     needsVision: boolean,
-    response: Awaited<ReturnType<对话服务['处理消息']>>,
+    response: 对话响应,
     maxHistory: number,
   ): Promise<{
-    finalResponse: Awaited<ReturnType<对话服务['处理消息']>>;
-    visionImage?: { base64: string; format?: string };
+    finalResponse: 对话响应;
+    visionImage?: 视觉图片;
   }> {
     if (!needsVision) {
       return { finalResponse: response };
@@ -402,8 +404,9 @@ export class WebSocket对话网关 {
         finalResponse: visionResponse,
         visionImage,
       };
-    } catch (error: any) {
-      logger.error('视觉识别失败', error, { robotId });
+    } catch (error) {
+      const 错误消息 = this.提取错误消息(error, '视觉识别失败');
+      logger.error('视觉识别失败', this.转成错误对象(error), { robotId });
       this.依赖.发送到UI(robotId, {
         type: 'vision_status',
         robotId,
@@ -411,14 +414,14 @@ export class WebSocket对话网关 {
         conversationId: traceId,
         data: {
           status: 'error',
-          message: `视觉识别失败: ${error.message}`,
+          message: `视觉识别失败: ${错误消息}`,
         },
       }, 'business');
 
       return {
         finalResponse: {
           ...response,
-          text: removeVisionTags(response.text) + `\n\n（抱歉，我现在看不到周围环境：${error.message}）`,
+          text: removeVisionTags(response.text) + `\n\n（抱歉，我现在看不到周围环境：${错误消息}）`,
         },
       };
     }
@@ -454,7 +457,7 @@ export class WebSocket对话网关 {
   private async 发送TTS音频(
     robotId: string,
     text: string,
-    ttsOptions: any,
+    ttsOptions: TTSOptions | undefined,
     选项: {
       流式会话ID: string;
       最终响应会话ID?: string;
@@ -540,7 +543,7 @@ export class WebSocket对话网关 {
   private async queueUserText(
     robotId: string,
     text: string,
-    ttsOptions: any,
+    ttsOptions: TTSOptions | undefined,
     inputType: 用户输入类型,
     audioMeta?: 音频转写元数据,
     conversationId?: string,
@@ -609,5 +612,13 @@ export class WebSocket对话网关 {
       pending.audioMeta,
       pending.conversationId,
     );
+  }
+
+  private 转成错误对象(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  private 提取错误消息(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
   }
 }

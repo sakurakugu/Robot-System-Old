@@ -1,9 +1,17 @@
 import { logger } from '../../core/logger';
 import { uuidv7 } from '../../core/utils/helpers';
-import type { ServerMessage } from '../../types';
+import type {
+  ActionInputMessage,
+  AudioControlMessage,
+  ControlInputMessage,
+  ServerMessage,
+} from '../../types';
 import type { ConversationRepository } from '../大模型交互/repository';
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
+type 动作输入参数 = ActionInputMessage['data']['parameters'];
+type 控制输入数据 = ControlInputMessage['data'];
+type 音频控制数据 = AudioControlMessage['data'];
 
 export interface WebSocket手动命令网关依赖 {
   发送到机器人(robotId: string, message: ServerMessage, channel: Channel): boolean;
@@ -21,7 +29,7 @@ export class WebSocket手动命令网关 {
   async handleActionInput(
     robotId: string,
     action: string,
-    parameters?: Record<string, any>,
+    parameters?: 动作输入参数,
   ): Promise<void> {
     try {
       const traceId = uuidv7();
@@ -68,16 +76,16 @@ export class WebSocket手动命令网关 {
       }, 'business');
 
       logger.info('动作指令已发送，不生成TTS', { robotId, action });
-    } catch (error: any) {
-      logger.error('处理动作输入失败', error, { robotId, action });
-      this.依赖.发送错误(robotId, 'ACTION_ERROR', error.message || '动作处理失败', 'business');
+    } catch (error) {
+      logger.error('处理动作输入失败', this.转成错误对象(error), { robotId, action });
+      this.依赖.发送错误(robotId, 'ACTION_ERROR', this.提取错误消息(error, '动作处理失败'), 'business');
     }
   }
 
-  async handleControlInput(robotId: string, data: any): Promise<void> {
+  async handleControlInput(robotId: string, data: 控制输入数据): Promise<void> {
     try {
       const command = data?.command;
-      if (!command || typeof command !== 'string') {
+      if (!command) {
         this.依赖.发送错误(robotId, 'INVALID_CONTROL', '控制指令无效', 'business');
         return;
       }
@@ -107,13 +115,13 @@ export class WebSocket手动命令网关 {
       if (!sent) {
         this.依赖.发送错误(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
       }
-    } catch (error: any) {
-      logger.error('处理控制输入失败', error, { robotId });
-      this.依赖.发送错误(robotId, 'CONTROL_ERROR', error.message || '控制处理失败', 'business');
+    } catch (error) {
+      logger.error('处理控制输入失败', this.转成错误对象(error), { robotId });
+      this.依赖.发送错误(robotId, 'CONTROL_ERROR', this.提取错误消息(error, '控制处理失败'), 'business');
     }
   }
 
-  async handleAudioControl(robotId: string, data: any): Promise<void> {
+  async handleAudioControl(robotId: string, data: 音频控制数据): Promise<void> {
     try {
       const enabled = Boolean(data?.enabled);
       const sent = this.依赖.发送到机器人(robotId, {
@@ -126,9 +134,17 @@ export class WebSocket手动命令网关 {
       if (!sent) {
         this.依赖.发送错误(robotId, 'ROBOT_OFFLINE', '机器人未连接', 'business');
       }
-    } catch (error: any) {
-      logger.error('处理音频控制失败', error, { robotId });
-      this.依赖.发送错误(robotId, 'AUDIO_CONTROL_ERROR', error.message || '音频控制失败', 'business');
+    } catch (error) {
+      logger.error('处理音频控制失败', this.转成错误对象(error), { robotId });
+      this.依赖.发送错误(robotId, 'AUDIO_CONTROL_ERROR', this.提取错误消息(error, '音频控制失败'), 'business');
     }
+  }
+
+  private 转成错误对象(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  private 提取错误消息(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
   }
 }

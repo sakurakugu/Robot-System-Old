@@ -1,7 +1,8 @@
-import type { Server } from 'http';
+import type { IncomingMessage, Server } from 'http';
 import type { Duplex } from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import { logger } from '../../core/logger';
+import type { WebSocket升级请求 } from './ui-auth';
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
 
@@ -13,12 +14,12 @@ export type WebSocket默认通道路径配置 = {
 
 type UI鉴权接口 = {
   需要校验连接(pathname: string): boolean;
-  已认证(request: any): Promise<boolean>;
+  已认证(request: WebSocket升级请求): Promise<boolean>;
 };
 
 export interface WebSocket服务端宿主依赖 {
   UI鉴权器: UI鉴权接口;
-  处理连接(ws: WebSocket, req: any, channel: Channel): void;
+  处理连接(ws: WebSocket, req: IncomingMessage, channel: Channel): void;
 }
 
 /**
@@ -82,9 +83,9 @@ export class WebSocket服务端宿主 {
     logger.info('WebSocket服务已关闭');
   }
 
-  private async 处理Upgrade请求(request: any, socket: Duplex, head: Buffer): Promise<void> {
+  private async 处理Upgrade请求(request: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
     try {
-      const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
+      const pathname = new URL(request.url || '', `http://${this.获取请求主机(request)}`).pathname;
       const targetChannel = this.pathToChannelMap.get(pathname);
 
       if (!targetChannel) {
@@ -117,5 +118,13 @@ export class WebSocket服务端宿主 {
       }
       socket.destroy();
     }
+  }
+
+  private 获取请求主机(request: IncomingMessage): string {
+    const host = request.headers.host;
+    if (Array.isArray(host)) {
+      return host[0] || 'localhost';
+    }
+    return host || 'localhost';
   }
 }

@@ -1,6 +1,9 @@
 import type { RobotConnection } from '../../types';
 import { uuidv7 } from '../../core/utils/helpers';
-import { WebSocket请求响应跟踪器 } from './request-response-tracker';
+import {
+  WebSocket请求响应跟踪器,
+  type 可监听消息连接,
+} from './request-response-tracker';
 
 type 机器人命令请求消息 = {
   type: string;
@@ -129,7 +132,7 @@ export class 机器人命令网关 implements 机器人命令服务接口 {
       throw new Error(选项.发送失败消息);
     }
 
-    return this.请求响应跟踪器.等待响应<T响应>(connection.websocket, {
+    return this.请求响应跟踪器.等待响应<T响应>(this.获取可监听连接(connection), {
       超时毫秒: 选项.超时毫秒,
       超时消息: 选项.超时消息,
       连接关闭消息: '机器人连接已关闭',
@@ -150,6 +153,18 @@ export class 机器人命令网关 implements 机器人命令服务接口 {
         return data as T响应;
       },
     });
+  }
+
+  private 获取可监听连接(connection: RobotConnection): 可监听消息连接 {
+    const { websocket } = connection;
+    if (!websocket.on || !websocket.off) {
+      throw new Error('机器人连接不支持响应监听');
+    }
+
+    return {
+      on: websocket.on.bind(websocket),
+      off: websocket.off.bind(websocket),
+    };
   }
 
   请求机器人拍照(robotId: string): Promise<机器人拍照结果> {

@@ -1,19 +1,36 @@
 import OpusScript from 'opusscript';
 import 配置 from '../../config';
 import { logger } from '../../core/logger';
+import type { AudioChunk, AudioEnd, AudioStart } from '../../types';
 import { AliyunStreamingASR } from '../大模型交互/aliyun-streaming-asr';
 import type 语音识别服务 from '../大模型交互/asr-service';
+import type { ASROptions } from '../大模型交互/types';
 import type { RoleRecord } from '../角色管理/types';
 import type { RobotRecord } from '../机器人管理/types';
 
 type 音频格式 = 'opus' | 'pcm';
-
-type 音频识别选项 = {
+type 音频开始数据 = Partial<AudioStart>;
+type 音频块数据 = Partial<AudioChunk>;
+type 音频结束数据 = Partial<AudioEnd>;
+type 音频识别选项 = Omit<ASROptions, 'provider'> & {
   provider?: string;
-  model?: string;
-  language?: string;
-  prompt?: string;
-} & Record<string, unknown>;
+};
+type 可转Uint8数组值 =
+  | Uint8Array
+  | ArrayBuffer
+  | ArrayBufferView
+  | ArrayLike<number>;
+type Opus解码器实例 = {
+  decode(chunk: Buffer, frameSize: number): 可转Uint8数组值 | null | undefined;
+  delete(): void;
+};
+type OpusScript构造器 = {
+  new(sampleRate: number, channels: number, application: number): Opus解码器实例;
+  Application: {
+    VOIP: number;
+  };
+};
+const OpusScript实现 = OpusScript as unknown as OpusScript构造器;
 
 type 音频转写元数据 = {
   asrTime: number;
@@ -32,7 +49,7 @@ type AudioSession = {
   startedAt: number;
   lastChunkAt: number;
   streamingASR?: AliyunStreamingASR;
-  opusDecoder?: any;
+  opusDecoder?: Opus解码器实例;
   asrOptions?: 音频识别选项;
   pcmBuffer?: Buffer[];
   pcmBufferSize?: number;
@@ -62,7 +79,7 @@ export class 音频会话管理器 {
     return this.audioSessions.get(sessionId);
   }
 
-  async handleAudioStart(robotId: string, audioData: any): Promise<void> {
+  async handleAudioStart(robotId: string, audioData: 音频开始数据): Promise<void> {
     const sessionId = String(audioData?.sessionId || '');
     if (!sessionId) {
       logger.warn('音频开始缺少sessionId', { robotId });
@@ -104,7 +121,7 @@ export class 音频会话管理器 {
     });
   }
 
-  async handleAudioChunk(robotId: string, audioData: any): Promise<void> {
+  async handleAudioChunk(robotId: string, audioData: 音频块数据): Promise<void> {
     const sessionId = String(audioData?.sessionId || '');
     const buffer = audioData?.buffer;
     if (!buffer) {
@@ -173,7 +190,7 @@ export class 音频会话管理器 {
     }
   }
 
-  async handleAudioEnd(robotId: string, audioData: any): Promise<void> {
+  async handleAudioEnd(robotId: string, audioData: 音频结束数据): Promise<void> {
     const sessionId = String(audioData?.sessionId || '');
     if (!sessionId) {
       logger.warn('音频结束缺少sessionId', { robotId });
@@ -247,7 +264,10 @@ export class 音频会话管理器 {
           )
           : this.decodeOpusChunksToWav(session);
 
-        text = (await this.依赖.asrService.转录Wav(wavBuffer, (session.asrOptions || {}) as any)) || '';
+        text = (await this.依赖.asrService.转录Wav(
+          wavBuffer,
+          this.转换ASR服务选项(session.asrOptions),
+        )) || '';
       }
 
       const asrTime = Date.now() - asrStart;
@@ -261,8 +281,8 @@ export class 音频会话管理器 {
         durationMs,
         sessionId,
       });
-    } catch (error: any) {
-      const message = error?.message || '语音识别失败';
+    } catch (error) {
+      const message = this.提取错误消息(error, '语音识别失败');
       if (String(message).includes('Opus解码失败')) {
         logger.warn('Opus解码失败', {
           robotId,
@@ -275,7 +295,7 @@ export class 音频会话管理器 {
         return;
       }
 
-      logger.error('音频处理失败', error, { robotId, sessionId });
+      logger.error('音频处理失败', this.转成错误对象(error), { robotId, sessionId });
       this.依赖.发送错误(robotId, 'ASR_ERROR', message);
     } finally {
       this.释放会话资源(session);
@@ -344,10 +364,10 @@ export class 音频会话管理器 {
       const sampleRate = this.规范采样率(session.sampleRate);
       const channels = this.规范声道数(session.channels);
       try {
-        session.opusDecoder = new (OpusScript as any)(
+        session.opusDecoder = new OpusScript实现(
           sampleRate,
           channels,
-          (OpusScript as any).Application.VOIP,
+          OpusScript实现.Application.VOIP,
         );
         logger.debug('Opus 解码器初始化成功', {
           robotId: session.robotId,
@@ -385,8 +405,13 @@ export class 音频会话管理器 {
     const frameDurationMs = this.规范帧时长(session.frameDurationMs);
     const frameSize = Math.floor((sampleRate * frameDurationMs) / 1000);
     const pcmData = session.opusDecoder.decode(chunk, frameSize);
-    if (pcmData && pcmData.length > 0) {
-      const pcmBuffer = Buffer.from(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
+    if (pcmData) {
+      const 解码后数据 = this.转成Uint8数组(pcmData);
+      if (解码后数据.byteLength === 0) {
+        return;
+      }
+
+      const pcmBuffer = Buffer.from(解码后数据.buffer, 解码后数据.byteOffset, 解码后数据.byteLength);
       session.pcmBuffer = session.pcmBuffer || [];
       session.pcmBuffer.push(pcmBuffer);
       session.pcmBufferSize = (session.pcmBufferSize || 0) + pcmBuffer.length;
@@ -416,12 +441,12 @@ export class 音频会话管理器 {
     const frameDurationMs = this.规范帧时长(session.frameDurationMs);
     const frameSize = Math.floor((sampleRate * frameDurationMs) / 1000);
 
-    let decoder: any;
+    let decoder: Opus解码器实例 | undefined;
     try {
-      decoder = new (OpusScript as any)(
+      decoder = new OpusScript实现(
         sampleRate,
         channels,
-        (OpusScript as any).Application.VOIP,
+        OpusScript实现.Application.VOIP,
       );
     } catch (error) {
       logger.error('Opus解码器初始化失败', error instanceof Error ? error : new Error(String(error)), {
@@ -454,13 +479,18 @@ export class 音频会话管理器 {
           });
 
           const decoded = decoder.decode(chunk, frameSize);
-          if (decoded && decoded.length > 0) {
-            pcmBuffers.push(this.转成Uint8数组(decoded));
+          if (decoded) {
+            const 解码后数据 = this.转成Uint8数组(decoded);
+            if (解码后数据.byteLength === 0) {
+              continue;
+            }
+
+            pcmBuffers.push(解码后数据);
             successCount++;
             logger.debug('音频块解码成功', {
               sessionId: session.sessionId,
               index: i,
-              decodedLength: decoded.length,
+              decodedLength: 解码后数据.byteLength,
             });
           }
         } catch (error) {
@@ -577,20 +607,36 @@ export class 音频会话管理器 {
     return allowed.has(frameDurationMs) ? frameDurationMs : 20;
   }
 
-  private 转成Uint8数组(value: any): Uint8Array {
+  private 转换ASR服务选项(options?: 音频识别选项): ASROptions {
+    if (!options) {
+      return {};
+    }
+
+    return options as unknown as ASROptions;
+  }
+
+  private 转成Uint8数组(value: 可转Uint8数组值): Uint8Array {
     if (value instanceof Uint8Array) {
       return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     }
 
-    if (value?.buffer) {
+    if (ArrayBuffer.isView(value)) {
       return new Uint8Array(
         value.buffer,
-        Number(value.byteOffset || 0),
-        Number(value.byteLength || value.buffer.byteLength),
+        value.byteOffset,
+        value.byteLength,
       );
     }
 
+    if (value instanceof ArrayBuffer) {
+      return new Uint8Array(value);
+    }
+
     return new Uint8Array(value);
+  }
+
+  private 转成错误对象(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
   }
 
   private 提取错误消息(error: unknown, fallback: string): string {

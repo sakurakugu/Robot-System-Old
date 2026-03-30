@@ -1,8 +1,15 @@
 import { logger } from '../../core/logger';
-import type { RobotConnection, ServerMessage } from '../../types';
+import type {
+  RobotConnection,
+  RobotRegisterMessage,
+  ServerMessage,
+  StatusMessage,
+} from '../../types';
 import type { RobotRecord } from '../机器人管理/types';
 
 type Channel = 'control' | 'business' | 'audio_upload' | 'audio_download';
+type 机器人状态消息 = Pick<StatusMessage, 'robotId' | 'data'> & Partial<Pick<StatusMessage, 'timestamp'>>;
+type 机器人注册数据 = RobotRegisterMessage['data'];
 
 export interface WebSocket机器人运行网关依赖 {
   获取机器人记录(robotId: string): Promise<RobotRecord | undefined>;
@@ -56,19 +63,17 @@ export class WebSocket机器人运行网关 {
     logger.debug('收到心跳', { robotId });
   }
 
-  handleStatus(robotId: string, msg: any): void {
+  handleStatus(robotId: string, msg: 机器人状态消息): void {
     const payload = {
-      robotId: msg?.robotId ?? robotId,
-      seq: msg?.seq,
-      timestamp: msg?.timestamp,
-      data: msg?.data ?? msg,
+      robotId: msg.robotId || robotId,
+      timestamp: msg.timestamp,
+      data: msg.data || {},
     };
     logger.debug('收到状态更新', { robotId, payload });
 
     try {
-      const levelRaw = (payload.data && (payload.data.battery ?? payload.data.level)) as any;
-      const levelNum = typeof levelRaw === 'number' ? levelRaw : parseFloat(levelRaw);
-      if (!Number.isNaN(levelNum)) {
+      const levelNum = this.解析电量(payload.data.battery ?? payload.data.level);
+      if (levelNum !== undefined) {
         this.依赖.发送到UI(payload.robotId || robotId, {
           type: 'battery_status',
           robotId: payload.robotId || robotId,
@@ -78,8 +83,8 @@ export class WebSocket机器人运行网关 {
           },
         }, 'control');
       }
-    } catch (error: any) {
-      logger.error('广播电量状态失败', error, { robotId });
+    } catch (error) {
+      logger.error('广播电量状态失败', this.转成错误对象(error), { robotId });
     }
 
     try {
@@ -89,12 +94,12 @@ export class WebSocket机器人运行网关 {
         timestamp: Date.now(),
         data: payload.data || {},
       }, 'control');
-    } catch (error: any) {
-      logger.error('广播状态更新失败', error, { robotId });
+    } catch (error) {
+      logger.error('广播状态更新失败', this.转成错误对象(error), { robotId });
     }
   }
 
-  async handleRobotRegister(robotId: string, data: any): Promise<void> {
+  async handleRobotRegister(robotId: string, data: 机器人注册数据): Promise<void> {
     logger.info('收到机器人注册', { robotId, data });
 
     try {
@@ -147,9 +152,30 @@ export class WebSocket机器人运行网关 {
           text: `客户端注册成功！欢迎 ${name || '机器狗'}`,
         },
       }, 'business');
-    } catch (error: any) {
-      logger.error('处理客户端注册失败', error, { robotId });
-      this.依赖.发送错误(robotId, 'REGISTER_ERROR', error.message, 'business');
+    } catch (error) {
+      logger.error('处理客户端注册失败', this.转成错误对象(error), { robotId });
+      this.依赖.发送错误(robotId, 'REGISTER_ERROR', this.提取错误消息(error, '机器人注册失败'), 'business');
     }
+  }
+
+  private 解析电量(value: unknown): number | undefined {
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    }
+
+    return undefined;
+  }
+
+  private 转成错误对象(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  private 提取错误消息(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
   }
 }

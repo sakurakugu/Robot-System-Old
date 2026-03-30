@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'http';
 import type { WebSocket } from 'ws';
 import { logger } from '../../core/logger';
 import { isValidRobotId, uuidv7 } from '../../core/utils/helpers';
@@ -29,7 +30,7 @@ export interface WebSocket连接生命周期管理器依赖 {
 export class WebSocket连接生命周期管理器 {
   constructor(private readonly 依赖: WebSocket连接生命周期管理器依赖) {}
 
-  handleConnection(ws: WebSocket, req: any, channel: Channel): void {
+  handleConnection(ws: WebSocket, req: IncomingMessage, channel: Channel): void {
     const 上下文 = this.解析连接上下文(req);
     let { robotId, role } = 上下文;
 
@@ -142,7 +143,7 @@ export class WebSocket连接生命周期管理器 {
     }
   }
 
-  private 解析连接上下文(req: any): {
+  private 解析连接上下文(req: IncomingMessage): {
     robotId: string | null;
     role: string;
     phoneId?: string;
@@ -150,7 +151,7 @@ export class WebSocket连接生命周期管理器 {
     phoneDeviceId?: string;
     isPhoneSession: boolean;
   } {
-    const url = new URL(req.url!, `http://${req.headers.host}`);
+    const url = new URL(req.url || '', `http://${this.获取请求主机(req)}`);
     let robotId = url.searchParams.get('robotId');
     let role = (url.searchParams.get('role') || '').toLowerCase();
 
@@ -174,5 +175,13 @@ export class WebSocket连接生命周期管理器 {
       phoneDeviceId,
       isPhoneSession,
     };
+  }
+
+  private 获取请求主机(req: IncomingMessage): string {
+    const host = req.headers.host;
+    if (Array.isArray(host)) {
+      return host[0] || 'localhost';
+    }
+    return host || 'localhost';
   }
 }

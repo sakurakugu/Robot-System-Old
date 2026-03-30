@@ -1,15 +1,10 @@
+import type { IncomingMessage } from 'http';
 import 配置 from '../../config';
 import type { AccountService } from '../account/service';
 
 type 可鉴权账号服务 = Pick<AccountService, 'buildUserContext'>;
 
-export interface WebSocket升级请求 {
-  url?: string;
-  headers: {
-    host?: string;
-    authorization?: string;
-  };
-}
+export type WebSocket升级请求 = Pick<IncomingMessage, 'url' | 'headers'>;
 
 /**
  * WebSocket UI 连接鉴权器
@@ -45,4 +40,3 @@ export class WebSocketUI鉴权器 {
     return (await 账号服务.buildUserContext(token)).mode === 'authenticated';
   }
 }
-

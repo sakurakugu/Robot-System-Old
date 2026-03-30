@@ -167,8 +167,8 @@ export class WebSocket连接注册表 {
     try {
       connection.websocket.send(JSON.stringify(message));
       return true;
-    } catch (error: any) {
-      logger.error('发送到机器人失败', error, { robotId });
+    } catch (error) {
+      logger.error('发送到机器人失败', this.转成错误对象(error), { robotId });
       return false;
     }
   }
@@ -187,8 +187,8 @@ export class WebSocket连接注册表 {
     for (const uiWs of byChannel.values()) {
       try {
         uiWs.send(JSON.stringify(message));
-      } catch (error: any) {
-        logger.error('发送消息到UI失败', error, { robotId });
+      } catch (error) {
+        logger.error('发送消息到UI失败', this.转成错误对象(error), { robotId });
       }
     }
   }
@@ -214,8 +214,8 @@ export class WebSocket连接注册表 {
       try {
         uiWs.send(JSON.stringify(message));
         sent = true;
-      } catch (error: any) {
-        logger.error('定向发送消息到UI失败', error, { robotId, phoneSessionId });
+      } catch (error) {
+        logger.error('定向发送消息到UI失败', this.转成错误对象(error), { robotId, phoneSessionId });
       }
     }
 
@@ -232,8 +232,8 @@ export class WebSocket连接注册表 {
       for (const uiWs of uiSet) {
         try {
           uiWs.send(JSON.stringify(message));
-        } catch (error: any) {
-          logger.error('广播消息到UI失败', error, { robotId });
+        } catch (error) {
+          logger.error('广播消息到UI失败', this.转成错误对象(error), { robotId });
         }
       }
     }
@@ -285,5 +285,8 @@ export class WebSocket连接注册表 {
       this.phoneSessionIndex.delete(meta.robotId);
     }
   }
-}
 
+  private 转成错误对象(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+}

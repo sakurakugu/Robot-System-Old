@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import type { IncomingMessage } from 'http';
 import { WebSocket连接注册表 } from './connection-registry';
 import { WebSocket连接生命周期管理器 } from './connection-lifecycle-manager';
 
@@ -31,7 +32,7 @@ function 创建请求(url: string) {
     socket: {
       remoteAddress: '127.0.0.1',
     },
-  };
+  } as unknown as IncomingMessage;
 }
 
 function 等待异步任务(): Promise<void> {

@@ -282,6 +282,11 @@ import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import ChatView from '@/modules/conversation/views/ChatView.vue'
 import ActionButton from '@/modules/robot/components/ActionButton.vue'
+import { useRobotOperationJoystick } from '@/modules/robot/composables/useRobotOperationJoystick'
+import {
+  defaultRobotOperationControlLayout,
+  useRobotOperationLayout,
+} from '@/modules/robot/composables/useRobotOperationLayout'
 import {
   Back,
   Camera,
@@ -298,7 +303,6 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { capturePhoto } from '../api'
 import { useRobotStore } from '../store'
-import { getUIConfig, updateUIConfig } from '../../settings/api'
 
 const props = defineProps<{ embedded?: boolean; robotUuid?: string }>()
 const router = useRouter()
@@ -316,20 +320,15 @@ const {
 } = useWebSocket()
 
 // UI State
-const controlMode = ref('move')
 const selectedUuid = ref('')
-const speed = ref(5)
 const showVideo = ref(true)
 const robotBattery = ref<number | undefined>(undefined) // Mock value
 const phoneBattery = ref<number | null>(null) // Mock value, null to hide
 const currentTime = ref('')
 const hasUpdate = ref(true)
 const showChatPanel = ref(false)
-const layoutEditMode = ref(false)
 const floatingLayerRef = ref<HTMLDivElement | null>(null)
 const micEnabled = ref(true)
-const twoLegStandActive = ref(false)
-const rightJoystickDisabled = ref(false)
 const isCapturing = ref(false)
 const sdkMode = ref(true) // SDK模式开关，默认开启
 const sdkModeLoading = ref(false) // SDK模式切换加载状态
@@ -338,28 +337,32 @@ const sdkModePrevValue = ref(true)
 /** 超时保护计时器，避免开关永久卡住 */
 let sdkModeSwitchTimeout: ReturnType<typeof setTimeout> | null = null
 
-watch(twoLegStandActive, (val) => {
-  rightJoystickDisabled.value = val
+const {
+  layoutEditMode,
+  getControlStyle,
+  startDrag,
+  startLayoutEdit,
+  cancelLayoutEdit,
+  saveLayout,
+  loadLayout,
+  setLayoutEditMode,
+} = useRobotOperationLayout(defaultRobotOperationControlLayout, floatingLayerRef)
+
+const {
+  controlMode,
+  speed,
+  twoLegStandActive,
+  rightJoystickDisabled,
+  onMoveJoystick,
+  onLookJoystick,
+  onMoveJoystickEnd,
+  onLookJoystickEnd,
+} = useRobotOperationJoystick({
+  isConnected,
+  robotId,
+  layoutEditMode,
+  sendMessage: wsSendMessage,
 })
-
-type ControlLayout = Record<string, { x: number; y: number }>
-
-const defaultControlLayout: ControlLayout = {
-  chatToggle: { x: 92, y: 12 },
-  voiceRecord: { x: 92, y: 24 },
-  leftJoystick: { x: 15, y: 80 },
-  rightJoystick: { x: 85, y: 80 },
-  action_stand_up: { x: 34, y: 78 },
-  action_sit_down: { x: 44, y: 78 },
-  action_front_jump: { x: 54, y: 78 },
-  action_jump: { x: 64, y: 78 },
-  action_back_flip: { x: 36, y: 88 },
-  action_two_leg_stand: { x: 50, y: 88 },
-  action_shake_hand: { x: 64, y: 88 },
-}
-
-const controlLayout = ref<ControlLayout>({ ...defaultControlLayout })
-const originalLayoutSnapshot = ref<ControlLayout>({ ...defaultControlLayout })
 
 const actionButtons = [
   { id: 'action_stand_up', action: 'stand_up', label: '起立', title: '起立' },
@@ -535,145 +538,12 @@ const handleSdkModeChange = (value: boolean) => {
   }, 30000)
 }
 
-type JoystickPayload = { x: number; y: number }
-type EffectiveControlMode = 'move' | 'pose' | 'two_leg'
-
-const joystickAxes = ref<[number, number, number, number]>([0, 0, 0, 0])
-
-const getEffectiveMode = (modeOverride?: 'move' | 'pose'): EffectiveControlMode => {
-  if (twoLegStandActive.value) return 'two_leg'
-  const currentMode: 'move' | 'pose' = controlMode.value === 'pose' ? 'pose' : 'move'
-  return modeOverride || currentMode
-}
-
-const sendMergedJoystick = (effectiveMode: EffectiveControlMode) => {
-  if (layoutEditMode.value) return
-  if (!isConnected.value) return
-  wsSendMessage({
-    type: 'control_input',
-    robotId: robotId.value,
-    timestamp: Date.now(),
-    data: {
-      command: 'joystick',
-      mode: effectiveMode,
-      speed: speed.value,
-      joystick: joystickAxes.value,
-    },
-  })
-}
-
-const onMoveJoystick = (payload: JoystickPayload) => {
-  if (controlMode.value === 'pose' && !twoLegStandActive.value) return
-  const effectiveMode = getEffectiveMode()
-  joystickAxes.value[0] = payload.x
-  joystickAxes.value[1] = payload.y
-  if (effectiveMode === 'two_leg') {
-    joystickAxes.value[2] = 0
-    joystickAxes.value[3] = 0
-  }
-  sendMergedJoystick(effectiveMode)
-}
-
-const onLookJoystick = (payload: JoystickPayload) => {
-  if (rightJoystickDisabled.value) return
-  const effectiveMode = getEffectiveMode(controlMode.value === 'pose' ? 'pose' : 'move')
-  if (effectiveMode === 'pose') {
-    // 姿态模式：垂直轴→俯仰(Axis2)，水平轴→横滚(Axis3)
-    joystickAxes.value[2] = payload.x
-    joystickAxes.value[3] = payload.y
-  } else {
-    // 移动模式：水平轴(y)→偏航(Axis2)，垂直轴不使用
-    joystickAxes.value[2] = payload.y
-    joystickAxes.value[3] = 0
-  }
-  sendMergedJoystick(effectiveMode)
-}
-
-const onMoveJoystickEnd = () => {
-  if (controlMode.value === 'pose' && !twoLegStandActive.value) return
-  const effectiveMode = getEffectiveMode()
-  if (effectiveMode === 'two_leg') {
-    joystickAxes.value = [0, 0, 0, 0]
-  } else {
-    joystickAxes.value[0] = 0
-    joystickAxes.value[1] = 0
-  }
-  sendMergedJoystick(effectiveMode)
-}
-
-const onLookJoystickEnd = () => {
-  if (rightJoystickDisabled.value) return
-  const effectiveMode = getEffectiveMode(controlMode.value === 'pose' ? 'pose' : 'move')
-  joystickAxes.value[2] = 0
-  joystickAxes.value[3] = 0
-  sendMergedJoystick(effectiveMode)
-}
-
 const openSettings = () => {
   if (!selectedUuid.value) {
     ElMessage.warning('请先选择机器人')
     return
   }
   router.push({ path: '/operation/edit', query: { robotUuid: selectedUuid.value, tab: 'basic' } })
-}
-
-const clampPercent = (value: number) => Math.min(100, Math.max(0, value))
-
-const getControlStyle = (id: string) => {
-  const pos = controlLayout.value[id] || defaultControlLayout[id]
-  const x = pos?.x ?? 50
-  const y = pos?.y ?? 50
-  return {
-    left: `${x}%`,
-    top: `${y}%`,
-  }
-}
-
-const startDrag = (id: string, event: PointerEvent) => {
-  if (!layoutEditMode.value) return
-  const layer = floatingLayerRef.value
-  if (!layer) return
-  event.preventDefault()
-  const rect = layer.getBoundingClientRect()
-
-  const updatePosition = (ev: PointerEvent) => {
-    const x = clampPercent(((ev.clientX - rect.left) / rect.width) * 100)
-    const y = clampPercent(((ev.clientY - rect.top) / rect.height) * 100)
-    controlLayout.value = {
-      ...controlLayout.value,
-      [id]: { x, y },
-    }
-  }
-
-  const onMove = (ev: PointerEvent) => updatePosition(ev)
-  const onUp = () => {
-    window.removeEventListener('pointermove', onMove)
-    window.removeEventListener('pointerup', onUp)
-  }
-
-  updatePosition(event)
-  window.addEventListener('pointermove', onMove)
-  window.addEventListener('pointerup', onUp)
-}
-
-const startLayoutEdit = () => {
-  layoutEditMode.value = true
-  originalLayoutSnapshot.value = JSON.parse(JSON.stringify(controlLayout.value))
-}
-
-const cancelLayoutEdit = () => {
-  controlLayout.value = JSON.parse(JSON.stringify(originalLayoutSnapshot.value))
-  layoutEditMode.value = false
-}
-
-const saveLayout = async () => {
-  try {
-    await updateUIConfig({ controlLayout: controlLayout.value })
-    ElMessage.success('布局已保存')
-    layoutEditMode.value = false
-  } catch {
-    ElMessage.error('布局保存失败')
-  }
 }
 
 
@@ -688,28 +558,6 @@ const fetchRobots = async () => {
     }
   } catch (error) {
     console.error('加载机器人列表失败:', error)
-  }
-}
-
-const fetchControlLayout = async () => {
-  try {
-    const response = await getUIConfig()
-    const layout = response.data?.controlLayout
-    if (layout && typeof layout === 'object') {
-      const next: ControlLayout = { ...defaultControlLayout }
-      for (const key of Object.keys(layout)) {
-        const item = layout[key]
-        const x = Number(item?.x)
-        const y = Number(item?.y)
-        if (!Number.isNaN(x) && !Number.isNaN(y)) {
-          next[key] = { x: clampPercent(x), y: clampPercent(y) }
-        }
-      }
-      controlLayout.value = next
-      originalLayoutSnapshot.value = JSON.parse(JSON.stringify(next))
-    }
-  } catch (e) {
-    console.error('加载布局失败', e)
   }
 }
 
@@ -749,13 +597,6 @@ const removeMessageHandler = onMessage((data) => {
       ElMessage.error(msg)
     }
   }
-})
-
-// Watchers
-watch(controlMode, (val) => {
-  joystickAxes.value = [0, 0, 0, 0]
-  const nextMode: EffectiveControlMode = val === 'pose' ? 'pose' : 'move'
-  sendMergedJoystick(nextMode)
 })
 
 watch(selectedUuid, async (val) => {
@@ -804,7 +645,7 @@ onMounted(() => {
   }
 
   fetchRobots()
-  fetchControlLayout()
+  loadLayout()
 })
 
 onUnmounted(() => {
@@ -812,14 +653,6 @@ onUnmounted(() => {
   removeMessageHandler()
   wsDisconnect()
 })
-
-const setLayoutEditMode = (val: boolean) => {
-  if (val) {
-    startLayoutEdit()
-  } else {
-    cancelLayoutEdit()
-  }
-}
 
 defineExpose({
   startLayoutEdit,

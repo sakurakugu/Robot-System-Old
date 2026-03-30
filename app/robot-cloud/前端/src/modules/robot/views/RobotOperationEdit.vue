@@ -240,7 +240,7 @@ const saveLayout = async () => {
     await operationRef.value?.saveLayout?.()
     layoutEditMode.value = false
   } catch {
-    ElMessage.error('布局保存失败')
+    // 保存失败提示由内层操作页统一处理
   }
 }
 

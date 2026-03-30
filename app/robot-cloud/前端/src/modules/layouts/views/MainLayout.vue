@@ -9,9 +9,6 @@
           <Bot />
         </el-icon>
         <h1>机器狗管理应用</h1>
-      </div>
-      <div class="header-actions">
-        <!-- 首页按钮 -->
         <el-button
           text
           class="home-btn"
@@ -20,9 +17,8 @@
           <el-icon><HomeFilled /></el-icon>
           <span>首页</span>
         </el-button>
-        
-        <el-divider direction="vertical" />
-        
+      </div>
+      <div class="header-actions">
         <!-- 用户头像下拉菜单 -->
         <el-dropdown
           trigger="click"
@@ -79,12 +75,6 @@
           :collapse-transition="false"
           router
         >
-          <el-menu-item index="/home">
-            <el-icon><HomeFilled /></el-icon>
-            <template #title>
-              首页
-            </template>
-          </el-menu-item>
           <el-menu-item index="/robots">
             <el-icon><List /></el-icon>
             <template #title>
@@ -309,7 +299,6 @@ const handleCommand = async (command: string) => {
   gap: 12px;
 }
 
-/* 首页按钮样式 */
 .home-btn {
   color: rgba(255, 255, 255, 0.9) !important;
   display: flex;
@@ -420,10 +409,5 @@ const handleCommand = async (command: string) => {
   background: var(--el-bg-color-page);
   padding: 0;
   overflow: auto;
-}
-
-/* 分隔线样式 */
-.header-actions :deep(.el-divider--vertical) {
-  border-color: rgba(255, 255, 255, 0.3);
 }
 </style>

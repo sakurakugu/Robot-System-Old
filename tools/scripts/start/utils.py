@@ -22,7 +22,7 @@ PID_DIR: Path = ROOT / ".cache" /"pid"
 
 def 确保目录存在() -> None:
     """确保日志目录和 PID 目录存在"""
-    (LOGS_DIR / "robot-cloud").mkdir(parents=True, exist_ok=True)
+    (LOGS_DIR / "cloud-server").mkdir(parents=True, exist_ok=True)
     PID_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -151,10 +151,14 @@ def kill_pid_file(name: str) -> bool:
         return False
 
 
-def 确保node_modules存在(dir_path: Path) -> None:
+def 确保node_modules存在(dir_path: Path, legacy_peer_deps: bool = False) -> None:
     if not (dir_path / "node_modules").exists():
         print(f"安装依赖: {dir_path}")
-        run(["npm", "install"], cwd=dir_path)
+        if legacy_peer_deps:
+            # 手机端要使用 --legacy-peer-deps ，因为有个sb图标库卡版本（你一个图标库卡版本干什么）
+            run(["npm", "install", "--legacy-peer-deps"], cwd=dir_path)
+        else:
+            run(["npm", "install"], cwd=dir_path)
     else:
         print(f"依赖已存在: {dir_path}")
 
@@ -343,7 +347,7 @@ def is_managed_process(pid: int, cmdline: str) -> bool:
     if not cmdline:
         return False
     markers = [
-        str(ROOT / "app" / "robot-cloud"),
+        str(ROOT / "app" / "cloud-server"),
         "ts-node-dev",
         "vite",
     ]

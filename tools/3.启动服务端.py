@@ -48,7 +48,7 @@ def show_help() -> None:
     print("  --help, -h        显示帮助")
     print("")
     print("说明：")
-    print("  默认会先用 Docker 启动 app/robot-cloud/docker-compose.yml 里的 postgres")
+    print("  默认会先用 Docker 启动 app/cloud-server/docker-compose.yml 里的 postgres")
     print("  然后再启动本地热更新后端和前端")
     print("")
 

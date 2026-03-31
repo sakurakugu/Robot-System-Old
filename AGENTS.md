@@ -4,9 +4,9 @@
 
 | 目录                                 | 技术栈                                     | 说明               |
 | ------------------------------------ | ------------------------------------------ | ------------------ |
-| `app/robot-phone/RobotPhone`         | React Native 0.84 + TypeScript             | 手机端 App         |
-| `app/robot-cloud/前端/`              | Vue 3 + TypeScript + Vite                  | 云端管理前端       |
-| `app/robot-cloud/后端/`              | Node.js + TypeScript + Express + WebSocket | 云端后端服务       |
+| `app/phone-app/RobotPhone`           | React Native 0.84 + TypeScript             | 手机端 App         |
+| `app/cloud-server/前端/`             | Vue 3 + TypeScript + Vite                  | 云端管理前端       |
+| `app/cloud-server/后端/`             | Node.js + TypeScript + Express + WebSocket | 云端后端服务       |
 | `app/robot-agent/robot-agent/`       | Python 3.10+                               | 机器狗本体代理程序 |
 | `app/robot-agent/robot-server/`      | Python 3.10+ + FastAPI                     | 机器狗配置服务器   |
 | `app/robot-agent/sparkrobot-common/` | Python 3.10+                               | 公共库             |

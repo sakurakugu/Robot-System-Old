@@ -222,10 +222,10 @@ create_shortcuts() {
 
 #     # 添加到 .bashrc
 #     if [ -f ~/.bashrc ]; then
-#         if ! grep -q "robot-dog aliases" ~/.bashrc; then
+#         if ! grep -q "robot-system aliases" ~/.bashrc; then
 #             cat >> ~/.bashrc << EOF
 
-# # robot-dog aliases
+# # robot-system aliases
 # alias robot-start='cd "$PROJECT_ROOT" && ./start.sh'
 # alias robot-stop='cd "$PROJECT_ROOT" && ./start.sh --stop'
 # alias robot-log='cd "$PROJECT_ROOT" && tail -f logs/*.log'

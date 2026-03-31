@@ -24,9 +24,9 @@ from .utils import (
 )
 
 
-ROBOT_CLOUD_DIR = ROOT / "app" / "robot-cloud"
-ROBOT_CLOUD_BACKEND = ROOT / "app" / "robot-cloud" / "后端"
-ROBOT_CLOUD_FRONTEND = ROOT / "app" / "robot-cloud" / "前端"
+CLOUD_SERVER_DIR = ROOT / "app" / "cloud-server"
+CLOUD_SERVER_BACKEND = ROOT / "app" / "cloud-server" / "后端"
+CLOUD_SERVER_FRONTEND = ROOT / "app" / "cloud-server" / "前端"
 
 
 def _which(cmd: str) -> str | None:
@@ -34,10 +34,10 @@ def _which(cmd: str) -> str | None:
 
 
 def _compose_env_path() -> Path:
-    env_path = ROBOT_CLOUD_DIR / ".env"
+    env_path = CLOUD_SERVER_DIR / ".env"
     if env_path.exists():
       return env_path
-    return ROBOT_CLOUD_DIR / ".env.example"
+    return CLOUD_SERVER_DIR / ".env.example"
 
 
 def _compose_env_args() -> List[str]:
@@ -45,9 +45,9 @@ def _compose_env_args() -> List[str]:
     return ["--env-file", str(env_path)]
 
 
-def _ensure_robot_cloud_env() -> None:
-    env_path = ROBOT_CLOUD_DIR / ".env"
-    example = ROBOT_CLOUD_DIR / ".env.example"
+def _ensure_cloud_server_env() -> None:
+    env_path = CLOUD_SERVER_DIR / ".env"
+    example = CLOUD_SERVER_DIR / ".env.example"
     if not env_path.exists() and example.exists():
         shutil.copyfile(example, env_path)
         print(f"已创建云端 Docker 环境文件: {env_path}")
@@ -125,18 +125,18 @@ def _parse_env_value(env_path: Path, key: str, default_port: int) -> int:
     return default_port
 
 
-def _robot_cloud_backend_port() -> int:
-    env_path = ROBOT_CLOUD_BACKEND / ".env"
+def _cloud_server_backend_port() -> int:
+    env_path = CLOUD_SERVER_BACKEND / ".env"
     if env_path.exists():
         return _parse_env_port(env_path, 3001)
-    example = ROBOT_CLOUD_BACKEND / ".env.example"
+    example = CLOUD_SERVER_BACKEND / ".env.example"
     if example.exists():
         return _parse_env_port(example, 3001)
     return 3001
 
-def _robot_cloud_backend_ports() -> dict:
-    env_path = ROBOT_CLOUD_BACKEND / ".env"
-    example = ROBOT_CLOUD_BACKEND / ".env.example"
+def _cloud_server_backend_ports() -> dict:
+    env_path = CLOUD_SERVER_BACKEND / ".env"
+    example = CLOUD_SERVER_BACKEND / ".env.example"
     src = env_path if env_path.exists() else example
 
     defaults = {
@@ -149,7 +149,7 @@ def _robot_cloud_backend_ports() -> dict:
     }
 
 
-def _robot_cloud_docker_ports() -> dict:
+def _cloud_server_docker_ports() -> dict:
     src = _compose_env_path()
     defaults = {
         "postgres": 15432,
@@ -160,18 +160,18 @@ def _robot_cloud_docker_ports() -> dict:
         "postgres": _parse_env_value(src, "DB_EXPOSE_PORT", defaults["postgres"]),
     }
 
-def _robot_cloud_frontend_port() -> int:
-    vite_path = ROBOT_CLOUD_FRONTEND / "vite.config.ts"
+def _cloud_server_frontend_port() -> int:
+    vite_path = CLOUD_SERVER_FRONTEND / "vite.config.ts"
     return _parse_vite_port(vite_path, 5174)
 
 
-def start_robot_cloud() -> List[Tuple[str, int]]:
+def start_cloud_server() -> List[Tuple[str, int]]:
     确保目录存在()
-    _ensure_robot_cloud_env()
-    复制env_example_如果没有(ROBOT_CLOUD_BACKEND)
+    _ensure_cloud_server_env()
+    复制env_example_如果没有(CLOUD_SERVER_BACKEND)
 
-    ports = _robot_cloud_backend_ports()
-    ports.update(_robot_cloud_docker_ports())
+    ports = _cloud_server_backend_ports()
+    ports.update(_cloud_server_docker_ports())
     if not 确保端口可用(ports, interactive=True):
         return []
 
@@ -179,45 +179,45 @@ def start_robot_cloud() -> List[Tuple[str, int]]:
     _ensure_docker_running()
     subprocess.run(
         ["docker", "compose", *_compose_env_args(), "up", "-d", "postgres"],
-        cwd=str(ROBOT_CLOUD_DIR),
+        cwd=str(CLOUD_SERVER_DIR),
         check=True,
     )
 
-    确保node_modules存在(ROBOT_CLOUD_BACKEND)
-    确保node_modules存在(ROBOT_CLOUD_FRONTEND)
+    确保node_modules存在(CLOUD_SERVER_BACKEND)
+    确保node_modules存在(CLOUD_SERVER_FRONTEND)
 
     procs: List[Tuple[str, int]] = []
 
     print(f"启动机器狗管理系统后端...  (http://localhost:{ports['http']})")
-    backend_log = LOGS_DIR / "robot-cloud" / "backend.log"
-    p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=ROBOT_CLOUD_BACKEND, log_path=backend_log)
-    write_pid("robot-cloud-backend", pid_backend)
-    procs.append(("robot-cloud-backend", pid_backend))
+    backend_log = LOGS_DIR / "cloud-server" / "backend.log"
+    p_backend, pid_backend = spawn(["npm", "run", "dev"], cwd=CLOUD_SERVER_BACKEND, log_path=backend_log)
+    write_pid("cloud-server-backend", pid_backend)
+    procs.append(("cloud-server-backend", pid_backend))
 
-    print(f"启动机器狗管理系统前端...  (http://localhost:{_robot_cloud_frontend_port()})")
-    frontend_log = LOGS_DIR / "robot-cloud" / "frontend.log"
-    p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", str(_robot_cloud_frontend_port())], cwd=ROBOT_CLOUD_FRONTEND, log_path=frontend_log)
-    write_pid("robot-cloud-frontend", pid_frontend)
-    procs.append(("robot-cloud-frontend", pid_frontend))
+    print(f"启动机器狗管理系统前端...  (http://localhost:{_cloud_server_frontend_port()})")
+    frontend_log = LOGS_DIR / "cloud-server" / "frontend.log"
+    p_frontend, pid_frontend = spawn(["npm", "run", "dev", "--", "--port", str(_cloud_server_frontend_port())], cwd=CLOUD_SERVER_FRONTEND, log_path=frontend_log)
+    write_pid("cloud-server-frontend", pid_frontend)
+    procs.append(("cloud-server-frontend", pid_frontend))
 
     return procs
 
 
-def stop_robot_cloud() -> bool:
+def stop_cloud_server() -> bool:
     any_stopped = False
-    any_stopped |= kill_pid_file("robot-cloud-backend")
-    any_stopped |= kill_pid_file("robot-cloud-frontend")
+    any_stopped |= kill_pid_file("cloud-server-backend")
+    any_stopped |= kill_pid_file("cloud-server-frontend")
     if _which("docker") is not None and _docker_info_ok():
         subprocess.run(
             ["docker", "compose", *_compose_env_args(), "stop", "postgres"],
-            cwd=str(ROBOT_CLOUD_DIR),
+            cwd=str(CLOUD_SERVER_DIR),
             check=False,
         )
     return any_stopped
 
 
 def stop_all() -> None:
-    stopped_any = stop_robot_cloud()
+    stopped_any = stop_cloud_server()
 
     pkill_patterns(["vite", "ts-node-dev"])
     if stopped_any:
@@ -233,9 +233,9 @@ def start_all() -> List[Tuple[str, int]]:
     print("========================================")
 
     print("\n----------------------------------------")
-    print("  准备机器狗管理系统 (Robot Cloud)")
+    print("  准备机器狗管理系统 (Cloud Server)")
     print("----------------------------------------")
-    procs = start_robot_cloud()
+    procs = start_cloud_server()
     return procs
 
 
@@ -243,8 +243,8 @@ def status_all() -> None:
     print("========================================")
     print("  机器狗控制系统 - 状态")
     print("========================================")
-    print("Robot Cloud 本地进程:")
-    for name in ("robot-cloud-backend", "robot-cloud-frontend"):
+    print("Cloud Server 本地进程:")
+    for name in ("cloud-server-backend", "cloud-server-frontend"):
         pid = (ROOT / ".cache" / "pid" / f"{name}.pid")
         if pid.exists():
             print(f"  - {name}: pid 文件存在")
@@ -262,7 +262,7 @@ def status_all() -> None:
     print("PostgreSQL 容器:")
     subprocess.run(
         ["docker", "compose", *_compose_env_args(), "ps", "postgres"],
-        cwd=str(ROBOT_CLOUD_DIR),
+        cwd=str(CLOUD_SERVER_DIR),
         check=False,
     )
 
@@ -272,9 +272,9 @@ def test_all() -> bool:
     print("  机器狗控制系统 - 自检")
     print("========================================")
 
-    print("测试机器狗管理系统 (Robot Cloud)...")
-    ports = _robot_cloud_backend_ports()
-    cfp = _robot_cloud_frontend_port()
+    print("测试机器狗管理系统 (Cloud Server)...")
+    ports = _cloud_server_backend_ports()
+    cfp = _cloud_server_frontend_port()
     ok = http_ok(f"http://localhost:{ports['http']}/api/v1/health")
     ok &= http_ok(f"http://localhost:{cfp}")
     print("机器狗管理系统通过" if ok else "机器狗管理系统异常")

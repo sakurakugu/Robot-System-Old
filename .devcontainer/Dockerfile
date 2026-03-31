@@ -62,10 +62,10 @@ RUN pip install --upgrade setuptools
 
 # 设置环境变量
 # 将自定义库路径加入 PYTHONPATH，这样在任何地方都能 import SDK
-# 假设 workspace 映射到 /workspaces/robot-dog (VS Code 默认行为)
-ENV PYTHONPATH="${PYTHONPATH}:/workspaces/robot-dog/src/python/lib"
+# 假设 workspace 映射到 /workspaces/robot-system (VS Code 默认行为)
+ENV PYTHONPATH="${PYTHONPATH}:/workspaces/robot-system/src/python/lib"
 # 让 Python 可以自动找到 .so 库文件
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/workspaces/robot-dog/src/python/lib/so/x86_64"
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/workspaces/robot-system/src/python/lib/so/x86_64"
 
 # 默认启动 bash
 CMD ["bash"]

@@ -77,17 +77,17 @@ show_menu() {
 install_project_dependencies() {
     print_info "安装项目依赖..."
 
-    # 安装 robot-cloud Node.js 依赖
-    if [ -f "$ROOT_DIR/app/robot-cloud/后端/package.json" ]; then
+    # 安装 cloud-server Node.js 依赖
+    if [ -f "$ROOT_DIR/app/cloud-server/后端/package.json" ]; then
         print_info "安装对话系统后端依赖..."
-        cd "$ROOT_DIR/app/robot-cloud/后端"
+        cd "$ROOT_DIR/app/cloud-server/后端"
         npm install
         print_success "对话系统后端依赖安装完成"
     fi
 
-    if [ -f "$ROOT_DIR/app/robot-cloud/前端/package.json" ]; then
+    if [ -f "$ROOT_DIR/app/cloud-server/前端/package.json" ]; then
         print_info "安装对话系统前端依赖..."
-        cd "$ROOT_DIR/app/robot-cloud/前端"
+        cd "$ROOT_DIR/app/cloud-server/前端"
         npm install
         print_success "对话系统前端依赖安装完成"
     fi
@@ -107,20 +107,20 @@ install_project_dependencies() {
 update_project_dependencies() {
     print_info "更新项目依赖..."
 
-    # 更新 robot-cloud 后端依赖
-    if [ -f "$ROOT_DIR/app/robot-cloud/后端/package.json" ]; then
+    # 更新 cloud-server 后端依赖
+    if [ -f "$ROOT_DIR/app/cloud-server/后端/package.json" ]; then
         print_info "更新对话系统后端依赖..."
-        cd "$ROOT_DIR/app/robot-cloud/后端"
+        cd "$ROOT_DIR/app/cloud-server/后端"
         npx ncu
         npx ncu -u
         npm install
         print_success "对话系统后端依赖更新完成"
     fi
 
-    # 更新 robot-cloud 前端依赖
-    if [ -f "$ROOT_DIR/app/robot-cloud/前端/package.json" ]; then
+    # 更新 cloud-server 前端依赖
+    if [ -f "$ROOT_DIR/app/cloud-server/前端/package.json" ]; then
         print_info "更新对话系统前端依赖..."
-        cd "$ROOT_DIR/app/robot-cloud/前端"
+        cd "$ROOT_DIR/app/cloud-server/前端"
         npx ncu
         npx ncu -u
         npm install

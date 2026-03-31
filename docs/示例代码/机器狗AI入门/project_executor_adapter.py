@@ -65,7 +65,7 @@ class 项目动作执行适配器:
     def _获取执行器脚本路径(self) -> Path:
         current_file = Path(__file__).resolve()
         repo_root = current_file.parents[3]
-        script_path = repo_root / "app" / "robot-agent" / "robot-agent" / "src" / "modules" / "actions" / "executor.py"
+        script_path = repo_root / "app" / "robot-onboard" / "robot-agent" / "src" / "modules" / "actions" / "executor.py"
         if not script_path.exists():
             raise FileNotFoundError(f"找不到项目动作执行脚本: {script_path}")
         return script_path

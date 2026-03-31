@@ -24,8 +24,9 @@ def 检查环境变量(name: str, required: bool = False) -> bool:
 
 
 def main() -> None:
-    current_dir = Path(__file__).resolve().parent
-    repo_root = current_dir.parents[3]
+    current_file = Path(__file__).resolve()
+    current_dir = current_file.parent
+    repo_root = current_file.parents[3]
 
     打印("示例文件检查")
     检查文件(current_dir / "01_ai_cli.py")
@@ -42,8 +43,8 @@ def main() -> None:
     检查环境变量("DOG_CONFIRM_BEFORE_RUN", required=False)
 
     打印("项目执行链路检查")
-    executor_path = repo_root / "app" / "robot-agent" / "robot-agent" / "src" / "modules" / "actions" / "executor.py"
-    sdk_path = repo_root / "app" / "robot-agent" / "robot-agent" / "src" / "core" / "dog" / "sdk.py"
+    executor_path = repo_root / "app" / "robot-onboard" / "robot-agent" / "src" / "modules" / "actions" / "executor.py"
+    sdk_path = repo_root / "app" / "robot-onboard" / "robot-agent" / "src" / "core" / "dog" / "sdk.py"
     检查文件(executor_path)
     检查文件(sdk_path)
 

@@ -158,8 +158,6 @@ set_permissions() {
 
     PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-    chmod +x "$PROJECT_ROOT/start.sh"
-
     if [ -d "$PROJECT_ROOT/tools/scripts" ]; then
         chmod +x "$PROJECT_ROOT/tools/scripts"/*.sh 2>/dev/null || true
     fi

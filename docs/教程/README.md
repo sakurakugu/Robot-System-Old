@@ -8,21 +8,21 @@
 
 ## 文档列表
 
-1. [1. 教程总规划.md](D:\elric\Code\Repos\robot-system\docs\教程\1. 教程总规划.md)
-2. [2. 第1章 我们要做什么.md](D:\elric\Code\Repos\robot-system\docs\教程\2. 第1章 我们要做什么.md)
-3. [3. 第2章 先用扣子做一个机器狗助手.md](D:\elric\Code\Repos\robot-system\docs\教程\3. 第2章 先用扣子做一个机器狗助手.md)
-4. [4. 第3章 用 Python 写一个 AI 命令行助手.md](D:\elric\Code\Repos\robot-system\docs\教程\4. 第3章 用 Python 写一个 AI 命令行助手.md)
-5. [5. 第4章 用 Python 控制机器狗.md](D:\elric\Code\Repos\robot-system\docs\教程\5. 第4章 用 Python 控制机器狗.md)
-6. [6. 第5章 让 AI 来控制机器狗.md](D:\elric\Code\Repos\robot-system\docs\教程\6. 第5章 让 AI 来控制机器狗.md)
-7. [7. 第6章 做一个自己的小项目.md](D:\elric\Code\Repos\robot-system\docs\教程\7. 第6章 做一个自己的小项目.md)
-8. [8. 教学实施建议.md](D:\elric\Code\Repos\robot-system\docs\教程\8. 教学实施建议.md)
-9. [9. 老师讲课稿.md](D:\elric\Code\Repos\robot-system\docs\教程\9. 老师讲课稿.md)
-10. [10. 第2章课堂版 扣子操作指引.md](D:\elric\Code\Repos\robot-system\docs\教程\10.%20第2章课堂版%20扣子操作指引.md)
-11. [11. 学生练习单.md](D:\elric\Code\Repos\robot-system\docs\教程\11.%20学生练习单.md)
-12. [12. 课堂口令清单.md](D:\elric\Code\Repos\robot-system\docs\教程\12.%20课堂口令清单.md)
-13. [13. 第3章课堂版 Python调用AI操作指引.md](D:\elric\Code\Repos\robot-system\docs\教程\13.%20第3章课堂版%20Python调用AI操作指引.md)
-14. [14. 第4章课堂版 控制机器狗操作指引.md](D:\elric\Code\Repos\robot-system\docs\教程\14.%20第4章课堂版%20控制机器狗操作指引.md)
-15. [15. 第5章课堂版 AI控制机器狗操作指引.md](D:\elric\Code\Repos\robot-system\docs\教程\15.%20第5章课堂版%20AI控制机器狗操作指引.md)
+1. [1. 教程总规划.md](./1. 教程总规划.md)
+2. [2. 第1章 我们要做什么.md](./2. 第1章 我们要做什么.md)
+3. [3. 第2章 先用扣子做一个机器狗助手.md](./3. 第2章 先用扣子做一个机器狗助手.md)
+4. [4. 第3章 用 Python 写一个 AI 命令行助手.md](./4. 第3章 用 Python 写一个 AI 命令行助手.md)
+5. [5. 第4章 用 Python 控制机器狗.md](./5. 第4章 用 Python 控制机器狗.md)
+6. [6. 第5章 让 AI 来控制机器狗.md](./6. 第5章 让 AI 来控制机器狗.md)
+7. [7. 第6章 做一个自己的小项目.md](./7. 第6章 做一个自己的小项目.md)
+8. [8. 教学实施建议.md](./8. 教学实施建议.md)
+9. [9. 老师讲课稿.md](./9. 老师讲课稿.md)
+10. [10. 第2章课堂版 扣子操作指引.md](./10. 第2章课堂版 扣子操作指引.md)
+11. [11. 学生练习单.md](./11. 学生练习单.md)
+12. [12. 课堂口令清单.md](./12. 课堂口令清单.md)
+13. [13. 第3章课堂版 Python调用AI操作指引.md](./13. 第3章课堂版 Python调用AI操作指引.md)
+14. [14. 第4章课堂版 控制机器狗操作指引.md](./14. 第4章课堂版 控制机器狗操作指引.md)
+15. [15. 第5章课堂版 AI控制机器狗操作指引.md](./15. 第5章课堂版 AI控制机器狗操作指引.md)
 
 ## 教程目标
 

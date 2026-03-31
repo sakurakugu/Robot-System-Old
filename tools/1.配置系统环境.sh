@@ -14,6 +14,9 @@ NC='\033[0m' # 无颜色 (No Color)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR=$ROOT_DIR/tools/scripts
+CLOUD_BACKEND_DIR="$ROOT_DIR/repos/robot-cloud/后端"
+CLOUD_FRONTEND_DIR="$ROOT_DIR/repos/robot-cloud/前端"
+PHONE_APP_DIR="$ROOT_DIR/repos/robot-phone"
 
 # 打印带颜色的信息
 print_info() {
@@ -77,27 +80,26 @@ show_menu() {
 install_project_dependencies() {
     print_info "安装项目依赖..."
 
-    # 安装 cloud-server Node.js 依赖
-    if [ -f "$ROOT_DIR/app/cloud-server/后端/package.json" ]; then
+    # 安装 robot-cloud Node.js 依赖
+    if [ -f "$CLOUD_BACKEND_DIR/package.json" ]; then
         print_info "安装对话系统后端依赖..."
-        cd "$ROOT_DIR/app/cloud-server/后端"
+        cd "$CLOUD_BACKEND_DIR"
         npm install
         print_success "对话系统后端依赖安装完成"
     fi
 
-    if [ -f "$ROOT_DIR/app/cloud-server/前端/package.json" ]; then
+    if [ -f "$CLOUD_FRONTEND_DIR/package.json" ]; then
         print_info "安装对话系统前端依赖..."
-        cd "$ROOT_DIR/app/cloud-server/前端"
+        cd "$CLOUD_FRONTEND_DIR"
         npm install
         print_success "对话系统前端依赖安装完成"
     fi
 
-    # 安装 Python 依赖（如果有 requirements.txt）
-    if [ -f "$ROOT_DIR/requirements.txt" ]; then
-        print_info "安装 Python 依赖..."
-        cd "$ROOT_DIR"
-        pip install -r requirements.txt
-        print_success "Python 依赖安装完成"
+    if [ -f "$PHONE_APP_DIR/package.json" ]; then
+        print_info "安装手机端依赖..."
+        cd "$PHONE_APP_DIR"
+        npm install --legacy-peer-deps
+        print_success "手机端依赖安装完成"
     fi
 
     cd "$ROOT_DIR"
@@ -107,24 +109,31 @@ install_project_dependencies() {
 update_project_dependencies() {
     print_info "更新项目依赖..."
 
-    # 更新 cloud-server 后端依赖
-    if [ -f "$ROOT_DIR/app/cloud-server/后端/package.json" ]; then
+    # 更新 robot-cloud 后端依赖
+    if [ -f "$CLOUD_BACKEND_DIR/package.json" ]; then
         print_info "更新对话系统后端依赖..."
-        cd "$ROOT_DIR/app/cloud-server/后端"
+        cd "$CLOUD_BACKEND_DIR"
         npx ncu
         npx ncu -u
         npm install
         print_success "对话系统后端依赖更新完成"
     fi
 
-    # 更新 cloud-server 前端依赖
-    if [ -f "$ROOT_DIR/app/cloud-server/前端/package.json" ]; then
+    # 更新 robot-cloud 前端依赖
+    if [ -f "$CLOUD_FRONTEND_DIR/package.json" ]; then
         print_info "更新对话系统前端依赖..."
-        cd "$ROOT_DIR/app/cloud-server/前端"
+        cd "$CLOUD_FRONTEND_DIR"
         npx ncu
         npx ncu -u
         npm install
         print_success "对话系统前端依赖更新完成"
+    fi
+
+    if [ -f "$PHONE_APP_DIR/package.json" ]; then
+        print_info "同步手机端依赖..."
+        cd "$PHONE_APP_DIR"
+        npm install --legacy-peer-deps
+        print_success "手机端依赖同步完成"
     fi
 
     cd "$ROOT_DIR"
@@ -212,8 +221,9 @@ main() {
     print_success "安装完成！"
     echo ""
     print_info "接下来的步骤："
-    print_info "1. 运行 ./start.sh 启动项目"
-    print_info "2. 查看 docs/2. 连接机器狗.md 了解如何连接机器狗"
+    print_info "1. 进入 repos/robot-cloud 运行 python tools/3.启动服务端.py"
+    print_info "2. 进入 repos/robot-phone 运行 python tools/4.启动手机端.py"
+    print_info "3. 查看 docs/5. 应用程序目录结构.md 了解工作区结构"
     echo ""
 }
 

@@ -234,8 +234,8 @@ configure_python() {
 suggest_virtualenv() {
     echo ""
     print_info "提示: 你可以创建虚拟环境来隔离项目依赖"
-    print_info "命令: pyenv virtualenv $PYTHON_VERSION robot-system-env"
-    print_info "激活: pyenv activate robot-system-env"
+    print_info "命令: pyenv virtualenv $PYTHON_VERSION robot-workspace-env"
+    print_info "激活: pyenv activate robot-workspace-env"
     print_info "退出: pyenv deactivate"
     echo ""
 }

@@ -227,8 +227,9 @@ check_project_deps() {
     PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
     # Node.js项目依赖
-    check_npm_packages "$PROJECT_ROOT/app/cloud-server/后端" "后端 - Cloud Server"
-    check_npm_packages "$PROJECT_ROOT/app/cloud-server/前端" "前端 - Cloud Server"
+    check_npm_packages "$PROJECT_ROOT/repos/robot-cloud/后端" "后端 - robot-cloud"
+    check_npm_packages "$PROJECT_ROOT/repos/robot-cloud/前端" "前端 - robot-cloud"
+    check_npm_packages "$PROJECT_ROOT/repos/robot-phone" "手机端 - robot-phone"
 
     # Python包
     check_python_package "numpy" "NumPy" false
@@ -246,10 +247,11 @@ check_project_files() {
     PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
     SCRIPT_DIR="$PROJECT_ROOT/tools/scripts/setup"
 
-    check_path "$PROJECT_ROOT/app/cloud-server/后端/src/server.ts" "云服务器后端入口文件" true
-    check_path "$PROJECT_ROOT/app/cloud-server/前端/src/app/main.ts" "云服务器前端入口文件" true
-    # check_path "$PROJECT_ROOT/app/robot-control" "机器狗控制目录" true
-    check_path "$PROJECT_ROOT/start.sh" "启动脚本" true
+    check_path "$PROJECT_ROOT/repos/robot-cloud/后端/src/main.ts" "云服务器后端入口文件" true
+    check_path "$PROJECT_ROOT/repos/robot-cloud/前端/src/app/main.ts" "云服务器前端入口文件" true
+    check_path "$PROJECT_ROOT/repos/robot-phone/package.json" "手机端项目" true
+    check_path "$PROJECT_ROOT/repos/robot-onboard/robot-agent/pyproject.toml" "机器狗本体项目" true
+    check_path "$PROJECT_ROOT/tools/1.配置系统环境.sh" "环境安装脚本" true
 
     echo ""
 }
@@ -311,11 +313,11 @@ show_summary() {
             print_warning "环境基本就绪，但有 $WARNINGS 个警告项。"
         fi
         echo ""
-        print_info "可以运行: ./start.sh 启动项目"
+        print_info "可以进入 repos/robot-cloud 或 repos/robot-phone 运行各自工具脚本"
     else
         print_error "有 $FAILED 个必需项未满足，请先安装缺失的依赖。"
         echo ""
-        print_info "运行安装脚本: ./setup.sh"
+        print_info "运行安装脚本: bash tools/1.配置系统环境.sh"
     fi
 
     echo ""

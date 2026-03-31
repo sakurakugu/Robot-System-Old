@@ -113,6 +113,7 @@ export class 机器人服务 {
     const ip = data.ip || null;
     let uuid: string | null = null;
 
+    // TODO: 目前这个改到了 云端，因此无法通过ssh连接机器狗了，需在手机端或其他端实现或者直接删除
     // 如果提供了 IP，尝试 SSH 初始化
     if (ip) {
       const pythonScript = path.resolve(__dirname, '../../core/utils/ssh_helper.py');
@@ -145,14 +146,6 @@ export class 机器人服务 {
 
         const configToml = `# 火花机器人配置文件\n# 生成于 ${formatTimestamp()}\n\nuuid = "${uuid}"\n`;
         await this.写入SSH文件(pythonScript, ip, '/home/firefly/sparkrobot/config/config.toml', configToml);
-      }
-
-      // 复制客户端代码
-      const localClientPath = path.resolve(__dirname, '../../../../../robot-agent/robot-agent');
-      const remoteClientPath = '/home/firefly/sparkrobot/robot-agent/robot-agent';
-      const copyResult = await this.复制到机器人(pythonScript, ip, localClientPath, remoteClientPath);
-      if (!copyResult.success) {
-        throw new Error(`复制客户端代码失败: ${copyResult.error || '未知错误'}`);
       }
 
       logger.info(`机器人 ${ip} 初始化完成，UUID: ${uuid}`);
@@ -325,63 +318,6 @@ export class 机器人服务 {
           }
         } else {
           resolve(false);
-        }
-      });
-    });
-  }
-
-  private async 复制到机器人(pythonScript: string, ip: string, localPath: string, remotePath: string): Promise<{ success: boolean; error?: string }> {
-    return new Promise((resolve) => {
-      const p = spawn(this.pythonCommand, [pythonScript, 'copy', ip, localPath, remotePath]);
-      let stdout = '';
-      let stderr = '';
-      let isResolved = false;
-
-      // 设置 2 分钟超时
-      const timeout = setTimeout(() => {
-        if (!isResolved) {
-          isResolved = true;
-          p.kill();
-          logger.error(`复制超时 (${ip}): ${stderr}`);
-          resolve({ success: false, error: '复制超时（2分钟）' });
-        }
-      }, 120000);
-
-      p.stdout.on('data', (d) => {
-        const data = d.toString();
-        stdout += data;
-        // 实时输出进度日志
-        if (data.includes('[INFO]') || data.includes('[SUCCESS]') || data.includes('[ERROR]')) {
-          logger.debug(data.trim());
-        }
-      });
-
-      p.stderr.on('data', (d) => {
-        stderr += d.toString();
-      });
-
-      p.on('error', (err) => {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeout);
-          resolve({ success: false, error: err.message });
-        }
-      });
-
-      p.on('close', (code) => {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeout);
-          if (code === 0) {
-            try {
-              resolve(JSON.parse(stdout));
-            } catch {
-              resolve({ success: false, error: '解析输出失败' });
-            }
-          } else {
-            logger.error(`复制失败 (${ip}, code=${code}): ${stderr}`);
-            resolve({ success: false, error: stderr || '复制失败' });
-          }
         }
       });
     });

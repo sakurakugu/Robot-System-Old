@@ -1,5 +1,5 @@
 {
-  "name": "robot-system-interaction",
+  "name": "robot-system-backend",
   "version": "1.0.0",
   "description": "机器狗交互管理系统后端服务",
   "main": "dist/main.js",

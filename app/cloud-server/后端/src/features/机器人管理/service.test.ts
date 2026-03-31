@@ -1,15 +1,47 @@
+import { spawn } from 'child_process';
+import { EventEmitter } from 'events';
 import type { 机器人包服务 } from '../机器人包管理/service';
 import type { RobotPackageInfo } from '../机器人包管理/types';
-import type { 机器人命令服务接口 } from '../websocket/robot-command-gateway';
+import type { 机器人命令服务接口 } from '../../infra/websocket/robot-command-gateway';
 import type { RoleRecord } from '../角色管理/types';
 import type { RobotRepository } from './repository';
 import { 机器人服务 } from './service';
 import type { RobotRecord } from './types';
 
+jest.mock('child_process', () => ({
+  spawn: jest.fn(),
+}));
+
 jest.mock('uuid', () => ({
   v7: jest.fn(() => 'robot-1'),
   validate: jest.fn(() => true),
 }));
+
+const spawnMock = jest.mocked(spawn);
+
+function 创建子进程Mock(options: { stdout?: string; stderr?: string; code?: number } = {}) {
+  const { stdout = '', stderr = '', code = 0 } = options;
+  const child = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    kill: jest.Mock;
+  };
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = jest.fn();
+
+  setImmediate(() => {
+    if (stdout) {
+      child.stdout.emit('data', Buffer.from(stdout));
+    }
+    if (stderr) {
+      child.stderr.emit('data', Buffer.from(stderr));
+    }
+    child.emit('close', code);
+  });
+
+  return child;
+}
 
 function 创建机器人仓库Mock(): jest.Mocked<RobotRepository> {
   return {
@@ -112,6 +144,7 @@ function 创建机器人记录(partial: Partial<RobotRecord> = {}): RobotRecord 
 describe('机器人服务', () => {
   afterEach(() => {
     jest.clearAllMocks();
+    spawnMock.mockReset();
   });
 
   it('获取所有机器人 应解析 tags 并附带角色信息', async () => {
@@ -156,6 +189,51 @@ describe('机器人服务', () => {
     );
     expect(result.uuid).toBe('robot-1');
     expect(result.tags).toEqual(['lab']);
+  });
+
+  it('创建机器人 在有 IP 时不应再复制机器人端源码', async () => {
+    spawnMock
+      .mockImplementationOnce(() => 创建子进程Mock({
+        stdout: JSON.stringify({
+          success: true,
+          connected: true,
+        }),
+      }) as unknown as ReturnType<typeof spawn>)
+      .mockImplementationOnce(() => 创建子进程Mock({
+        stdout: JSON.stringify({
+          success: true,
+          output: 'remote-uuid',
+        }),
+      }) as unknown as ReturnType<typeof spawn>);
+
+    const repository = 创建机器人仓库Mock();
+    repository.getRobot.mockImplementation(async (uuid) => {
+      if (uuid !== 'remote-uuid') {
+        return undefined;
+      }
+      return 创建机器人记录({
+        uuid: 'remote-uuid',
+        ip: '192.168.1.20',
+        role_uuid: null,
+      });
+    });
+    repository.getRoleById.mockResolvedValue(undefined);
+
+    const service = new 机器人服务(repository);
+    const result = await service.创建机器人({
+      name: '远程狗',
+      ip: '192.168.1.20',
+    });
+
+    expect(result.uuid).toBe('remote-uuid');
+    expect(repository.upsertRobot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uuid: 'remote-uuid',
+        ip: '192.168.1.20',
+      }),
+    );
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    expect(spawnMock.mock.calls.some(([, args]) => Array.isArray(args) && args[1] === 'copy')).toBe(false);
   });
 
   it('更新机器人 在不存在时应报错', async () => {

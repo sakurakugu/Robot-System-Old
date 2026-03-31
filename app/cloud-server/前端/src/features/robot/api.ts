@@ -1,0 +1,135 @@
+// 机器人模块 - API
+
+import { http } from '@/share/api/http'
+import type {
+    ApiResponse,
+    ConnectionTestResult,
+    CreateRobotDTO,
+    LocalIpResponse,
+    RobotGroupsResponse,
+    RobotListResponse,
+    RobotResponse,
+    RobotVolumeResponse,
+    UpdateRobotDTO
+} from './types'
+
+/**
+ * 获取所有机器人列表
+ */
+export function getRobotList() {
+  return http.get<RobotListResponse>('/api/v1/robots')
+}
+
+/**
+ * 获取机器人分组
+ */
+export function getRobotGroups() {
+  return http.get<RobotGroupsResponse>('/api/v1/robots/groups')
+}
+
+/**
+ * 获取指定机器人信息
+ */
+export function getRobotDetail(uuid: string) {
+  return http.get<RobotResponse>(`/api/v1/robots/${uuid}`)
+}
+
+/**
+ * 创建机器人
+ */
+export function createRobot(data: CreateRobotDTO) {
+  return http.post<RobotResponse>('/api/v1/robots', data)
+}
+
+/**
+ * 更新机器人信息
+ */
+export function updateRobot(uuid: string, data: UpdateRobotDTO) {
+  return http.put<RobotResponse>(`/api/v1/robots/${uuid}`, data)
+}
+
+/**
+ * 获取当前机器人的本地网络出口 IP
+ */
+export function getLocalNetworkIp() {
+  return http.get<LocalIpResponse>('/api/v1/network/local-ip')
+}
+
+/**
+ * 删除机器人
+ */
+export function deleteRobot(uuid: string) {
+  return http.delete<ApiResponse>(`/api/v1/robots/${uuid}`)
+}
+
+/**
+ * 测试机器人连接
+ */
+export function testRobotConnection(uuid: string) {
+  return http.post<ConnectionTestResult>(`/api/v1/robots/${uuid}/test-connection`)
+}
+
+/**
+ * 连接机器人
+ */
+export function connectRobot(uuid: string) {
+  return http.post<RobotResponse>(`/api/v1/robots/${uuid}/connect`)
+}
+
+/**
+ * 更新机器人固件
+ */
+export function updateRobotFirmware(uuid: string) {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/update-firmware`)
+}
+
+/**
+ * 获取日志上传历史
+ */
+export function getLogHistory(uuid: string, limit = 5) {
+  return http.get<ApiResponse>(`/api/v1/robots/${uuid}/logs/history`, {
+    params: { limit },
+  })
+}
+
+/**
+ * 上传日志
+ */
+export function uploadLog(uuid: string, data: { from?: string; to?: string; logType?: string }) {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/logs/upload`, data)
+}
+
+/**
+ * 获取机器人音量
+ */
+export function getRobotVolume(uuid: string) {
+  return http.get<RobotVolumeResponse>(`/api/v1/robots/${uuid}/volume`)
+}
+
+/**
+ * 设置机器人音量
+ */
+export function setRobotVolume(uuid: string, volume: number) {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/volume`, { volume })
+}
+
+/**
+ * 设置机器人静音
+ */
+export function setRobotMute(uuid: string, mute: boolean) {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/volume/mute`, { mute })
+}
+
+/**
+ * 拍照
+ */
+export function capturePhoto(uuid: string) {
+  return http.post<{ success: boolean; data: { image: string; format: string } }>(`/api/v1/robots/${uuid}/camera/capture`)
+}
+
+/**
+ * 写入日志标记
+ */
+export function markRobotLog(uuid: string, message: string = '') {
+  return http.post<ApiResponse>(`/api/v1/robots/${uuid}/logs/mark`, { message })
+}

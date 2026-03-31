@@ -1,5 +1,5 @@
 import type { 可查询数据库 } from '../../infra/db/client';
-import type { ActionLogRecord, ActionStatus, ConversationRecord, 对话类型 } from '../../types';
+import type { ActionLogRecord, ActionStatus, ConversationRecord, 对话类型 } from '../../shared/types';
 
 export type 对话上下文消息 = {
   role: 'user' | 'assistant';

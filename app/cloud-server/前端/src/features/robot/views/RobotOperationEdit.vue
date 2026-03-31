@@ -148,14 +148,14 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import RobotOperation from '@/features/robot/views/RobotOperation.vue'
+import RobotSettings from '@/features/robot/views/RobotSettings.vue'
 import { Check, Close, EditPen } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import RobotOperation from '@/modules/robot/views/RobotOperation.vue'
-import RobotSettings from '@/modules/robot/views/RobotSettings.vue'
 import { useRobotStore } from '../store'
 
 const route = useRoute()

@@ -1,8 +1,8 @@
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import path from 'path';
 import { logger } from '../../infra/logger';
-import { uuidv7 } from '../../infra/utils/helpers';
-import { AudioResponse, TTSOptions } from '../../types';
+import { AudioResponse, TTSOptions } from '../../shared/types';
+import { uuidv7 } from '../../shared/utils/helpers';
 
 type PendingRequest = {
   resolve: (audio: AudioResponse) => void;

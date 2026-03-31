@@ -1,4 +1,4 @@
-import { RateLimiter } from '../../infra/utils/helpers';
+import { RateLimiter } from '../../shared/utils/helpers';
 import { Action, SafetyCheckResult, SafetyRule } from './types';
 
 export class 动作控制器 {

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import winston from 'winston';
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 
 const LEVEL_NAME_CN: Record<string, string> = {
   debug: '调试',

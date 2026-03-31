@@ -28,4 +28,4 @@ RUN mkdir -p /app/data/logs
 
 EXPOSE 9000
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/main.js"]

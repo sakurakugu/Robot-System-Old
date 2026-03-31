@@ -8,9 +8,9 @@ import App from './App.vue'
 import { router } from './layouts/router'
 import './style.css'
 // 导入编舞系统样式
+import '@/features/choreo/styles/index.css'
 import { setupConsole } from '../share/utils/logger'
 import { setupAuthenticatedFetch } from '../share/utils/setupAuthenticatedFetch'
-import './modules/choreo/styles/index.css'
 import { useThemeStore } from './theme/store'
 
 setupConsole()

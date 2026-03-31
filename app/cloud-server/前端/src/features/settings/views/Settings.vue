@@ -112,8 +112,8 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { submitFeedback } from '@/features/settings/api'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { Select, Tools } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'

@@ -277,24 +277,24 @@
 </template>
 
 <script setup lang="ts">
-import JoystickPad from '@/components/JoystickPad.vue'
-import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
+import ChatView from '@/features/conversation/views/ChatView.vue'
+import ActionButton from '@/features/robot/components/ActionButton.vue'
 import { useRobotOperationJoystick } from '@/features/robot/composables/useRobotOperationJoystick'
 import {
-    defaultRobotOperationControlLayout,
-    useRobotOperationLayout,
+  defaultRobotOperationControlLayout,
+  useRobotOperationLayout,
 } from '@/features/robot/composables/useRobotOperationLayout'
-import ChatView from '@/modules/conversation/views/ChatView.vue'
-import ActionButton from '@/modules/robot/components/ActionButton.vue'
+import JoystickPad from '@/share/components/JoystickPad.vue'
+import VoiceRecordButton from '@/share/components/VoiceRecordButton.vue'
 import { useWebSocket } from '@/share/websocket/useWebSocket'
 import {
-    Back,
-    Camera,
-    Cellphone,
-    ChatLineSquare,
-    Setting,
-    SwitchButton,
-    VideoCamera
+  Back,
+  Camera,
+  Cellphone,
+  ChatLineSquare,
+  Setting,
+  SwitchButton,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot, Mic, MicOff } from 'lucide-vue-next'

@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import DevTopFab from '@/components/DevTopFab.vue'
+import DevTopFab from '@/share/components/DevTopFab.vue';
 </script>
 
 <style>

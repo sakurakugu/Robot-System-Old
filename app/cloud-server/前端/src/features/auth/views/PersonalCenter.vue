@@ -94,8 +94,8 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/features/auth/store'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { formatDate, formatDateTime } from '@/share/utils/date'
 import { HomeFilled, User } from '@element-plus/icons-vue'
 import { computed } from 'vue'

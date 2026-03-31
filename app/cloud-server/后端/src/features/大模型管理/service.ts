@@ -1,4 +1,4 @@
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 import { apiKeyManager } from '../../infra/config/apikey-manager';
 import type { SettingsRepository } from '../设置/repository';
 import {

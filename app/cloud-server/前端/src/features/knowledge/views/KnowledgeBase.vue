@@ -133,8 +133,8 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { createKnowledge, deleteKnowledge, listKnowledge, updateKnowledge, type KnowledgeItem } from '@/features/knowledge/api'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { Collection, Document, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, reactive, ref } from 'vue'

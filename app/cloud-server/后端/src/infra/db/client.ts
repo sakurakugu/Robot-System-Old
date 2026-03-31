@@ -1,5 +1,5 @@
 import { Pool, types, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 
 types.setTypeParser(20, (value) => Number(value));
 types.setTypeParser(21, (value) => Number(value));

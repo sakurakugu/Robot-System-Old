@@ -6,7 +6,7 @@ export const robotRoutes: RouteRecordRaw[] = [
   {
     path: '/robots',
     name: 'RobotList',
-    component: () => import('@/modules/robot/views/RobotManage.vue'),
+    component: () => import('@/features/robot/views/RobotManage.vue'),
     meta: {
       title: '机器人管理',
       icon: 'Robot',
@@ -15,7 +15,7 @@ export const robotRoutes: RouteRecordRaw[] = [
   {
     path: '/robots/add',
     name: 'RobotAdd',
-    component: () => import('@/modules/robot/views/RobotAdd.vue'),
+    component: () => import('@/features/robot/views/RobotAdd.vue'),
     meta: {
       title: '新增机器人',
       hidden: true,
@@ -24,7 +24,7 @@ export const robotRoutes: RouteRecordRaw[] = [
   {
     path: '/robots/:uuid',
     name: 'RobotDetail',
-    component: () => import('@/modules/robot/views/RobotSettings.vue'),
+    component: () => import('@/features/robot/views/RobotSettings.vue'),
     meta: {
       title: '机器人详情',
       hidden: true,
@@ -33,7 +33,7 @@ export const robotRoutes: RouteRecordRaw[] = [
   {
     path: '/robots/:uuid/settings',
     name: 'RobotSettings',
-    component: () => import('@/modules/robot/views/RobotSettings.vue'),
+    component: () => import('@/features/robot/views/RobotSettings.vue'),
     meta: {
       title: '机器人设置',
       hidden: true,
@@ -42,7 +42,7 @@ export const robotRoutes: RouteRecordRaw[] = [
   {
     path: '/operation',
     name: 'Operation',
-    component: () => import('@/modules/robot/views/RobotOperation.vue'),
+    component: () => import('@/features/robot/views/RobotOperation.vue'),
     meta: {
       title: '机器人操作',
       icon: 'Operation',
@@ -51,7 +51,7 @@ export const robotRoutes: RouteRecordRaw[] = [
   {
     path: '/operation/edit',
     name: 'OperationEdit',
-    component: () => import('@/modules/robot/views/RobotOperationEdit.vue'),
+    component: () => import('@/features/robot/views/RobotOperationEdit.vue'),
     meta: {
       title: '机器人操作编辑',
       hidden: true,

@@ -470,13 +470,13 @@ import { choreoApi } from '../api'
 import RobotPreview from '../components/RobotPreview.vue'
 import { HistoryPanel, TimelineEditor } from '../components/timeline'
 import type {
-    ChoreoProject,
-    ChoreoRobot,
-    ChoreoWSMessage,
-    ExecutionStatus,
-    HistoryRecord,
-    Robot,
-    TimelineConfig,
+  ChoreoProject,
+  ChoreoRobot,
+  ChoreoWSMessage,
+  ExecutionStatus,
+  HistoryRecord,
+  Robot,
+  TimelineConfig,
 } from '../types'
 import ActionList from './ActionList.vue'
 

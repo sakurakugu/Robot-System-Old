@@ -185,29 +185,29 @@
 </template>
 
 <script setup lang="ts">
-import VoiceRecordButton from '@/components/VoiceRecordButton.vue'
 import { getConversationHistory, sendCommand } from '@/features/conversation/api'
 import {
-    buildTargetBoxStyle,
-    buildVisionImageUrl,
-    formatMessageTime as formatTime,
-    normalizeConversationHistory,
-    parseActionFormat,
-    type ChatMessage,
-    type VisionStatus,
+  buildTargetBoxStyle,
+  buildVisionImageUrl,
+  formatMessageTime as formatTime,
+  normalizeConversationHistory,
+  parseActionFormat,
+  type ChatMessage,
+  type VisionStatus,
 } from '@/features/conversation/chat'
 import { useChatAudio } from '@/features/conversation/composables/useChatAudio'
+import VoiceRecordButton from '@/share/components/VoiceRecordButton.vue'
 import { useWebSocket } from '@/share/websocket/useWebSocket'
 import {
-    ChatDotSquare,
-    Clock,
-    Lightning,
-    Loading,
-    Microphone,
-    Promotion,
-    Select,
-    User,
-    WarningFilled,
+  ChatDotSquare,
+  Clock,
+  Lightning,
+  Loading,
+  Microphone,
+  Promotion,
+  Select,
+  User,
+  WarningFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'

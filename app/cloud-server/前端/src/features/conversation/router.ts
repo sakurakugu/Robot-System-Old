@@ -6,7 +6,7 @@ export const conversationRoutes: RouteRecordRaw[] = [
   {
     path: '/chat',
     name: 'Chat',
-    component: () => import('@/modules/conversation/views/ChatView.vue'),
+    component: () => import('@/features/conversation/views/ChatView.vue'),
     meta: {
       title: '对话',
       icon: 'ChatDotRound',
@@ -15,7 +15,7 @@ export const conversationRoutes: RouteRecordRaw[] = [
   {
     path: '/chat/:uuid',
     name: 'ChatWithRobot',
-    component: () => import('@/modules/conversation/views/ChatView.vue'),
+    component: () => import('@/features/conversation/views/ChatView.vue'),
     meta: {
       title: '对话',
       hidden: true,

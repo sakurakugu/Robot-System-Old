@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 import { 处理控制器, 返回数据 } from '../../shared/http/controller';
 import type { 设置服务 } from './service';
 

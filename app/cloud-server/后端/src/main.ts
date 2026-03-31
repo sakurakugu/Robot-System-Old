@@ -2,7 +2,7 @@ import { spawn } from "child_process";
 import { createServer } from "http";
 import path from "path";
 import { 应用程序 } from "./app/app";
-import 配置 from "./config";
+import 配置 from "./infra/config";
 import { logger } from "./infra/logger";
 
 function 执行子进程(command: string, args: string[], cwd: string): Promise<void> {

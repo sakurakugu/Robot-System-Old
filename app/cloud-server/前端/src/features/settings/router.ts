@@ -6,7 +6,7 @@ export const systemRoutes: RouteRecordRaw[] = [
   {
     path: '/update-manage',
     name: 'UpdateManage',
-    component: () => import('@/modules/settings/views/UpdateManage.vue'),
+    component: () => import('@/features/settings/views/UpdateManage.vue'),
     meta: {
       title: '更新管理',
       icon: 'UploadFilled',
@@ -16,7 +16,7 @@ export const systemRoutes: RouteRecordRaw[] = [
   {
     path: '/params',
     name: 'Params',
-    component: () => import('@/modules/settings/views/ParamsManage.vue'),
+    component: () => import('@/features/settings/views/ParamsManage.vue'),
     meta: {
       title: '参数管理',
       icon: 'Setting',
@@ -26,7 +26,7 @@ export const systemRoutes: RouteRecordRaw[] = [
   {
     path: '/feedback-manage',
     name: 'FeedbackManage',
-    component: () => import('@/modules/settings/views/FeedbackManage.vue'),
+    component: () => import('@/features/settings/views/FeedbackManage.vue'),
     meta: {
       title: '反馈管理',
       icon: 'ChatDotRound',
@@ -36,7 +36,7 @@ export const systemRoutes: RouteRecordRaw[] = [
   {
     path: '/settings',
     name: 'Settings',
-    component: () => import('@/modules/settings/views/Settings.vue'),
+    component: () => import('@/features/settings/views/Settings.vue'),
     meta: {
       title: '系统设置',
       icon: 'Tools',

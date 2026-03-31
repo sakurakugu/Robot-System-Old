@@ -1,8 +1,8 @@
 import type { Request, RequestHandler, Response } from 'express';
 import { Router } from 'express';
 import os from 'os';
-import { formatTimestamp } from '../../infra/utils/datetime';
 import { 发送Http错误 } from '../../shared/http/controller';
+import { formatTimestamp } from '../../shared/utils/datetime';
 
 export interface 系统路由依赖 {
   获取在线机器人数量(): number;

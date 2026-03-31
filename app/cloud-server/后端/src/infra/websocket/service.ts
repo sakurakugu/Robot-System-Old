@@ -1,7 +1,7 @@
 import { Server } from 'http';
 import 语音识别服务 from '../../features/大模型交互/asr-service';
 import TTSService from '../../features/大模型交互/tts-service';
-import type { RobotConnection, ServerMessage } from '../../types';
+import type { RobotConnection, ServerMessage } from '../../shared/types';
 import { 音频路由网关 } from './audio-route-gateway';
 import { 音频会话管理器 } from './audio-session-manager';
 import { WebSocket连接生命周期管理器 } from './connection-lifecycle-manager';

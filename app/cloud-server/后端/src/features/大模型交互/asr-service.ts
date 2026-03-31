@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import FormData from 'form-data';
 import { v7 as uuidv7 } from 'uuid';
 import WebSocket from 'ws';
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 import { apiKeyManager } from '../../infra/config/apikey-manager';
 import { logger } from '../../infra/logger';
 import type { ASROptions } from './types';

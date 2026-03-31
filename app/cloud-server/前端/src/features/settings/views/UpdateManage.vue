@@ -572,18 +572,18 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import {
-    deleteAppVersion,
-    deleteRobotPackage,
-    getAppVersions,
-    getRobotPackageVersions,
-    rollbackAppVersion,
-    rollbackRobotPackage,
-    uploadAppPackage,
-    uploadRobotPackages,
+  deleteAppVersion,
+  deleteRobotPackage,
+  getAppVersions,
+  getRobotPackageVersions,
+  rollbackAppVersion,
+  rollbackRobotPackage,
+  uploadAppPackage,
+  uploadRobotPackages,
 } from '@/features/settings/api'
 import type { AppVersionInfo, ReleaseChannel, RobotPackageInfo } from '@/features/settings/types'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { formatDateTime } from '@/share/utils/date'
 import { Refresh, UploadFilled } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance, UploadUserFile } from 'element-plus'

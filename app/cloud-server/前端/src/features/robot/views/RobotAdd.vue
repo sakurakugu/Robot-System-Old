@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { isValidIP } from '@/share/utils/validator'
 import { ElMessage } from 'element-plus'
 import { Bot } from 'lucide-vue-next'

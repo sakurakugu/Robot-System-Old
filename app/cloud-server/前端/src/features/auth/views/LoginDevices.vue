@@ -90,9 +90,9 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { getMySessions, revokeSession } from '@/features/auth/api'
 import type { LoginSession } from '@/features/auth/types'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { Monitor, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'

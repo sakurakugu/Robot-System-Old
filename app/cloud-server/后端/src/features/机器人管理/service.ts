@@ -3,12 +3,12 @@ import net from 'net';
 import path from 'path';
 import { v7 as uuidv7, validate as validUUID } from 'uuid';
 import { logger } from '../../infra/logger';
-import { formatTimestamp } from '../../infra/utils/datetime';
 import type {
-    机器人命令服务接口,
-    机器人安装包下载路径,
-    机器人安装包哈希,
+  机器人命令服务接口,
+  机器人安装包下载路径,
+  机器人安装包哈希,
 } from '../../infra/websocket/robot-command-gateway';
+import { formatTimestamp } from '../../shared/utils/datetime';
 import type { 机器人包服务 } from '../机器人包管理/service';
 import type { RobotRepository } from './repository';
 import type { CreateRobotDto, RobotRecord, RobotResponse, UpdateRobotDto, 音频路由配置 } from './types';

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 import { apiKeyManager } from '../../infra/config/apikey-manager';
 import { 默认系统提示词 } from '../../infra/const';
 import { logger } from '../../infra/logger';

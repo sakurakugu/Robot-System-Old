@@ -1,4 +1,4 @@
-import type { ServerMessage } from '../../types';
+import type { ServerMessage } from '../../shared/types';
 import type { ChoreoWSMessage } from './types';
 
 type 编舞消息通道 = 'control' | 'business' | 'audio_upload' | 'audio_download';

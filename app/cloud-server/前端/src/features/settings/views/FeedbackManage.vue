@@ -192,9 +192,9 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { getFeedbackDetail, getFeedbackList, updateFeedbackStatus } from '@/features/settings/api'
 import type { FeedbackItem, FeedbackStatus } from '@/features/settings/types'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { ChatDotRound, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'

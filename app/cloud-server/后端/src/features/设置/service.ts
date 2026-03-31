@@ -1,4 +1,4 @@
-import 配置 from '../../config';
+import 配置 from '../../infra/config';
 import type { SettingsRepository } from './repository';
 import type { AIConfig, UIConfig } from './types';
 

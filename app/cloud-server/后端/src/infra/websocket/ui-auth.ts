@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'http';
-import 配置 from '../../config';
 import type { AccountService } from '../../features/account/service';
+import 配置 from '../../infra/config';
 
 type 可鉴权账号服务 = Pick<AccountService, 'buildUserContext'>;
 

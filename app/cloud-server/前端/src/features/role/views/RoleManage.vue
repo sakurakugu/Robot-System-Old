@@ -93,16 +93,16 @@
           fixed="right"
         >
           <template #default="scope">
-            <el-button 
-              type="primary" 
-              link 
+            <el-button
+              type="primary"
+              link
               @click="editRole(scope.row)"
             >
               编辑
             </el-button>
-            <el-button 
-              type="danger" 
-              link 
+            <el-button
+              type="danger"
+              link
               :disabled="scope.row.is_default === 1"
               @click="deleteRole(scope.row)"
             >
@@ -340,7 +340,7 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -544,7 +544,7 @@ const showRobots = async (role: Role) => {
   currentRole.value = role
   robotsDialogVisible.value = true
   loadingRobots.value = true
-  
+
   try {
     boundRobots.value = await getRoleRobots(role.uuid)
   } catch {

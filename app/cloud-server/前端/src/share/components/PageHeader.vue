@@ -37,6 +37,10 @@ withDefaults(defineProps<Props>(), {
   iconSize: 24,
 })
 
+defineSlots<{
+  extra?: () => unknown
+}>()
+
 const emit = defineEmits<{ back: [] }>()
 </script>
 

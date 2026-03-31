@@ -1,5 +1,5 @@
 import { v7 as uuidv7 } from 'uuid';
-import { logger } from "../logger";
+import { logger } from "../../infra/logger";
 
 export { uuidv7 };
 

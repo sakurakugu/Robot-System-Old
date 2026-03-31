@@ -1,5 +1,6 @@
 // 路由配置
 
+import MainLayout from '@/app/layouts/views/MainLayout.vue'
 import { authLayoutRoutes, authRoutes } from '@/features/auth/router'
 import { useAuthStore } from '@/features/auth/store'
 import { choreoRoutes } from '@/features/choreo/router'
@@ -9,7 +10,6 @@ import { knowledgeBase } from '@/features/knowledge/router'
 import { robotRoutes } from '@/features/robot/router'
 import { roleRoutes } from '@/features/role/router'
 import { systemRoutes } from '@/features/settings/router'
-import MainLayout from '@/modules/layouts/views/MainLayout.vue'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [

@@ -6,7 +6,7 @@ export const roleRoutes: RouteRecordRaw[] = [
   {
     path: '/roles',
     name: 'RoleManage',
-    component: () => import('@/modules/role/views/RoleManage.vue'),
+    component: () => import('@/features/role/views/RoleManage.vue'),
     meta: {
       title: '角色管理',
       icon: 'UserFilled',

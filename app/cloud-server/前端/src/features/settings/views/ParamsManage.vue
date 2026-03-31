@@ -88,28 +88,28 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/features/auth/store'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { Select, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import { getAIConfig, getLLMConfig, updateAIConfig, updateLLMConfig } from '../api'
 import MaskedSecretInput from '../components/MaskedSecretInput.vue'
 import {
-    applyProviderSecretConfig,
-    applyXunfeiAsrSecretConfig,
-    buildLLMUpdatePayload,
-    buildXunfeiUpdatePayload,
-    createProviderSecretConfig,
-    createXunfeiAsrSecretConfig,
-    enableProviderEdit,
-    enableXunfeiFieldEdit,
-    llmProviderKeys,
-    setProviderSecretValue,
-    setXunfeiFieldValue,
-    toggleProviderVisibility,
-    toggleXunfeiFieldVisibility,
-    type XunfeiFieldKey,
+  applyProviderSecretConfig,
+  applyXunfeiAsrSecretConfig,
+  buildLLMUpdatePayload,
+  buildXunfeiUpdatePayload,
+  createProviderSecretConfig,
+  createXunfeiAsrSecretConfig,
+  enableProviderEdit,
+  enableXunfeiFieldEdit,
+  llmProviderKeys,
+  setProviderSecretValue,
+  setXunfeiFieldValue,
+  toggleProviderVisibility,
+  toggleXunfeiFieldVisibility,
+  type XunfeiFieldKey,
 } from '../params'
 import type { LLMProviderKey } from '../types'
 

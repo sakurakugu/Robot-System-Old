@@ -247,7 +247,7 @@ check_project_files() {
     SCRIPT_DIR="$PROJECT_ROOT/tools/scripts/setup"
 
     check_path "$PROJECT_ROOT/app/cloud-server/后端/src/server.ts" "云服务器后端入口文件" true
-    check_path "$PROJECT_ROOT/app/cloud-server/前端/src/main.ts" "云服务器前端入口文件" true
+    check_path "$PROJECT_ROOT/app/cloud-server/前端/src/app/main.ts" "云服务器前端入口文件" true
     # check_path "$PROJECT_ROOT/app/robot-control" "机器狗控制目录" true
     check_path "$PROJECT_ROOT/start.sh" "启动脚本" true
 

@@ -1,5 +1,5 @@
 import { logger } from "../../infra/logger";
-import { parseActions } from "../../infra/utils/helpers";
+import { parseActions } from "../../shared/utils/helpers";
 import ActionController from "../机器人交互/action-controller";
 import LLM服务 from "./llm-service";
 import type { ConversationRepository } from './repository';

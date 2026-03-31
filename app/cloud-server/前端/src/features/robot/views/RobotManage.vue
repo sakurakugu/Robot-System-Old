@@ -287,8 +287,7 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
-import { storeToRefs } from 'pinia'
+import PageHeader from '@/share/components/PageHeader.vue'
 import {
   ChatLineSquare,
   Delete,
@@ -300,6 +299,7 @@ import {
 import type { TagProps } from 'element-plus'
 import { ElMessageBox } from 'element-plus'
 import { Bot } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { updateRobotFirmware } from '../api'

@@ -67,9 +67,9 @@
 </template>
 
 <script setup lang="ts">
-import PageHeader from '@/components/PageHeader.vue'
 import { getUsers, updateUserRole } from '@/features/auth/api'
 import type { AuthUser } from '@/features/auth/types'
+import PageHeader from '@/share/components/PageHeader.vue'
 import { UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'

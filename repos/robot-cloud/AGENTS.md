@@ -2,12 +2,12 @@
 
 云端服务仓库，包含以下子项目：
 
-| 目录 | 技术栈 | 说明 |
-| --- | --- | --- |
-| `前端/` | Vue 3 + TypeScript + Vite | 云端管理前端 |
-| `后端/` | Node.js + TypeScript + Express + WebSocket | 云端后端服务 |
-| `nginx/` | Nginx | 生产反向代理配置 |
-| `tools/` | Python | 本地热更新启动脚本 |
+| 目录     | 技术栈                                     | 说明               |
+| -------- | ------------------------------------------ | ------------------ |
+| `前端/`  | Vue 3 + TypeScript + Vite                  | 云端管理前端       |
+| `后端/`  | Node.js + TypeScript + Express + WebSocket | 云端后端服务       |
+| `nginx/` | Nginx                                      | 生产反向代理配置   |
+| `tools/` | Python                                     | 本地热更新启动脚本 |
 
 ---
 
